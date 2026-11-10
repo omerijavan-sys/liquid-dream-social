@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Phone, Eye, EyeOff, Shield, ChevronDown, Clock, CheckCircle2, XCircle } from "lucide-react";
@@ -322,12 +321,14 @@ const AuthPage = () => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: postAuthRedirect() });
-      if (result.error) { toast.error("Google sign-in failed"); return; }
-      if (result.redirected) return;
-      navigate(getNextPath());
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: postAuthRedirect() },
+      });
+      if (error) throw error;
+      void logSecurityEvent("auth", "google_oauth_started");
     } catch (err: any) {
-      toast.error(err.message || "Google sign-in failed");
+      toast.error(friendlyError(err.message || "Google sign-in failed"));
     } finally {
       setLoading(false);
     }
