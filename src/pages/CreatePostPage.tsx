@@ -61,6 +61,7 @@ const CreatePostPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [mode, setMode] = useState<Mode>("upload");
+  const [textOnly, setTextOnly] = useState(false);
   const [caption, setCaption] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -407,25 +408,26 @@ const CreatePostPage = () => {
   };
 
   const handlePost = async () => {
-    if (!user || !file) {
-      toast.error("Capture or select something first");
+    if (!user || (!file && !caption.trim())) {
+      toast.error("Add a photo, video, or some text first");
       return;
     }
     setUploading(true);
     try {
-      const finalFile = await bakeImage(file);
-      const ext = finalFile.name.split(".").pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("media").upload(path, finalFile);
-      if (uploadErr) throw uploadErr;
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("media").getPublicUrl(path);
+      let publicUrl: string | null = null;
+      if (file) {
+        const finalFile = await bakeImage(file);
+        const ext = finalFile.name.split(".").pop();
+        const path = `${user.id}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from("media").upload(path, finalFile);
+        if (uploadErr) throw uploadErr;
+        publicUrl = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+      }
       const { error } = await supabase.from("posts").insert({
         user_id: user.id,
         caption: caption || null,
         media_url: publicUrl,
-        media_type: mediaType,
+        media_type: file ? mediaType : "text",
         music_title: track?.title ?? null,
         music_artist: track?.artist ?? null,
         music_art_url: track?.artUrl ?? null,
@@ -460,7 +462,7 @@ const CreatePostPage = () => {
           <span className="text-headline text-foreground text-base flex-1">New Post</span>
           <button
             onClick={handlePost}
-            disabled={uploading || !file}
+            disabled={uploading || (!file && !caption.trim())}
             className="depth-press px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
           >
             {uploading ? "..." : "Share"}
@@ -473,7 +475,7 @@ const CreatePostPage = () => {
             {(["camera", "upload"] as Mode[]).map((m) => (
               <button
                 key={m}
-                onClick={() => setMode(m)}
+                onClick={() => { setTextOnly(false); setMode(m); }}
                 className={`depth-press flex-1 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-2 ${
                   mode === m ? "bg-primary text-primary-foreground" : "liquid-glass text-foreground"
                 }`}
@@ -484,6 +486,23 @@ const CreatePostPage = () => {
             ))}
           </div>
         )}
+        {!preview && mode === "upload" && (
+          <div className="px-5 pb-3">
+            <button
+              onClick={() => {
+                setTextOnly((current) => !current);
+                setFile(null);
+                setPreview(null);
+              }}
+              aria-pressed={textOnly}
+              className={`depth-press w-full rounded-xl py-2 text-sm font-medium ${
+                textOnly ? "bg-primary text-primary-foreground" : "liquid-glass text-foreground"
+              }`}
+            >
+              {textOnly ? "Text-only post selected" : "Create a text-only post"}
+            </button>
+          </div>
+        )}
       </div>
 
       <canvas ref={canvasRef} className="hidden" />
@@ -491,8 +510,9 @@ const CreatePostPage = () => {
 
       <div className="p-5 space-y-4">
         {/* PREVIEW MODE */}
-        {preview ? (
+        {preview || textOnly ? (
           <>
+            {preview && <>
             <div
               ref={previewRef}
               className="relative liquid-glass rounded-2xl overflow-hidden aspect-square"
@@ -602,12 +622,13 @@ const CreatePostPage = () => {
                 </AnimatePresence>
               </div>
             )}
+            </>}
 
             <div className="liquid-glass rounded-2xl p-4 relative z-10">
               <textarea
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
-                placeholder="Write a caption..."
+                placeholder={textOnly ? "Write something to share..." : "Write a caption..."}
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none h-24"
               />
             </div>

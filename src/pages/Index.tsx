@@ -3,17 +3,18 @@ import TopNavBar from "@/components/TopNavBar";
 import GlassTabBar from "@/components/GlassTabBar";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
-import FloatingOrb from "@/components/FloatingOrb";
 import FeedPost from "@/components/FeedPost";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { timeAgo } from "@/utils/timeAgo";
 
 const Index = () => {
   const [posts, setPosts] = useState<any[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
+    let active = true;
     const fetchPosts = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       const [{ data }, { data: follows }] = await Promise.all([
         supabase
           .from("posts")
@@ -26,6 +27,7 @@ const Index = () => {
           : Promise.resolve({ data: [] as any[] }),
       ]);
 
+      if (!active) return;
       if (data && data.length > 0) {
         const followed = new Set((follows || []).map(f => f.following_id));
         // People you follow come first, then everyone else — newest first within each group.
@@ -40,6 +42,7 @@ const Index = () => {
           .select("user_id, display_name, username, avatar_url, is_verified, is_official")
           .in("user_id", userIds);
 
+        if (!active) return;
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
         setPosts(sorted.map(post => ({ ...post, profile: profileMap.get(post.user_id) || null })));
       } else {
@@ -48,8 +51,11 @@ const Index = () => {
     };
     fetchPosts();
     const channel = supabase.channel("home-posts").on("postgres_changes", { event: "*", schema: "public", table: "posts" }, fetchPosts).subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, []);
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -65,8 +71,8 @@ const Index = () => {
               <div className="w-16 h-16 rounded-3xl liquid-glass flex items-center justify-center mb-4">
                 <span className="text-2xl relative z-10">📷</span>
               </div>
-              <p className="text-foreground font-semibold mb-1">Welcome to Primegram</p>
-              <p className="text-sm text-muted-foreground">No posts yet. Follow people or create your first post!</p>
+              <p className="text-foreground font-semibold mb-1">Your feed is ready</p>
+              <p className="text-sm text-muted-foreground">No posts yet. Create your first post to get started.</p>
             </div>
           ) : (
             posts.map((post, i) => (
@@ -83,10 +89,16 @@ const Index = () => {
                 index={i}
                 postId={post.id}
                 authorId={post.user_id}
-                handle={post.profile?.username}
-                bio={post.profile?.bio}
                 isVerified={post.profile?.is_verified}
                 isOfficial={post.profile?.is_official}
+                views={post.views_count || 0}
+                music={post.music_title ? {
+                  title: post.music_title,
+                  artist: post.music_artist,
+                  art_url: post.music_art_url,
+                  stream_url: post.music_url,
+                  youtube_id: post.music_youtube_id,
+                } : null}
               />
             ))
           )}
@@ -94,7 +106,6 @@ const Index = () => {
       </main>
 
       <FloatingActions />
-      <FloatingOrb />
       <GlassTabBar />
     </div>
   );

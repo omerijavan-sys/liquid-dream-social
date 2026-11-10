@@ -263,16 +263,20 @@ const MessagesPage = () => {
                 <button onClick={() => setActiveChat(null)} className="depth-press">
                   <ArrowLeft className="w-5 h-5 text-foreground" />
                 </button>
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold">
+                <button onClick={() => navigate(`/profile/${activeChat.user_id}`)} aria-label={`Open ${activeChat.username || "user"}'s profile`} className="w-8 h-8 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold">
                   {(activeChat.display_name || "U")[0].toUpperCase()}
-                </div>
-                <span className="text-headline text-foreground text-sm flex-1 min-w-0 truncate">
+                </button>
+                <button
+                  onClick={() => navigate(`/profile/${activeChat.user_id}`)}
+                  className="flex-1 min-w-0 truncate text-left text-headline text-foreground text-sm"
+                  aria-label={`Open ${activeChat.username || activeChat.display_name || "user"}'s profile`}
+                >
                   {activeChat.display_name || activeChat.username || "User"}
                   <span className="block text-xs text-muted-foreground">{onlineIds.includes(activeChat.user_id) ? "Online" : "Offline"}</span>
                   {aiModeChats.has(activeChat.user_id) && (
                     <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">AI ON</span>
                   )}
-                </span>
+                </button>
                 <button
                   onClick={() => toggleAiMode(activeChat.user_id)}
                   title="AI Mode — chats on your behalf, learns your style"
@@ -358,24 +362,27 @@ const MessagesPage = () => {
           </div>
         )}
         {displayList.map((conv, i) => (
-          <motion.button
+          <motion.div
             key={conv.user_id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            onClick={() => setActiveChat(conv)}
-            className="depth-press liquid-glass rounded-2xl p-4 flex items-center gap-3 w-full text-left relative z-10"
+            className="liquid-glass rounded-2xl p-4 flex items-center gap-3 w-full relative z-10"
           >
-            <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
+            <button onClick={() => navigate(`/profile/${conv.user_id}`)} aria-label={`Open ${conv.username || "user"}'s profile`} className="w-12 h-12 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
               {(conv.display_name || conv.username || "U")[0].toUpperCase()}
-            </div>
+            </button>
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-semibold text-foreground">{conv.display_name || conv.username || "User"}</span>
-              <p className="text-sm text-muted-foreground truncate">{conv.lastMsg || `@${conv.username || "user"}`}</p>
+              <button onClick={() => navigate(`/profile/${conv.user_id}`)} className="text-left text-sm font-semibold text-foreground">
+                {conv.display_name || conv.username || "User"}
+              </button>
+              <button onClick={() => setActiveChat(conv)} className="block w-full text-left text-sm text-muted-foreground truncate">
+                {conv.lastMsg || `@${conv.username || "user"}`}
+              </button>
               {onlineIds.includes(conv.user_id) && <span className="text-xs text-primary">Online</span>}
             </div>
-            {!!conv.unread && <span className="bg-primary text-primary-foreground rounded-full px-2 py-1 text-xs">{conv.unread}</span>}
-          </motion.button>
+            {!!conv.unread && <button onClick={() => setActiveChat(conv)} aria-label={`${conv.unread} unread messages`} className="bg-primary text-primary-foreground rounded-full px-2 py-1 text-xs">{conv.unread}</button>}
+          </motion.div>
         ))}
       </div>
     </div>

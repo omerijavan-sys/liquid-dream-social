@@ -26,6 +26,9 @@ const DiscoverPage = lazy(() => import("./pages/DiscoverPage"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const ExtremePage = lazy(() => import("./pages/ExtremePage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
+const CrushPage = lazy(() => import("./pages/CrushPage"));
+const AdultPage = lazy(() => import("./pages/AdultPage"));
+const PublicProfilePage = lazy(() => import("./pages/PublicProfilePage"));
 import GlobalRealtimeListener from "./components/GlobalRealtimeListener";
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 
@@ -75,11 +78,14 @@ const App = () => (
             <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
             <Route path="/reels" element={<ProtectedRoute><ReelsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/profile/:userId" element={<ProtectedRoute><PublicProfilePage /></ProtectedRoute>} />
             <Route path="/call/:userId" element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
             <Route path="/sports" element={<ProtectedRoute><SportsPage /></ProtectedRoute>} />
             <Route path="/movies" element={<ProtectedRoute><MoviesPage /></ProtectedRoute>} />
             <Route path="/discover" element={<ProtectedRoute><DiscoverPage /></ProtectedRoute>} />
             <Route path="/extreme" element={<ProtectedRoute><ExtremePage /></ProtectedRoute>} />
+            <Route path="/crush" element={<ProtectedRoute><CrushPage /></ProtectedRoute>} />
+            <Route path="/adult" element={<ProtectedRoute><AdultPage /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
             <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />

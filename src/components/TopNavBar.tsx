@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
-import { MessageCircle, Settings, Wallet, UserPlus, Rocket } from "lucide-react";
+import { MessageCircle, Settings, Wallet, Rocket } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import pLogo from "@/assets/p-logo-lux.png";
 
@@ -61,9 +61,6 @@ const TopNavBar = () => {
           className="flex items-center gap-2"
           animate={collapsed ? { opacity: 0, width: 0, overflow: "hidden" } : { opacity: 1, width: "auto" }}
         >
-          <button className={iconBtn} onClick={() => navigate("/discover")} aria-label="Discover people">
-            <UserPlus className="w-4 h-4 text-foreground" strokeWidth={1.5} />
-          </button>
           <button className={iconBtn} onClick={() => navigate("/messages")}>
             <MessageCircle className="w-4 h-4 text-foreground" strokeWidth={1.5} />
           </button>

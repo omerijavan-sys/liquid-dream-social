@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Heart, Loader2, RefreshCw, ScanFace, Sparkles, Upload } from "lucide-react";
+import { Camera, Heart, Loader2, RefreshCw, Sparkles, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -30,42 +30,53 @@ const MatchTab = () => {
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<MatchResult | null>(null);
 
+  useEffect(() => () => {
+    if (photo) URL.revokeObjectURL(photo);
+  }, [photo]);
+
   const analyze = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choose an image file");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Choose an image smaller than 10 MB");
+      return;
+    }
     setPhoto(URL.createObjectURL(file));
     setScanning(true);
     setResult(null);
-    // Stable "vibe fingerprint" from the photo bytes so the same photo always
-    // matches the same way.
-    const buf = new Uint8Array(await file.arrayBuffer());
-    let h = 2166136261;
-    for (const b of buf.subarray(0, 8192)) {
-      h ^= b;
-      h = Math.imul(h, 16777619);
+    try {
+      const [{ data: pool, error }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("user_id,username,display_name,avatar_url")
+          .neq("user_id", user?.id ?? "")
+          .limit(50),
+        new Promise((resolve) => setTimeout(resolve, 1800)),
+      ]);
+      if (error) throw error;
+      const candidates = (pool ?? []).filter((profile) => profile.username);
+      if (!candidates.length) {
+        toast.error("No members to match with yet");
+        return;
+      }
+
+      const candidate = candidates[Math.floor(Math.random() * candidates.length)];
+      const pct = 68 + Math.floor(Math.random() * 30);
+      const score = () => Math.min(99, Math.max(60, pct + Math.floor(Math.random() * 9) - 4));
+      setResult({
+        u: candidate,
+        pct,
+        vibe: score(),
+        energy: score(),
+        aura: score(),
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't find a match");
+    } finally {
+      setScanning(false);
     }
-    const [{ data: pool }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("user_id,username,display_name,avatar_url")
-        .neq("user_id", user?.id ?? "")
-        .limit(50),
-      new Promise((r) => setTimeout(r, 2600)), // let the scan animation breathe
-    ]);
-    setScanning(false);
-    const candidates = (pool ?? []).filter((p) => p.username);
-    if (!candidates.length) {
-      toast.error("No members to match with yet");
-      return;
-    }
-    const u = candidates[Math.abs(h) % candidates.length];
-    const seed = Math.abs(h);
-    const pct = 68 + (seed % 30); // 68–97%
-    setResult({
-      u,
-      pct,
-      vibe: Math.min(99, pct + ((seed >> 3) % 7) - 3),
-      energy: Math.min(99, pct + ((seed >> 5) % 9) - 4),
-      aura: Math.min(99, pct + ((seed >> 7) % 11) - 5),
-    });
   };
 
   const crush = async () => {
@@ -84,10 +95,10 @@ const MatchTab = () => {
     <div className="space-y-4">
       <div className="rounded-2xl border border-primary/30 bg-card/70 backdrop-blur-xl p-4 shadow-[0_0_30px_-12px_hsl(var(--primary)/0.6)]">
         <p className="font-bold flex items-center gap-2 mb-1">
-          <ScanFace className="w-4 h-4 text-primary" /> Vibe & Face Match
+          <Sparkles className="w-4 h-4 text-primary" /> Vibe Match
         </p>
         <p className="text-sm text-muted-foreground mb-3">
-          Upload or snap a photo — Prime AI scans the vibe and finds your best match on Primegram.
+          Photo matching and face recognition are not used. Your photo stays on this device; suggested members and scores are randomized for entertainment only.
         </p>
         <input
           ref={fileRef}
@@ -95,7 +106,11 @@ const MatchTab = () => {
           accept="image/*"
           capture="user"
           className="hidden"
-          onChange={(e) => e.target.files?.[0] && analyze(e.target.files[0])}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.currentTarget.value = "";
+            if (file) void analyze(file);
+          }}
         />
         {!photo && !scanning && (
           <div className="grid grid-cols-2 gap-3">
@@ -133,7 +148,7 @@ const MatchTab = () => {
                   <div className="absolute inset-x-0 bottom-0 p-2 bg-background/70 backdrop-blur-sm text-center">
                     <p className="text-xs font-semibold text-foreground flex items-center justify-center gap-1.5">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                      Analyzing Vibe & Facial Compatibility…
+                      Finding a vibe match…
                     </p>
                   </div>
                 </>
@@ -141,6 +156,15 @@ const MatchTab = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        {photo && !scanning && !result && (
+          <Button
+            variant="secondary"
+            className="mt-3 w-full"
+            onClick={() => setPhoto(null)}
+          >
+            Choose another photo
+          </Button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -154,7 +178,7 @@ const MatchTab = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <p className="font-black tracking-wide text-primary flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4" /> PERFECT MATCH
+                <Sparkles className="w-4 h-4" />                 VIBE MATCH
               </p>
               <button
                 onClick={() => {
@@ -167,17 +191,20 @@ const MatchTab = () => {
               </button>
             </div>
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 rounded-2xl p-0.5 bg-gradient-to-br from-primary to-accent shrink-0">
+              <button onClick={() => navigate(`/profile/${result.u.user_id}`)} aria-label={`Open ${result.u.username}'s profile`} className="w-16 h-16 rounded-2xl p-0.5 bg-gradient-to-br from-primary to-accent shrink-0">
                 <img
                   src={result.u.avatar_url || "/favicon.png"}
                   alt=""
                   className="w-full h-full rounded-2xl object-cover bg-secondary"
                 />
-              </div>
+              </button>
               <div className="flex-1 min-w-0">
-                <p className="text-lg font-bold text-foreground truncate">
+                <button
+                  onClick={() => navigate(`/profile/${result.u.user_id}`)}
+                  className="text-left text-lg font-bold text-foreground truncate"
+                >
                   @{result.u.username}
-                </p>
+                </button>
                 <p className="text-sm text-muted-foreground">{result.u.display_name}</p>
               </div>
               <div className="text-right shrink-0">
@@ -223,7 +250,7 @@ const MatchTab = () => {
               </Button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-3 text-center">
-              AI-powered for fun — compatibility scores are generated for entertainment.
+              For entertainment only. Scores are randomized; your photo stays on this device and is never used for face recognition or sent to the server.
             </p>
           </motion.div>
         )}

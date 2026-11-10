@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import PostMusicPlayer from "@/components/PostMusicPlayer";
 
 interface AdultPost {
   id: string;
@@ -15,6 +16,11 @@ interface AdultPost {
   views_count: number;
   user_id: string;
   creator?: string | null;
+  music_title?: string | null;
+  music_artist?: string | null;
+  music_art_url?: string | null;
+  music_url?: string | null;
+  music_youtube_id?: string | null;
 }
 
 const AdultTab = () => {
@@ -27,21 +33,80 @@ const AdultTab = () => {
   const [open, setOpen] = useState<AdultPost | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const [{ data: prof }, { data: ups }] = await Promise.all([
-        supabase.from("profiles").select("adult_verified_at").eq("user_id", user.id).maybeSingle(),
-        supabase.from("posts").select("*").eq("is_adult", true).order("created_at", { ascending: false }).limit(60),
-      ]);
-      setVerified(!!prof?.adult_verified_at);
-      setPosts(ups ?? []);
-    })();
+    if (!user) {
+      setVerified(false);
+      setPosts([]);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("adult_verified_at")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          toast.error("Couldn't check age verification");
+          setVerified(false);
+          return;
+        }
+        setVerified(!!data?.adult_verified_at);
+      });
+    return () => { cancelled = true; };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !verified) {
+      setPosts([]);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("posts")
+      .select("*")
+      .eq("is_adult", true)
+      .order("created_at", { ascending: false })
+      .limit(60)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          toast.error("Couldn't load the verified feed");
+          return;
+        }
+        setPosts(data ?? []);
+      });
+    return () => { cancelled = true; };
   }, [user, verified]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    supabase.rpc("register_post_view", { _post_id: open.id }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        toast.error("Couldn't record this view");
+        return;
+      }
+      setOpen((current) => current?.id === open.id ? { ...current, views_count: data } : current);
+      setPosts((current) => current.map((post) => post.id === open.id ? { ...post, views_count: data } : post));
+    });
+    return () => { cancelled = true; };
+  }, [open?.id]);
 
   const verify = async () => {
     const { d, m, y } = dob;
-    if (!d || !m || !y || Number(y) < 1900) {
+    if (!d || !m || !y) {
       toast.error("Enter your full date of birth");
+      return;
+    }
+    const parsedDate = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+    if (
+      parsedDate.getUTCFullYear() !== Number(y) ||
+      parsedDate.getUTCMonth() !== Number(m) - 1 ||
+      parsedDate.getUTCDate() !== Number(d)
+    ) {
+      toast.error("Enter a valid date of birth");
       return;
     }
     if (!consent) {
@@ -49,14 +114,25 @@ const AdultTab = () => {
       return;
     }
     setChecking(true);
-    const { data, error } = await supabase.rpc("verify_adult", {
-      _dob: `${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`,
-    });
-    setChecking(false);
-    if (error) return toast.error(error.message);
-    if (!data) return toast.error("That date of birth shows you're under 18");
-    toast.success("Verified — welcome");
-    setVerified(true);
+    try {
+      const { data, error } = await supabase.rpc("verify_adult", {
+        _dob: `${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      if (!data) {
+        toast.error("That date of birth shows you're under 18");
+        return;
+      }
+      toast.success("Verified — welcome");
+      setVerified(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't verify your age");
+    } finally {
+      setChecking(false);
+    }
   };
 
   if (verified === null) {
@@ -70,7 +146,7 @@ const AdultTab = () => {
   if (!verified) {
     const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
     const months = Array.from({ length: 12 }, (_, i) => String(i + 1));
-    const years = Array.from({ length: 70 }, (_, i) => String(new Date().getFullYear() - 12 - i));
+    const years = Array.from({ length: 130 }, (_, i) => String(new Date().getFullYear() - 12 - i));
     const selectCls = "flex-1 rounded-xl bg-secondary/60 border border-input px-2 py-2.5 text-sm text-foreground";
     return (
       <div className="rounded-2xl border border-primary/30 bg-card/70 backdrop-blur-xl p-5 shadow-[0_0_30px_-12px_hsl(var(--primary)/0.6)]">
@@ -146,6 +222,11 @@ const AdultTab = () => {
               ) : (
                 <span className="p-2 block text-xs text-foreground">{p.caption}</span>
               )}
+              {p.music_title && (
+                <span className="absolute right-2 top-2 rounded-full bg-background/80 px-2 py-1 text-[10px] text-foreground backdrop-blur">
+                  ♪ {p.music_title}
+                </span>
+              )}
               <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] text-foreground backdrop-blur-sm">
                 <Eye className="w-2.5 h-2.5" /> {(p.views_count || 0).toLocaleString()}
               </span>
@@ -174,8 +255,22 @@ const AdultTab = () => {
               <img src={open?.media_url || ""} alt="" className="max-w-full max-h-full object-contain" />
             )}
           </div>
+          {open?.music_title && (
+            <PostMusicPlayer music={{
+              title: open.music_title,
+              artist: open.music_artist,
+              art_url: open.music_art_url,
+              stream_url: open.music_url,
+              youtube_id: open.music_youtube_id,
+            }} />
+          )}
           {open?.caption && (
             <p className="p-4 text-sm text-foreground/90 text-center">{open.caption}</p>
+          )}
+          {open && (
+            <p className="flex items-center justify-center gap-1 pb-4 text-xs text-muted-foreground">
+              <Eye className="h-3.5 w-3.5" /> {open.views_count.toLocaleString()} views
+            </p>
           )}
         </DialogContent>
       </Dialog>

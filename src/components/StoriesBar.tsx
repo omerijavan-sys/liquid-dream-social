@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { isVideoMedia } from "@/utils/media";
+import { useNavigate } from "react-router-dom";
 
 interface StoryBubbleProps {
   name: string;
@@ -48,6 +49,7 @@ const StoryBubble = ({ name, imageUrl, initial, gradient, hasNew = true, index, 
 
 interface StoryView {
   id: string;
+  user_id: string;
   image_url: string;
   display_name: string;
   created_at: string;
@@ -56,6 +58,7 @@ interface StoryView {
 
 const StoriesBar = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stories, setStories] = useState<StoryView[]>([]);
   const [viewingStory, setViewingStory] = useState<StoryView | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -91,6 +94,7 @@ const StoriesBar = () => {
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
         setStories(data.map(s => ({
           id: s.id,
+          user_id: s.user_id,
           image_url: s.media_url || "",
           display_name: profileMap.get(s.user_id)?.display_name || "User",
           created_at: s.created_at,
@@ -144,7 +148,7 @@ const StoriesBar = () => {
       const { data: post, error } = await supabase.from("posts").insert({ user_id: user.id, media_url: publicUrl, media_type: "story", caption: "Story" }).select("id").single();
       if (error) throw error;
       toast.success("Story posted!");
-      setStories(prev => [{ id: post.id, image_url: publicUrl, display_name: user.user_metadata?.full_name || "You", created_at: new Date().toISOString() }, ...prev]);
+      setStories(prev => [{ id: post.id, user_id: user.id, image_url: publicUrl, display_name: user.user_metadata?.full_name || "You", created_at: new Date().toISOString() }, ...prev]);
     } catch (err: any) {
       toast.error(err.message || "Failed");
     } finally {
@@ -175,10 +179,19 @@ const StoriesBar = () => {
               </div>
               <div className="flex items-center justify-between mt-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-foreground text-sm font-bold">
+                  <button
+                    onClick={() => navigate(viewingStory.user_id === user?.id ? "/profile" : `/profile/${viewingStory.user_id}`)}
+                    aria-label={`Open ${viewingStory.display_name}'s profile`}
+                    className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-foreground text-sm font-bold"
+                  >
                     {viewingStory.display_name[0]}
-                  </div>
-                  <span className="text-foreground text-sm font-medium truncate">{viewingStory.display_name}</span>
+                  </button>
+                  <button
+                    onClick={() => navigate(viewingStory.user_id === user?.id ? "/profile" : `/profile/${viewingStory.user_id}`)}
+                    className="text-foreground text-sm font-medium truncate"
+                  >
+                    {viewingStory.display_name}
+                  </button>
                   <span className="text-muted-foreground text-xs">{new Date(viewingStory.created_at).toLocaleTimeString()}</span>
                 </div>
                 <Button variant="secondary" size="icon" aria-label="Close story" onClick={() => setViewingStory(null)} className="w-8 h-8 rounded-full"><X /></Button>

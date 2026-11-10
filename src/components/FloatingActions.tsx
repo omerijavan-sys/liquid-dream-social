@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Layers, Music, Trophy, Gamepad2, Film, X, Video } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { MessageCircle, Plus, Search, Sparkles, Layers, Music, Trophy, Gamepad2, Film, X, Video, Eye, EyeOff } from "lucide-react";
 import OnlineCalls from "./OnlineCalls";
 import { useNavigate } from "react-router-dom";
 import PrimeMusicHub from "./PrimeMusicHub";
@@ -73,41 +72,92 @@ const FloatingActions = () => {
   const [callsOpen, setCallsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [hidden, setHidden] = useState(() => localStorage.getItem("primegram:floatingActionsHidden") === "true");
   const [PrimeAI, setPrimeAI] = useState<React.ComponentType<any> | null>(null);
+  const navigate = useNavigate();
 
-  const openAI = async () => {
+  const openAI = useCallback(async () => {
     if (!PrimeAI) {
       const mod = await import("./PrimeAIChat");
       setPrimeAI(() => mod.default);
     }
     setAiOpen(true);
+    setMenuOpen(false);
     setHubOpen(false);
-  };
+  }, [PrimeAI]);
+
+  useEffect(() => {
+    const handleOpenAssistant = () => { void openAI(); };
+    window.addEventListener("prime:openOrb", handleOpenAssistant);
+    return () => window.removeEventListener("prime:openOrb", handleOpenAssistant);
+  }, [openAI]);
+
+  const actions = [
+    { label: "Create post", icon: Plus, run: () => navigate("/create") },
+    { label: "Open chat", icon: MessageCircle, run: () => navigate("/messages") },
+    { label: "Quick search", icon: Search, run: () => navigate("/search") },
+    { label: "AI assistant", icon: Sparkles, run: () => { void openAI(); } },
+    { label: "Online calls", icon: Video, run: () => { setCallsOpen(true); setMenuOpen(false); } },
+    { label: "Prime Hub", icon: Layers, run: () => { setHubOpen(true); setMenuOpen(false); } },
+    { label: "Hide floating actions", icon: EyeOff, run: () => {
+      localStorage.setItem("primegram:floatingActionsHidden", "true");
+      setHidden(true);
+      setMenuOpen(false);
+    } },
+  ];
 
   return (
     <>
-      <div className="fixed right-4 bottom-24 z-[55] flex flex-col gap-3">
-        <Button variant="outline" size="icon" aria-label="1-on-1 online calls" title="1-on-1 online calls" onClick={() => setCallsOpen(true)} className="depth-press w-12 h-12 rounded-xl liquid-glass-elevated relative">
-          <Video className="text-primary" /><span className="absolute -top-1 -right-1 rounded-full bg-primary text-primary-foreground w-5 h-5 text-xs flex items-center justify-center">1</span>
-        </Button>
+      {hidden ? (
+        <button
+          type="button"
+          aria-label="Show floating actions"
+          title="Show floating actions"
+          onClick={() => {
+            localStorage.setItem("primegram:floatingActionsHidden", "false");
+            setHidden(false);
+          }}
+          className="fixed bottom-24 right-4 z-[55] flex h-11 w-11 items-center justify-center rounded-full liquid-glass-elevated text-foreground shadow-lg"
+        >
+          <Eye className="h-5 w-5" />
+        </button>
+      ) : (
+      <div className="fixed bottom-24 right-4 z-[55] flex flex-col items-end gap-3">
+        <AnimatePresence>
+          {menuOpen && actions.map((action, index) => (
+            <motion.button
+              key={action.label}
+              initial={{ opacity: 0, y: 12, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 420, damping: 30, delay: index * 0.025 }}
+              onClick={action.run}
+              className="depth-press flex items-center gap-3 rounded-2xl liquid-glass-elevated px-4 py-3 text-sm font-medium text-foreground shadow-lg"
+            >
+              <action.icon className="h-4 w-4 text-primary" />
+              {action.label}
+            </motion.button>
+          ))}
+        </AnimatePresence>
         <motion.button
+          type="button"
+          aria-label={menuOpen ? "Close quick actions" : "Open quick actions"}
+          aria-expanded={menuOpen}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.92 }}
-          onClick={() => { setHubOpen(!hubOpen); setAiOpen(false); }}
-          className="depth-press w-12 h-12 rounded-2xl liquid-glass-elevated flex items-center justify-center"
+          onClick={() => setMenuOpen((open) => !open)}
+          className="depth-press flex h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg"
+          style={{ boxShadow: "0 4px 24px hsla(280, 80%, 60%, 0.38)" }}
         >
-          <Layers className="w-5 h-5 text-primary relative z-10" />
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.92 }}
-          onClick={openAI}
-          className="depth-press w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg"
-          style={{ boxShadow: "0 4px 20px hsla(210, 100%, 60%, 0.3)" }}
-        >
-          <Sparkles className="w-5 h-5 text-primary-foreground" />
+          <motion.span animate={{ rotate: menuOpen ? 45 : 0 }} className="flex">
+            {menuOpen
+              ? <X className="h-6 w-6 text-primary-foreground" />
+              : <Plus className="h-6 w-6 text-primary-foreground" />}
+          </motion.span>
         </motion.button>
       </div>
+      )}
 
       <PrimeHubPanel open={hubOpen} onClose={() => setHubOpen(false)} />
       <OnlineCalls open={callsOpen} onClose={() => setCallsOpen(false)} />

@@ -223,10 +223,27 @@ const ReelsPage = () => {
               {/* Bottom info */}
               <div className="absolute left-4 right-16 bottom-16 z-10">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-9 h-9 rounded-full bg-primary/30 flex items-center justify-center text-white text-sm font-bold">
-                    {(reel.profile?.display_name || "U")[0]}
-                  </div>
-                  <span className="text-white font-semibold text-sm">{reel.profile?.display_name || "User"}</span>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (reel.profile?.user_id) navigate(`/profile/${reel.profile.user_id}`);
+                    }}
+                    aria-label={`Open ${reel.profile?.display_name || "user"}'s profile`}
+                    className="w-9 h-9 shrink-0 rounded-full bg-primary/30 flex items-center justify-center overflow-hidden text-white text-sm font-bold"
+                  >
+                    {reel.profile?.avatar_url
+                      ? <img src={reel.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      : (reel.profile?.display_name || "U")[0]}
+                  </button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (reel.profile?.user_id) navigate(`/profile/${reel.profile.user_id}`);
+                    }}
+                    className="text-white font-semibold text-sm"
+                  >
+                    {reel.profile?.display_name || "User"}
+                  </button>
                 </div>
                 {reel.caption && <p className="text-white/90 text-sm mb-1">{reel.caption}</p>}
                 {reel.music_title && <p className="text-white/60 text-xs">🎵 {reel.music_title}</p>}
@@ -287,7 +304,13 @@ const ReelsPage = () => {
               {comments.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No comments yet. Be the first!</p>}
               {comments.map(c => (
                 <div key={c.id} className="text-sm">
-                  <span className="font-semibold text-foreground mr-2">{c.profile?.username || c.profile?.display_name || "user"}</span>
+                  <button
+                    onClick={() => c.profile?.user_id && navigate(`/profile/${c.profile.user_id}`)}
+                    disabled={!c.profile?.user_id}
+                    className="font-semibold text-foreground mr-2 disabled:cursor-default"
+                  >
+                    {c.profile?.username || c.profile?.display_name || "user"}
+                  </button>
                   <span className="text-foreground/90">{c.content}</span>
                 </div>
               ))}

@@ -1,7 +1,7 @@
 export const BOOSTS = [
   { id: "starter", name: "Starter Boost", price: 30, views: 300, perk: "pushed into feeds" },
   { id: "explore", name: "Explore Top", price: 100, views: 1500, perk: "top of Explore" },
-  { id: "trending", name: "Trending in Kisumu", price: 300, views: 5000, perk: "Trending in Kisumu banner" },
+  { id: "trending", name: "Trending Boost", price: 300, views: 5000, perk: "Trending banner" },
 ] as const;
 
 export const TIERS = [

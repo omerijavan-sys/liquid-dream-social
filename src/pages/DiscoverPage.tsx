@@ -128,20 +128,26 @@ const DiscoverPage = () => {
                 transition={{ delay: Math.min(i * 0.03, 0.4) }}
                 className="liquid-glass rounded-2xl p-4 flex items-center gap-3 relative z-10"
               >
-                {p.avatar_url ? (
-                  <img src={p.avatar_url} alt={p.username || ""} className="w-12 h-12 rounded-full object-cover" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-semibold">
-                    {(p.display_name || p.username || "U")[0].toUpperCase()}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">
+                <button
+                  onClick={() => navigate(`/profile/${p.user_id}`)}
+                  aria-label={`Open ${p.username || p.display_name || "user"}'s profile`}
+                  className="h-12 w-12 shrink-0 overflow-hidden rounded-full"
+                >
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary to-primary/60 font-semibold text-primary-foreground">
+                      {(p.display_name || p.username || "U")[0].toUpperCase()}
+                    </div>
+                  )}
+                </button>
+                <button onClick={() => navigate(`/profile/${p.user_id}`)} className="flex-1 min-w-0 text-left">
+                  <p className="truncate text-sm font-semibold text-foreground">
                     {p.display_name || p.username || "User"}
                   </p>
-                  {p.username && <p className="text-caption text-muted-foreground truncate">@{p.username}</p>}
-                  {p.bio && <p className="text-caption text-muted-foreground truncate mt-0.5">{p.bio}</p>}
-                </div>
+                  {p.username && <p className="truncate text-caption text-muted-foreground">@{p.username}</p>}
+                  {p.bio && <p className="mt-0.5 truncate text-caption text-muted-foreground">{p.bio}</p>}
+                </button>
                 <button
                   onClick={() => toggleFollow(p.user_id)}
                   className={`depth-press px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${

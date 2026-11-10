@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
-import { Home, Search, PlusSquare, User, Film } from "lucide-react";
+import { Home, Search, PlusSquare, User, Film, Heart, ShieldAlert } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const tabs = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Search, label: "Search", path: "/search" },
+  { icon: Heart, label: "Crush", path: "/crush" },
   { icon: PlusSquare, label: "Create", path: "/create" },
   { icon: Film, label: "Reels", path: "/reels" },
+  { icon: ShieldAlert, label: "18+ verified", path: "/adult" },
   { icon: User, label: "Profile", path: "/profile" },
 ];
 
@@ -31,7 +33,7 @@ const GlassTabBar = () => {
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
     >
       <motion.nav
-        className="liquid-glass-elevated flex items-center gap-1 px-2"
+        className="liquid-glass-elevated flex items-center gap-0.5 px-1"
         animate={collapsed ? {
           borderRadius: "2rem", paddingLeft: "0.75rem", paddingRight: "0.75rem",
           paddingTop: "0.5rem", paddingBottom: "0.5rem",
@@ -41,7 +43,7 @@ const GlassTabBar = () => {
         }}
         layout
         transition={{ type: "spring", stiffness: 500, damping: 35 }}
-        style={{ width: collapsed ? "auto" : "calc(100% - 2rem)", maxWidth: collapsed ? "280px" : "400px" }}
+        style={{ width: collapsed ? "auto" : "calc(100% - 1rem)", maxWidth: collapsed ? "320px" : "460px" }}
       >
         {tabs.map((tab, i) => {
           const Icon = tab.icon;
@@ -50,8 +52,10 @@ const GlassTabBar = () => {
             <motion.button
               key={tab.label}
               onClick={() => navigate(tab.path)}
-              className={`depth-press relative flex items-center justify-center rounded-2xl transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`}
-              animate={collapsed ? { width: 40, height: 40 } : { width: 64, height: 48 }}
+              aria-label={tab.label}
+              title={tab.label}
+              className={`depth-press relative flex min-w-0 flex-1 items-center justify-center rounded-2xl transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`}
+              animate={collapsed ? { width: 40, height: 40, flex: "0 0 40px" } : { width: "auto", height: 48, flex: "1 1 0%" }}
               layout
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
             >

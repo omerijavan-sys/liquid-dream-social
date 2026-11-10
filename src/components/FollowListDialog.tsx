@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { useNavigate } from "react-router-dom";
 
 type Person = { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; is_verified: boolean; is_official: boolean };
 
@@ -22,18 +23,21 @@ export const FollowButton = ({ targetId, following, onChange }: { targetId: stri
   );
 };
 
-export const PersonRow = ({ p, following, onToggle }: { p: Person; following: boolean; onToggle: (v: boolean) => void }) => (
-  <div className="flex items-center gap-3 py-2">
-    <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden flex items-center justify-center text-sm font-bold">
-      {p.avatar_url ? <img src={p.avatar_url} alt="" className="w-full h-full object-cover" /> : (p.username || "U")[0].toUpperCase()}
+export const PersonRow = ({ p, following, onToggle }: { p: Person; following: boolean; onToggle: (v: boolean) => void }) => {
+  const navigate = useNavigate();
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <button onClick={() => navigate(`/profile/${p.user_id}`)} aria-label={`Open ${p.username || "user"}'s profile`} className="w-10 h-10 shrink-0 rounded-full bg-secondary overflow-hidden flex items-center justify-center text-sm font-bold">
+        {p.avatar_url ? <img src={p.avatar_url} alt="" className="w-full h-full object-cover" /> : (p.username || "U")[0].toUpperCase()}
+      </button>
+      <button onClick={() => navigate(`/profile/${p.user_id}`)} className="flex-1 min-w-0 text-left">
+        <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1">{p.username || "user"}<VerifiedBadge isVerified={p.is_verified} isOfficial={p.is_official} /></p>
+        <p className="text-xs text-muted-foreground truncate">{p.display_name}</p>
+      </button>
+      <FollowButton targetId={p.user_id} following={following} onChange={onToggle} />
     </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1">{p.username || "user"}<VerifiedBadge isVerified={p.is_verified} isOfficial={p.is_official} /></p>
-      <p className="text-xs text-muted-foreground truncate">{p.display_name}</p>
-    </div>
-    <FollowButton targetId={p.user_id} following={following} onChange={onToggle} />
-  </div>
-);
+  );
+};
 
 const FollowListDialog = ({ open, onOpenChange, mode, userId, myFollowing, setMyFollowing }: {
   open: boolean; onOpenChange: (v: boolean) => void; mode: "followers" | "following"; userId: string;

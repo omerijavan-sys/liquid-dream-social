@@ -107,13 +107,13 @@ const SearchPage = () => {
               transition={{ delay: i * 0.03 }}
               className="liquid-glass rounded-2xl p-4 flex items-center gap-3 relative z-10"
             >
-              <div className="w-11 h-11 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                {(profile.display_name || "U")[0].toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
+              <button onClick={() => navigate(`/profile/${profile.user_id}`)} aria-label={`Open ${profile.username || "user"}'s profile`} className="w-11 h-11 shrink-0 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden text-primary font-semibold">
+                {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : (profile.display_name || "U")[0].toUpperCase()}
+              </button>
+              <button onClick={() => navigate(`/profile/${profile.user_id}`)} className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-semibold text-foreground truncate">{profile.display_name || "User"}</p>
                 <p className="text-caption text-muted-foreground">@{profile.username || "user"}</p>
-              </div>
+              </button>
               <button
                 onClick={() => toggleFollow(profile.user_id)}
                 className={`depth-press px-4 py-2 rounded-xl text-xs font-semibold ${following.has(profile.user_id) ? "liquid-glass-subtle text-foreground" : "bg-primary text-primary-foreground"}`}

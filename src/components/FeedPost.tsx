@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, MessageCircle, Send, Bookmark, Play, Pause, Loader2, Volume2, VolumeX, MoreHorizontal, Link2, Flag, EyeOff, UserMinus, User, X, Maximize2 } from "lucide-react";
+import { Heart, MessageCircle, Send, Bookmark, Play, Pause, Loader2, Volume2, VolumeX, MoreHorizontal, Link2, Flag, EyeOff, UserMinus, User, X, Maximize2, Eye, Rocket } from "lucide-react";
 import { useMute } from "@/contexts/MuteContext";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import CommentsSection from "@/components/CommentsSection";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { FollowButton } from "@/components/FollowListDialog";
+import PostMusicPlayer from "@/components/PostMusicPlayer";
+import type { PostMusic } from "@/components/PostMusicPlayer";
 
 interface FeedPostProps {
   image: string;
@@ -28,6 +29,8 @@ interface FeedPostProps {
   authorId?: string;
   handle?: string | null;
   bio?: string | null;
+  music?: PostMusic | null;
+  views?: number;
 }
 
 const SAVED_KEY = "primegram:savedPosts";
@@ -42,7 +45,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
     <div className={`${size} rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold`}>{avatar}</div>
   );
 
-const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, handle, bio }: FeedPostProps) => {
+const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, music, views = 0 }: FeedPostProps) => {
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
   const [me, setMe] = useState<string | null>(null);
@@ -60,9 +63,8 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
   const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(comments);
   const [fullPost, setFullPost] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
   const [following, setFollowing] = useState(false);
-  const [stats, setStats] = useState({ followers: 0, following: 0, posts: 0 });
+  const [viewCount, setViewCount] = useState(views);
 
   const isVideo = mediaType === "video";
   const postLink = postId ? `${window.location.origin}/?post=${postId}` : window.location.origin;
@@ -88,17 +90,21 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
     return () => { cancelled = true; };
   }, [postId, authorId]);
 
+  useEffect(() => setViewCount(views), [views]);
+
   useEffect(() => {
-    if (!profileOpen || !authorId) return;
-    (async () => {
-      const [a, b, c] = await Promise.all([
-        supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", authorId),
-        supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", authorId),
-        supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", authorId),
-      ]);
-      setStats({ followers: a.count ?? 0, following: b.count ?? 0, posts: c.count ?? 0 });
-    })();
-  }, [profileOpen, authorId, following]);
+    if (!fullPost || !postId) return;
+    let cancelled = false;
+    supabase.rpc("register_post_view", { _post_id: postId }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        toast.error("Couldn't record this view");
+        return;
+      }
+      setViewCount(data);
+    });
+    return () => { cancelled = true; };
+  }, [fullPost, postId]);
 
   const setLike = async (next: boolean) => {
     if (!postId) return;
@@ -197,7 +203,7 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
 
   if (hidden) return null;
 
-  const openProfile = () => authorId && setProfileOpen(true);
+  const openProfile = () => authorId && navigate(`/profile/${authorId}`);
 
   return (
     <motion.div
@@ -239,7 +245,11 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
         </div>
 
         <div className="relative bg-background/40 flex items-center justify-center" onClick={handleTap}>
-          {isVideo ? (
+          {mediaType === "text" || !image ? (
+            <div className="w-full min-h-40 px-6 py-10 flex items-center justify-center">
+              <p className="max-w-prose whitespace-pre-wrap text-center text-lg text-foreground">{caption}</p>
+            </div>
+          ) : isVideo ? (
             <div className="relative w-full">
               <video
                 ref={videoRef}
@@ -299,7 +309,23 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
               </motion.div>
             )}
           </AnimatePresence>
+          {postId && authorId === me && (isVideo || (mediaType === "image" && image)) && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(`/extreme?tab=boost&post=${encodeURIComponent(postId)}`);
+              }}
+              aria-label="Boost this post"
+              title="Boost this post"
+              className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-background/80 text-primary shadow-lg backdrop-blur-md"
+            >
+              <Rocket className="h-4 w-4" />
+            </button>
+          )}
         </div>
+
+        {music?.title && <PostMusicPlayer music={music} />}
 
         <div className="p-4 relative z-10">
           <div className="flex items-center gap-4 mb-3">
@@ -326,7 +352,12 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
             <button onClick={() => setShowComments(true)} className="text-sm text-muted-foreground mt-1">View all {commentCount} comments</button>
           )}
           {showComments && postId && <CommentsSection postId={postId} onCountChange={setCommentCount} />}
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-2">{timeAgo}</p>
+          <p className="mt-2 flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <span>{timeAgo}</span>
+            <span aria-label={`${viewCount.toLocaleString()} views`} className="flex items-center gap-1">
+              <Eye className="h-3 w-3" /> {viewCount.toLocaleString()}
+            </span>
+          </p>
         </div>
       </div>
 
@@ -335,18 +366,21 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
         <DialogContent className="max-w-none w-screen h-dvh p-0 border-0 rounded-none bg-background/95 flex flex-col [&>button]:hidden">
           <DialogTitle className="sr-only">Post by {username}</DialogTitle>
           <div className="flex items-center gap-3 p-4">
-            <button onClick={() => { setFullPost(false); openProfile(); }}><Avatar avatar={avatar} username={username} /></button>
+          <button onClick={() => { setFullPost(false); openProfile(); }} aria-label={`Open ${username}'s profile`}><Avatar avatar={avatar} username={username} /></button>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground flex items-center gap-1">{username}<VerifiedBadge isVerified={isVerified} isOfficial={isOfficial} /></p>
+            <button onClick={() => { setFullPost(false); openProfile(); }} className="text-left text-sm font-semibold text-foreground flex items-center gap-1">{username}<VerifiedBadge isVerified={isVerified} isOfficial={isOfficial} /></button>
               <p className="text-caption text-muted-foreground">{timeAgo}</p>
             </div>
             <button onClick={() => setFullPost(false)} aria-label="Close" className="depth-press w-9 h-9 rounded-full liquid-glass flex items-center justify-center"><X className="w-5 h-5 text-foreground" /></button>
           </div>
           <div className="flex-1 min-h-0 flex items-center justify-center">
-            {isVideo
-              ? <video src={image} controls autoPlay playsInline muted={muted} className="max-w-full max-h-full object-contain" />
-              : <img src={image} alt={`Post by ${username}`} className="max-w-full max-h-full object-contain" />}
+            {mediaType === "text" || !image
+              ? <p className="max-w-2xl whitespace-pre-wrap p-8 text-center text-lg text-foreground">{caption}</p>
+              : isVideo
+                ? <video src={image} controls autoPlay playsInline muted={muted} className="max-w-full max-h-full object-contain" />
+                : <img src={image} alt={`Post by ${username}`} className="max-w-full max-h-full object-contain" />}
           </div>
+          {music?.title && <PostMusicPlayer music={music} />}
           <div className="p-4 space-y-2 max-h-[40vh] overflow-y-auto">
             <div className="flex items-center gap-4">
               <button onClick={() => setLike(!liked)} aria-label="Like"><Heart className={`w-6 h-6 ${liked ? "fill-like text-like" : "text-foreground"}`} /></button>
@@ -355,39 +389,9 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
               <button onClick={toggleSave} aria-label="Save"><Bookmark className={`w-6 h-6 ${saved ? "fill-foreground" : ""} text-foreground`} /></button>
             </div>
             <p className="text-sm font-semibold text-foreground">{likeCount.toLocaleString()} likes</p>
+            <p className="flex items-center gap-1 text-xs text-muted-foreground"><Eye className="h-3.5 w-3.5" />{viewCount.toLocaleString()} views</p>
             {caption && <p className="text-sm text-foreground/80"><span className="font-semibold">{username}</span> {caption}</p>}
             {postId && <CommentsSection postId={postId} onCountChange={setCommentCount} />}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Full-screen profile card */}
-      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="max-w-none w-screen h-dvh p-0 border-0 rounded-none bg-background flex flex-col items-center justify-center [&>button]:hidden">
-          <DialogTitle className="sr-only">{username}'s profile</DialogTitle>
-          <button onClick={() => setProfileOpen(false)} aria-label="Close" className="absolute top-4 right-4 depth-press w-9 h-9 rounded-full liquid-glass flex items-center justify-center"><X className="w-5 h-5 text-foreground" /></button>
-          <div className="w-full max-w-sm px-6 text-center space-y-5">
-            <div className="mx-auto w-28 h-28 rounded-full p-1 bg-gradient-to-br from-primary to-accent">
-              <div className="w-full h-full rounded-full overflow-hidden bg-background flex items-center justify-center">
-                <Avatar avatar={avatar} username={username} size="w-full h-full text-4xl" />
-              </div>
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-foreground flex items-center justify-center gap-1">{username}<VerifiedBadge isVerified={isVerified} isOfficial={isOfficial} /></h2>
-              {handle && <p className="text-sm text-muted-foreground">@{handle}</p>}
-            </div>
-            {bio && <p className="text-sm text-foreground/80">{bio}</p>}
-            <div className="grid grid-cols-3 liquid-glass rounded-2xl py-4">
-              {[["Posts", stats.posts], ["Followers", stats.followers], ["Following", stats.following]].map(([l, v]) => (
-                <div key={l as string} className="relative z-10"><p className="text-lg font-bold text-foreground">{v}</p><p className="text-xs text-muted-foreground">{l}</p></div>
-              ))}
-            </div>
-            {authorId && authorId !== me && (
-              <div className="flex gap-3">
-                <div className="flex-1 [&>button]:w-full"><FollowButton targetId={authorId} following={following} onChange={setFollowing} /></div>
-                <button onClick={() => { setProfileOpen(false); navigate("/messages"); }} className="flex-1 depth-press rounded-xl liquid-glass text-sm font-semibold text-foreground py-2">Message</button>
-              </div>
-            )}
           </div>
         </DialogContent>
       </Dialog>

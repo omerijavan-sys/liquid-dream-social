@@ -49,8 +49,8 @@ const PeoplePicker = ({ onPick, label }: { onPick: (p: Profile) => void; label: 
 const BoostTab = ({ refresh }: { refresh: () => void }) => {
   const { user } = useAuth();
   const [posts, setPosts] = useState<{ id: string; caption: string | null; media_url: string | null }[]>([]);
-  const [sel, setSel] = useState<string | null>(null);
-  useEffect(() => { if (user) supabase.from("posts").select("id,caption,media_url").eq("user_id", user.id).order("created_at", { ascending: false }).limit(12).then(({ data }) => setPosts(data ?? [])); }, [user]);
+  const [sel, setSel] = useState<string | null>(() => new URLSearchParams(window.location.search).get("post"));
+  useEffect(() => { if (user) supabase.from("posts").select("id,caption,media_url").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100).then(({ data }) => setPosts(data ?? [])); }, [user]);
   const boost = async (tier: string) => {
     if (!sel) return toast.error("Pick one of your posts first");
     const { error } = await supabase.rpc("prime_boost", { _post_id: sel, _tier: tier });

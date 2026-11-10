@@ -167,10 +167,10 @@ const ProfilePage = () => {
             <div className="flex gap-4 overflow-x-auto pb-2">
               {suggested.map(s => (
                 <div key={s.user_id} className="flex flex-col items-center gap-1 w-20 shrink-0">
-                  <div className="w-14 h-14 rounded-full bg-secondary overflow-hidden flex items-center justify-center font-bold">
+                <button onClick={() => navigate(`/profile/${s.user_id}`)} aria-label={`Open ${s.username || "user"}'s profile`} className="w-14 h-14 rounded-full bg-secondary overflow-hidden flex items-center justify-center font-bold">
                     {s.avatar_url ? <img src={s.avatar_url} alt="" className="w-full h-full object-cover" /> : (s.username || "U")[0].toUpperCase()}
-                  </div>
-                  <p className="text-xs text-foreground truncate w-full text-center">{s.username || s.display_name}</p>
+                </button>
+                <button onClick={() => navigate(`/profile/${s.user_id}`)} className="text-xs text-foreground truncate w-full text-center">{s.username || s.display_name}</button>
                   <FollowButton targetId={s.user_id} following={myFollowing.has(s.user_id)} onChange={v => {
                     const n = new Set(myFollowing); v ? n.add(s.user_id) : n.delete(s.user_id); setMyFollowing(n);
                   }} />

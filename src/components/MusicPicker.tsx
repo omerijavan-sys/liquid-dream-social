@@ -17,6 +17,7 @@ async function getAudiusHost(): Promise<string | null> {
   if (audiusHost) return audiusHost;
   try {
     const res = await fetch("https://api.audius.co");
+    if (!res.ok) return null;
     const j = await res.json();
     const hosts: string[] = j?.data ?? [];
     if (!hosts.length) return null;
@@ -35,9 +36,6 @@ interface AudiusTrack {
   user?: { name?: string };
 }
 
-const fmt = (s?: number) =>
-  s ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
-
 const MusicPicker = ({
   open,
   onClose,
@@ -51,9 +49,14 @@ const MusicPicker = ({
   const [source, setSource] = useState<"global" | "chart">("global");
   const [results, setResults] = useState<PickedTrack[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setLoading(false);
+      return;
+    }
+    setSearchError(null);
     if (source === "chart") {
       setResults(
         tracks.slice(0, 40).map((t) => ({
@@ -71,18 +74,25 @@ const MusicPicker = ({
       setLoading(false);
       return;
     }
+    setResults([]);
     setLoading(true);
+    let cancelled = false;
     const t = setTimeout(async () => {
       const host = await getAudiusHost();
       if (!host) {
-        setLoading(false);
+        if (!cancelled) {
+          setSearchError("Music search is temporarily unavailable. Try again shortly.");
+          setLoading(false);
+        }
         return;
       }
       try {
         const res = await fetch(
           `${host}/v1/tracks/search?query=${encodeURIComponent(term)}&app_name=Primegram`
         );
+        if (!res.ok) throw new Error("Music search request failed");
         const j = await res.json();
+        if (cancelled) return;
         setResults(
           (j.data ?? []).slice(0, 25).map((tr: AudiusTrack) => ({
             title: tr.title,
@@ -91,12 +101,18 @@ const MusicPicker = ({
             streamUrl: `${host}/v1/tracks/${tr.id}/stream?app_name=Primegram`,
           }))
         );
-      } catch {
+      } catch (error) {
+        if (cancelled) return;
         setResults([]);
+        setSearchError(error instanceof Error ? error.message : "Music search failed");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     }, 350);
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [q, source, open]);
 
   return (
@@ -123,7 +139,7 @@ const MusicPicker = ({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-headline text-foreground font-semibold">Background Track</p>
-                <p className="text-caption text-muted-foreground">Search songs from all over the world</p>
+                <p className="text-caption text-muted-foreground">Search tracks in Audius's global catalog</p>
               </div>
               <button
                 onClick={onClose}
@@ -180,6 +196,9 @@ const MusicPicker = ({
                   <p className="text-sm">Type a song name to search millions of tracks worldwide.</p>
                 </div>
               )}
+              {!loading && searchError && (
+                <p role="alert" className="py-8 text-center text-sm text-destructive">{searchError}</p>
+              )}
               {!loading &&
                 results.map((t, i) => (
                   <motion.button
@@ -207,7 +226,7 @@ const MusicPicker = ({
                     <span className="text-xs text-muted-foreground shrink-0">Add</span>
                   </motion.button>
                 ))}
-              {!loading && results.length === 0 && (source === "chart" || q.trim().length >= 2) && (
+              {!loading && !searchError && results.length === 0 && (source === "chart" || q.trim().length >= 2) && (
                 <p className="text-center text-sm text-muted-foreground py-10">No tracks found. Try another search.</p>
               )}
             </div>
