@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, ShieldAlert, Bot, Globe, Loader2, Search, X } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, ShieldAlert, Bot, Globe, Loader2, Search, X, Play, Pause } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,19 +49,41 @@ const PeoplePicker = ({ onPick, label }: { onPick: (p: Profile) => void; label: 
   );
 };
 
-const VerifiedTab = ({ refresh }: { refresh: () => void }) => {
-  const { user } = useAuth(); const [tier, setTier] = useState<string | null>(null);
+const VerifiedTab = ({ balance, refresh }: { balance: number | null; refresh: () => void }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [tier, setTier] = useState<string | null>(null);
+  const [subscribing, setSubscribing] = useState<string | null>(null);
   const load = () => user && supabase.rpc("prime_tier", { _user_id: user.id }).then(({ data }) => setTier((data as string) ?? null));
   useEffect(() => { load(); }, [user]);
-  const sub = async (t: string) => { const { error } = await supabase.rpc("prime_subscribe", { _tier: t }); if (error) return err(error); toast.success("You're Prime Verified for 30 days"); load(); refresh(); };
+  const sub = async (tierId: string) => {
+    setSubscribing(tierId);
+    try {
+      const { error } = await supabase.rpc("prime_subscribe", { _tier: tierId });
+      if (error) throw error;
+      toast.success("Subscription paid from your wallet and active for 30 days");
+      void load();
+      refresh();
+    } catch (error) {
+      err(error);
+    } finally {
+      setSubscribing(null);
+    }
+  };
   return (
     <div className="space-y-3">
       {tier && <p className="text-sm">Current tier: <b className="text-primary capitalize">{tier}</b></p>}
+      <div className={`${card} flex items-center justify-between gap-3`}>
+        <p className="text-sm">Wallet balance: <b>{balance === null ? "Loading…" : `${balance.toLocaleString()} KES`}</b></p>
+        <Button size="sm" variant="secondary" onClick={() => navigate("/wallet")}>Top up wallet</Button>
+      </div>
       {TIERS.map((t) => (
         <div key={t.id} className={`${card} ${t.id === "all_access" ? "border-primary/60 bg-gradient-to-br from-primary/10 via-card/70 to-fuchsia-500/10 shadow-[0_0_34px_-10px_hsl(var(--primary)/.8)]" : ""}`}>
           <div className="flex items-center justify-between gap-3">
             <div><p className="font-bold flex items-center gap-1"><BadgeCheck className={`w-4 h-4 ${t.color}`} />{t.name}</p><p className="text-sm text-muted-foreground">{t.perks}</p>{t.id === "all_access" && <p className="mt-1 text-xs text-primary">One prepaid month · no automatic renewal</p>}</div>
-            <Button onClick={() => sub(t.id)}>{t.price.toLocaleString()} KES/mo</Button>
+            <Button disabled={subscribing !== null} onClick={() => balance !== null && balance < t.price ? navigate("/wallet") : void sub(t.id)}>
+              {subscribing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : balance !== null && balance < t.price ? "Top up" : `${t.price.toLocaleString()} KES/mo`}
+            </Button>
           </div>
         </div>
       ))}
@@ -177,6 +199,8 @@ const SoundsTab = () => {
   const [tracks, setTracks] = useState<GlobalMusicTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,6 +228,8 @@ const SoundsTab = () => {
   }, [query]);
 
   const attachTrackToPost = (track: GlobalMusicTrack) => {
+    audioRef.current?.pause();
+    setPreviewingId(null);
     navigate("/create", {
       state: {
         track: {
@@ -216,8 +242,33 @@ const SoundsTab = () => {
     });
   };
 
+  const previewTrack = async (track: GlobalMusicTrack) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (previewingId === track.id) {
+      audio.pause();
+      audio.currentTime = 0;
+      setPreviewingId(null);
+      return;
+    }
+    audio.pause();
+    audio.src = track.streamUrl;
+    audio.load();
+    try {
+      await audio.play();
+      setPreviewingId(track.id);
+    } catch (reason) {
+      setPreviewingId(null);
+      toast.error(reason instanceof Error ? reason.message : "This track could not be played.");
+    }
+  };
+
   return (
     <div className="space-y-3">
+      <audio ref={audioRef} hidden onEnded={() => setPreviewingId(null)} onError={() => {
+        setPreviewingId(null);
+        toast.error("This track preview is currently unavailable.");
+      }} />
       <div className={`${card} space-y-3`}>
         <div className="flex items-center gap-2">
           <Globe className="h-5 w-5 shrink-0 text-primary" />
@@ -252,6 +303,9 @@ const SoundsTab = () => {
             <p className="truncate font-semibold">{index + 1}. {track.title}</p>
             <p className="truncate text-xs text-muted-foreground">{track.artist}{track.duration ? ` · ${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, "0")}` : ""}</p>
           </div>
+          <Button size="icon" variant="secondary" aria-label={`${previewingId === track.id ? "Stop" : "Preview"} ${track.title}`} onClick={() => void previewTrack(track)}>
+            {previewingId === track.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
           <Button size="sm" onClick={() => attachTrackToPost(track)}>Use sound</Button>
         </div>
       ))}
@@ -281,7 +335,7 @@ export default function ExtremePage() {
           {tabs.map(({ v, l, i: I }) => <TabsTrigger key={v} value={v} className="flex-1 gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><I className="w-3.5 h-3.5" />{l}</TabsTrigger>)}
         </TabsList>
         <div className="mt-4">
-          <TabsContent value="verified"><VerifiedTab refresh={refresh} /></TabsContent>
+          <TabsContent value="verified"><VerifiedTab balance={bal} refresh={refresh} /></TabsContent>
           <TabsContent value="tips"><TipTab refresh={refresh} /></TabsContent>
           <TabsContent value="crush"><CrushTab refresh={refresh} /></TabsContent>
           <TabsContent value="adult"><AdultTab /></TabsContent>

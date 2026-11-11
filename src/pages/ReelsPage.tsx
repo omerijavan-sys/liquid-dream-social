@@ -175,16 +175,16 @@ const ReelsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen overflow-hidden bg-[#080b14] text-white [background-image:radial-gradient(ellipse_at_24%_16%,rgba(168,85,247,.2),transparent_35%),radial-gradient(ellipse_at_88%_22%,rgba(34,211,238,.18),transparent_33%),radial-gradient(ellipse_at_73%_88%,rgba(212,175,55,.16),transparent_36%)]">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 safe-area-top">
         <div className="flex items-center justify-between px-5 py-4">
           <button onClick={() => navigate("/")} className="depth-press w-9 h-9 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center">
             <ArrowLeft className="w-5 h-5 text-white" />
           </button>
-          <span className="text-white font-semibold text-base">Reels</span>
-          <button onClick={() => setCreating(true)} className="depth-press w-9 h-9 rounded-full bg-primary flex items-center justify-center">
-            <Plus className="w-5 h-5 text-primary-foreground" />
+          <span className="font-serif text-lg font-bold text-amber-100">Reels</span>
+          <button onClick={() => setCreating(true)} aria-label="Create reel" className="depth-press flex h-9 w-9 items-center justify-center rounded-full border border-amber-100/70 bg-gradient-to-br from-amber-100 to-amber-500 text-black shadow-[0_0_18px_rgba(252,211,77,.38)]">
+            <Plus className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -203,86 +203,88 @@ const ReelsPage = () => {
           <button onClick={() => setCreating(true)} className="depth-press px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm">Create Reel</button>
         </div>
       ) : (
-        <div ref={containerRef} className="relative h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-none">
+        <div ref={containerRef} className="relative h-[100dvh] overflow-y-scroll snap-y snap-mandatory scrollbar-none pb-24 pt-14">
           {reels.map((reel, i) => (
             <div
               key={reel.id}
               data-index={i}
-              className="h-screen w-full snap-start snap-always relative flex items-center justify-center bg-black"
-              onClick={() => {
-                const v = videoRefs.current.get(i);
-                if (!v) return;
-                if (v.paused) v.play().catch(() => {}); else v.pause();
-              }}
+              className="relative mx-auto flex h-[calc(100dvh_-_3.5rem)] w-[calc(100%_-_1rem)] max-w-[1540px] snap-start snap-always flex-col pt-1 md:w-[calc(100%_-_0.5rem)]"
             >
-              {reel.video_url && (
-                <video
-                  ref={el => { if (el) videoRefs.current.set(i, el); }}
-                  src={reel.video_url}
-                  className="h-full w-full object-cover"
-                  loop
-                  playsInline
-                  muted={muted}
-                  preload={Math.abs(i - currentIndex) <= 2 ? "auto" : "none"}
-                />
-              )}
-              {/* Overlay gradient */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+              <div
+                className="relative h-[min(74vh,720px)] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#100c08] shadow-[0_18px_70px_rgba(0,0,0,.42)] md:ml-9 md:w-[calc(100%_-_6rem)] md:rounded-[2.6rem]"
+                onClick={() => {
+                  const video = videoRefs.current.get(i);
+                  if (!video) return;
+                  if (video.paused) video.play().catch(() => {});
+                  else video.pause();
+                }}
+              >
+                {reel.video_url && (
+                  <video
+                    ref={el => { if (el) videoRefs.current.set(i, el); }}
+                    src={reel.video_url}
+                    className="h-full w-full object-cover"
+                    loop
+                    playsInline
+                    muted={muted}
+                    preload={Math.abs(i - currentIndex) <= 1 ? "auto" : "none"}
+                  />
+                )}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/15" />
+                {reel.user_id === user?.id && (
+                  <button
+                    onClick={event => { event.stopPropagation(); navigate("/profile?tab=reels"); }}
+                    className="absolute bottom-3 right-3 z-10 rounded-xl border border-amber-100/70 bg-black/55 px-3 py-1.5 text-xs font-semibold text-amber-100 backdrop-blur-md"
+                  >
+                    View Insights
+                  </button>
+                )}
+              </div>
 
-              {/* Side actions */}
-              <div className="absolute right-3 bottom-28 flex flex-col items-center gap-5 z-10">
+              <div className="absolute right-1 top-[60%] z-10 flex -translate-y-1/4 flex-col items-center gap-2 md:right-0 md:top-[60%] md:gap-3">
                 <button onClick={(e) => { e.stopPropagation(); toggleLike(reel.id); }} className="depth-press flex flex-col items-center gap-1" aria-label="Like">
-                  <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
-                    <Heart className={`w-6 h-6 ${liked.has(reel.id) ? "text-red-500 fill-red-500" : "text-white"}`} />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
+                    <Heart className={`h-5 w-5 ${liked.has(reel.id) ? "fill-rose-400 text-rose-400" : "text-amber-100"}`} />
                   </div>
-                  <span className="text-white text-xs">{reel.likes_count}</span>
+                  <span className="text-[11px] text-amber-100">{reel.likes_count ?? 0}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); loadComments(reel.id); }} className="depth-press flex flex-col items-center gap-1" aria-label="Comments">
-                  <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
-                    <MessageCircle className="w-6 h-6 text-white" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
+                    <MessageCircle className="h-5 w-5 text-amber-100" />
                   </div>
-                  <span className="text-white text-xs">{commentCounts[reel.id] || 0}</span>
+                  <span className="text-[11px] text-amber-100">{commentCounts[reel.id] || 0}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); shareReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Share">
-                  <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
-                    <Share2 className="w-6 h-6 text-white" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
+                    <Share2 className="h-5 w-5 text-amber-100" />
                   </div>
                 </button>
                 <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
                 <button onClick={(e) => { e.stopPropagation(); setMuted(!muted); }} className="depth-press">
-                  <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
-                    {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
+                    {muted ? <VolumeX className="h-5 w-5 text-amber-100" /> : <Volume2 className="h-5 w-5 text-amber-100" />}
                   </div>
                 </button>
               </div>
 
-              {/* Bottom info */}
-              <div className="absolute left-4 right-16 bottom-16 z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (reel.profile?.user_id) navigate(`/profile/${reel.profile.user_id}`);
-                    }}
-                    aria-label={`Open ${reel.profile?.display_name || "user"}'s profile`}
-                    className="w-9 h-9 shrink-0 rounded-full bg-primary/30 flex items-center justify-center overflow-hidden text-white text-sm font-bold"
-                  >
-                    {reel.profile?.avatar_url
-                      ? <img src={reel.profile.avatar_url} alt="" className="h-full w-full object-cover" />
-                      : (reel.profile?.display_name || "U")[0]}
+              <div className="mt-4 flex min-w-0 items-center gap-2 pr-14">
+                <button
+                  onClick={() => reel.profile?.user_id && navigate(`/profile/${reel.profile.user_id}`)}
+                  aria-label={`Open ${reel.profile?.display_name || "user"}'s profile`}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-amber-100/70 bg-black/50 text-sm font-bold text-amber-100"
+                >
+                  {reel.profile?.avatar_url
+                    ? <img src={reel.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    : (reel.profile?.display_name || "U")[0]}
+                </button>
+                <div className="min-w-0">
+                  <button onClick={() => reel.profile?.user_id && navigate(`/profile/${reel.profile.user_id}`)} className="text-sm font-semibold text-white">
+                    {reel.profile?.display_name || "User"} <span className="text-amber-300">●</span>
                   </button>
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (reel.profile?.user_id) navigate(`/profile/${reel.profile.user_id}`);
-                    }}
-                    className="text-white font-semibold text-sm"
-                  >
-                    {reel.profile?.display_name || "User"}
-                  </button>
+                  {(reel.caption || reel.music_title) && (
+                    <p className="truncate text-xs text-white/65">{reel.caption || `♪ ${reel.music_title}`}</p>
+                  )}
                 </div>
-                {reel.caption && <p className="text-white/90 text-sm mb-1">{reel.caption}</p>}
-                {reel.music_title && <p className="text-white/60 text-xs">🎵 {reel.music_title}</p>}
               </div>
             </div>
           ))}

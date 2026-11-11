@@ -2,8 +2,6 @@ const CACHE_NAME = 'primegram-v2';
 const urlsToCache = [
   '/',
   '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -49,4 +47,10 @@ self.addEventListener('activate', event => {
       ))
       .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil(self.clients.openWindow(target));
 });

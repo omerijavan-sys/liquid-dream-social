@@ -7,6 +7,7 @@ import IncomingCallModal from "@/components/IncomingCallModal";
 import { playNotificationTone } from "@/hooks/useRingtone";
 import { logSecurityEvent } from "@/utils/audit";
 import { readPreference } from "@/utils/preferences";
+import { isAiAutoReplyEnabled, replyWithAi } from "@/services/aiAutoReply";
 
 interface Ring {
   id: string;
@@ -14,6 +15,21 @@ interface Ring {
   callerName: string;
   audio?: boolean;
 }
+
+const showBrowserNotification = async (title: string, body: string, url: string, tag: string) => {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(title, { body, icon: "/favicon.png", tag, data: { url } });
+      return;
+    }
+    const notice = new Notification(title, { body, icon: "/favicon.png", tag });
+    notice.onclick = () => { window.focus(); window.location.assign(url); notice.close(); };
+  } catch (error) {
+    console.error("Could not display browser notification:", error);
+  }
+};
 
 /**
  * App-wide realtime listener: incoming WebRTC calls (with ringtone) and
@@ -33,8 +49,9 @@ const GlobalRealtimeListener = () => {
       const { data } = await supabase.from("profiles").select("display_name, username").eq("user_id", row.caller_id).maybeSingle();
       const name = data?.display_name || data?.username || "Member";
       setRing({ id: row.id, callerId: row.caller_id, callerName: name, audio: row.audio });
-      if (readPreference("notifications", { push: false }).push && document.hidden && "Notification" in window && Notification.permission === "granted") {
-        new Notification("Incoming Primegram call", { body: name, icon: "/favicon.png", tag: row.id });
+      const prefs = readPreference("notifications", { push: false, calls: true });
+      if (prefs.push && prefs.calls !== false && document.hidden) {
+        void showBrowserNotification("Incoming Primegram call", name, `/call/${row.caller_id}?incoming=1&call=${row.id}${row.audio ? "&audio=1" : ""}`, row.id);
       }
     };
     const calls = supabase
@@ -61,6 +78,12 @@ const GlobalRealtimeListener = () => {
         { event: "INSERT", schema: "public", table: "messages", filter: `receiver_id=eq.${user.id}` },
         async ({ new: row }: any) => {
           const prefs = readPreference("notifications", { push: false, messages: true });
+          if (isAiAutoReplyEnabled(user.id, row.sender_id)) {
+            void replyWithAi(user, row).catch(error => {
+              console.error("AI auto-reply failed:", error);
+              toast.error("AI Mode couldn't send a reply. Check your connection and try again.");
+            });
+          }
           if (!prefs.messages) return;
           playNotificationTone();
           void logSecurityEvent("realtime", "message_received", row.sender_id, { message_id: row.id });
@@ -70,9 +93,8 @@ const GlobalRealtimeListener = () => {
             .eq("user_id", row.sender_id)
             .maybeSingle();
           const name = data?.display_name || data?.username || "New message";
-          if (prefs.push && document.hidden && "Notification" in window && Notification.permission === "granted") {
-            const notice = new Notification(name, { body: "New message on Primegram", icon: "/favicon.png" });
-            notice.onclick = () => { window.focus(); navigate("/messages"); notice.close(); };
+          if (prefs.push && document.hidden) {
+            void showBrowserNotification(name, "New message on Primegram", "/messages", `message-${row.id}`);
           }
           toast(name, {
             description: String(row.content ?? "").slice(0, 120),
@@ -82,10 +104,40 @@ const GlobalRealtimeListener = () => {
       )
       .subscribe();
 
+    let followedIds = new Set<string>();
+    const loadFollowedIds = async () => {
+      const { data, error } = await supabase.from("follows").select("following_id").eq("follower_id", user.id);
+      if (error) {
+        console.error("Could not load followed accounts for notifications:", error);
+        return;
+      }
+      followedIds = new Set((data ?? []).map(follow => follow.following_id));
+    };
+    void loadFollowedIds();
+    const updates = supabase
+      .channel(`updates-${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, async ({ new: row }) => {
+        if (!followedIds.has(row.user_id)) return;
+        const prefs = readPreference("notifications", { push: false, updates: true });
+        if (!prefs.updates) return;
+        const { data } = await supabase.from("profiles").select("display_name, username").eq("user_id", row.user_id).maybeSingle();
+        const name = data?.display_name || data?.username || "Someone you follow";
+        if (prefs.push && document.hidden) {
+          void showBrowserNotification(`${name} shared a post`, "See their latest update on Primegram", "/", `post-${row.id}`);
+        } else {
+          toast(`${name} shared a post`, {
+            description: "See their latest update on Primegram",
+            action: { label: "Open", onClick: () => navigate("/") },
+          });
+        }
+      })
+      .subscribe();
+
     return () => {
       clearInterval(ringPoll);
       supabase.removeChannel(calls);
       supabase.removeChannel(inbox);
+      supabase.removeChannel(updates);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);

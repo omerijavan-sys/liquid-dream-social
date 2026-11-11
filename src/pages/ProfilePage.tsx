@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Settings, Grid3X3, Bookmark, Heart, Camera, Film, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -21,12 +21,15 @@ interface Profile {
 
 const ProfilePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [posts, setPosts] = useState<any[]>([]);
-  const [tab, setTab] = useState<"posts" | "reels" | "saved" | "liked">("posts");
+  const [tab, setTab] = useState<"posts" | "reels" | "saved" | "liked">(() =>
+    new URLSearchParams(location.search).get("tab") === "reels" ? "reels" : "posts",
+  );
   const avatarRef = useRef<HTMLInputElement>(null);
   const [myFollowing, setMyFollowing] = useState<Set<string>>(new Set());
   const [suggested, setSuggested] = useState<any[]>([]);

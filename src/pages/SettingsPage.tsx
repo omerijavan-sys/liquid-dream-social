@@ -42,7 +42,13 @@ const SettingsPage = () => {
   const [saving, setSaving] = useState(false);
 
   // Toggle states
-  const [notifToggles, setNotifToggles] = useState(() => readPreference("notifications", { push: false, messages: true }));
+  const [notifToggles, setNotifToggles] = useState(() => ({
+    push: false,
+    messages: true,
+    calls: true,
+    updates: true,
+    ...readPreference("notifications", {}),
+  }));
   const [privToggles, setPrivToggles] = useState({ private: false, activity: true, tags: true, dms: true });
   const [reduceAnimations, setReduceAnimations] = useState(() => readPreference("reduce-motion", false));
   const [theme, setThemeState] = useState<Theme>(() => readPreference("theme", "dark"));
@@ -267,6 +273,7 @@ const SettingsPage = () => {
       case "notifications":
         return (
           <div className="space-y-3">
+            <p className="px-1 text-xs text-muted-foreground">Browser alerts appear when Primegram is open in the background. Allow notifications in your browser to enable them.</p>
             {Object.entries(notifToggles).map(([key, val]) => (
               <div key={key} className="liquid-glass rounded-2xl p-4 flex items-center justify-between relative z-10">
                 <span className="text-sm text-foreground capitalize">{key.replace(/([A-Z])/g, " $1")} Notifications</span>

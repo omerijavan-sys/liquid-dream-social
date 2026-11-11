@@ -53,6 +53,7 @@ const PublicProfilePage = () => {
   const [creatorPrice, setCreatorPrice] = useState<number | null>(null);
   const [subscribedUntil, setSubscribedUntil] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -80,13 +81,37 @@ const PublicProfilePage = () => {
     return () => { cancelled = true; };
   }, [user, userId]);
 
+  useEffect(() => {
+    if (!user) {
+      setWalletBalance(null);
+      return;
+    }
+    let cancelled = false;
+    void supabase.rpc("wallet_my_balance").then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        toast.error("Couldn't load your wallet balance");
+      } else {
+        setWalletBalance(Number(data ?? 0));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [user]);
+
   const subscribe = async () => {
     if (!user || !userId) return;
+    if (walletBalance !== null && creatorPrice !== null && walletBalance < creatorPrice) {
+      navigate("/wallet");
+      return;
+    }
     setSubscribing(true);
     try {
       const { data, error } = await supabase.rpc("creator_subscribe", { _creator_id: userId });
       if (error) throw error;
       setSubscribedUntil(data);
+      const { data: balance, error: balanceError } = await supabase.rpc("wallet_my_balance");
+      if (balanceError) toast.error("Subscription started, but the updated wallet balance could not be loaded.");
+      else setWalletBalance(Number(balance ?? 0));
       toast.success("Subscription started for one prepaid month");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't subscribe");
@@ -219,13 +244,19 @@ const PublicProfilePage = () => {
                   </button>
                   {creatorPrice !== null && (
                     <button
-                      onClick={() => void subscribe()}
+                      onClick={() => {
+                        if (!user) navigate("/auth");
+                        else if (walletBalance !== null && walletBalance < creatorPrice) navigate("/wallet");
+                        else void subscribe();
+                      }}
                       disabled={subscribing || !!subscribedUntil}
                       className="depth-press flex-1 rounded-xl bg-primary py-2 text-sm font-semibold text-primary-foreground disabled:opacity-70"
                     >
                       {subscribedUntil
                         ? `Subscribed until ${new Date(subscribedUntil).toLocaleDateString()}`
-                        : subscribing ? "Starting..." : `Subscribe · ${creatorPrice.toLocaleString()} KES/month`}
+                        : subscribing ? "Starting..." : !user ? `Sign in to subscribe · ${creatorPrice.toLocaleString()} KES/month`
+                          : walletBalance !== null && walletBalance < creatorPrice ? "Insufficient balance · top up"
+                            : `Wallet · ${creatorPrice.toLocaleString()} KES/month`}
                     </button>
                   )}
                 </div>

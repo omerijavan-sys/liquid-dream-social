@@ -1,6 +1,5 @@
-import { authHeader } from "@/utils/authFetch";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,8 +8,6 @@ import { toast } from "sonner";
 import { beginCall } from "@/utils/calls";
 import { useOnline } from "@/contexts/OnlineContext";
 import { Button } from "@/components/ui/button";
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prime-ai-chat`;
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
 type SpeechRecognitionLike = {
@@ -54,14 +51,20 @@ const MessagesPage = () => {
   const [conversations, setConversations] = useState<ChatUser[]>([]);
   const [activeChat, setActiveChat] = useState<ChatUser | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [msg, setMsg] = useState("");
   const [searchUser, setSearchUser] = useState("");
   const [searchResults, setSearchResults] = useState<ChatUser[]>([]);
   const [aiModeChats, setAiModeChats] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("ai-mode-chats") || "[]")); } catch { return new Set(); }
+    try {
+      const saved = user ? localStorage.getItem(`ai-mode-chats:${user.id}`) : null;
+      return new Set(JSON.parse(saved || localStorage.getItem("ai-mode-chats") || "[]"));
+    } catch { return new Set(); }
   });
-  const aiReplyingRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const preserveScrollRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const [voiceSearch, setVoiceSearch] = useState(false);
@@ -108,61 +111,10 @@ const MessagesPage = () => {
     setAiModeChats(prev => {
       const next = new Set(prev);
       if (next.has(chatId)) { next.delete(chatId); toast.success("AI Mode off"); }
-      else { next.add(chatId); toast.success("AI Mode on — I'll learn your style and reply for you"); }
-      localStorage.setItem("ai-mode-chats", JSON.stringify(Array.from(next)));
+      else { next.add(chatId); toast.success("AI Mode on — replies will be labeled as AI-generated"); }
+      if (user) localStorage.setItem(`ai-mode-chats:${user.id}`, JSON.stringify(Array.from(next)));
       return next;
     });
-  };
-
-  const aiAutoReply = async (incoming: Message, chat: ChatUser) => {
-    if (!user || aiReplyingRef.current) return;
-    aiReplyingRef.current = true;
-    try {
-      // Learn personality from this user's last 40 sent messages across all chats
-      const { data: myMsgs } = await supabase
-        .from("messages")
-        .select("content")
-        .eq("sender_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(40);
-      const styleSamples = (myMsgs || []).map((m: any) => m.content).filter(Boolean).reverse().join("\n");
-      const system = `You are impersonating the user in a chat. Reply as them, mirroring their tone, vocabulary, slang, emoji use, message length, and punctuation. Keep replies short (1-2 sentences) unless context demands more. Never reveal you are an AI.\n\nHere are recent messages the user sent (their style):\n${styleSamples}`;
-      const recent = messages.slice(-10).map(m => ({
-        role: (m.sender_id === user.id ? "assistant" : "user") as "assistant" | "user",
-        content: m.content,
-      }));
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: await authHeader() },
-        body: JSON.stringify({ messages: [{ role: "system", content: system }, ...recent, { role: "user", content: incoming.content }] }),
-      });
-      if (!resp.ok) throw new Error("AI reply failed");
-      const reader = resp.body?.getReader();
-      const decoder = new TextDecoder();
-      let buf = "", reply = "";
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          let line = buf.slice(0, nl); buf = buf.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") break;
-          try {
-            const c = JSON.parse(json).choices?.[0]?.delta?.content;
-            if (c) reply += c;
-          } catch {}
-        }
-      }
-      const text = reply.trim();
-      if (text) {
-        await supabase.from("messages").insert({ sender_id: user.id, receiver_id: chat.user_id, content: text });
-      }
-    } catch (e) { console.error(e); }
-    finally { aiReplyingRef.current = false; }
   };
 
   // Build the conversation list: people you've chatted with (latest first,
@@ -177,7 +129,7 @@ const MessagesPage = () => {
           .select("sender_id, receiver_id, content, created_at, read")
           .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
           .order("created_at", { ascending: false })
-          .limit(500),
+          .limit(200),
         supabase.from("follows").select("following_id").eq("follower_id", user.id),
       ]);
 
@@ -250,18 +202,34 @@ const MessagesPage = () => {
   // Fetch messages for active chat
   useEffect(() => {
     if (!activeChat || !user) return;
+    let cancelled = false;
+    setMessages([]);
+    setLoadingMessages(true);
+    setHasOlderMessages(false);
     const fetchMessages = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("messages")
-        .select("*")
+        .select("id, sender_id, receiver_id, content, created_at, read")
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${activeChat.user_id}),and(sender_id.eq.${activeChat.user_id},receiver_id.eq.${user.id})`)
-        .order("created_at", { ascending: true });
-      if (data) setMessages(data as Message[]);
-      // Mark their messages to me as read so they see "Seen".
-      await supabase.from("messages").update({ read: true })
-        .eq("sender_id", activeChat.user_id).eq("receiver_id", user.id).eq("read", false);
+        .order("created_at", { ascending: false })
+        .limit(61);
+      if (cancelled) return;
+      if (error) {
+        toast.error(error.message || "Couldn't load this conversation.");
+      } else {
+        const rows = data ?? [];
+        setHasOlderMessages(rows.length > 60);
+        setMessages(rows.slice(0, 60).reverse() as Message[]);
+        setLoadingMessages(false);
+        void supabase.from("messages").update({ read: true })
+          .eq("sender_id", activeChat.user_id).eq("receiver_id", user.id).eq("read", false)
+          .then(({ error: readError }) => {
+            if (readError) toast.error("Couldn't update message read status.");
+          });
+      }
+      setLoadingMessages(false);
     };
-    fetchMessages();
+    void fetchMessages();
 
     // Realtime subscription
     const channel = supabase
@@ -280,10 +248,6 @@ const MessagesPage = () => {
           if (newMsg.sender_id === activeChat.user_id) {
             void supabase.from("messages").update({ read: true }).eq("id", newMsg.id);
           }
-          // AI Mode auto-reply when message comes from the other party
-          if (newMsg.sender_id === activeChat.user_id && aiModeChats.has(activeChat.user_id)) {
-            aiAutoReply(newMsg, activeChat);
-          }
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
@@ -292,12 +256,40 @@ const MessagesPage = () => {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
   }, [activeChat, user]);
 
   useEffect(() => {
+    if (preserveScrollRef.current) {
+      preserveScrollRef.current = false;
+      return;
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const loadOlderMessages = async () => {
+    if (!activeChat || !user || !messages[0] || loadingOlderMessages) return;
+    setLoadingOlderMessages(true);
+    const { data, error } = await supabase
+      .from("messages")
+      .select("id, sender_id, receiver_id, content, created_at, read")
+      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${activeChat.user_id}),and(sender_id.eq.${activeChat.user_id},receiver_id.eq.${user.id})`)
+      .lt("created_at", messages[0].created_at)
+      .order("created_at", { ascending: false })
+      .limit(61);
+    if (error) {
+      toast.error(error.message || "Couldn't load earlier messages.");
+    } else {
+      const rows = data ?? [];
+      setHasOlderMessages(rows.length > 60);
+      preserveScrollRef.current = true;
+      setMessages(previous => [...rows.slice(0, 60).reverse() as Message[], ...previous]);
+    }
+    setLoadingOlderMessages(false);
+  };
 
   const sendMessage = async () => {
     if (!msg.trim() || !activeChat || !user) return;
@@ -352,7 +344,18 @@ const MessagesPage = () => {
             </div>
 
             <div className="relative z-10 flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-              {messages.length === 0 && (
+              {hasOlderMessages && (
+                <button onClick={() => void loadOlderMessages()} disabled={loadingOlderMessages} className="mx-auto flex items-center gap-2 rounded-full border border-amber-200/20 bg-white/[0.03] px-4 py-2 text-xs text-amber-100/80 disabled:opacity-50">
+                  {loadingOlderMessages && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {loadingOlderMessages ? "Loading…" : "Load earlier messages"}
+                </button>
+              )}
+              {loadingMessages && (
+                <div className="flex items-center justify-center py-8 text-amber-200/70" role="status" aria-label="Loading messages">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              )}
+              {!loadingMessages && messages.length === 0 && (
                 <div className="text-center text-muted-foreground text-sm py-10">No messages yet. Say hello!</div>
               )}
               {messages.map((m, idx) => {

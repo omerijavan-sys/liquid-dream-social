@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Music2, Pause, Play } from "lucide-react";
+import { toast } from "sonner";
 
 export interface PostMusic {
   title: string;
@@ -54,6 +55,10 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
         sharedAudio = new Audio(music.stream_url);
         currentUrl = music.stream_url;
         sharedAudio.addEventListener("ended", () => setPlaying(false));
+        sharedAudio.addEventListener("error", () => {
+          setPlaying(false);
+          if (currentUrl === music.stream_url) toast.error("This track could not be played.");
+        });
       }
       if (playing) {
         sharedAudio.pause();
@@ -62,7 +67,10 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
         sharedAudio
           .play()
           .then(() => setPlaying(true))
-          .catch(() => setPlaying(false));
+          .catch(error => {
+            setPlaying(false);
+            toast.error(error instanceof Error ? error.message : "This track could not be played.");
+          });
       }
     } else if (ytId) {
       const win = ytRef.current?.contentWindow;

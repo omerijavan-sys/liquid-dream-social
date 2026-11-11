@@ -33,6 +33,10 @@ const AuthPage = () => {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailOtp, setEmailOtp] = useState("");
+  const [recoveringPassword, setRecoveringPassword] = useState(false);
+  const [recoveryCodeSent, setRecoveryCodeSent] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryPassword, setRecoveryPassword] = useState("");
   const navigate = useNavigate();
   const addingAccount = new URLSearchParams(window.location.search).get("addAccount") === "1";
 
@@ -218,21 +222,67 @@ const AuthPage = () => {
 
   const handleForgotPassword = async () => {
     const sanitizedEmail = sanitizeInput(email.toLowerCase().trim());
-    if (!validateEmail(sanitizedEmail)) {
-      toast.error("Enter your email first, then tap reset");
+    const sanitizedPhone = sanitizeInput(`${selectedCountry.dial}${phoneNumber.replace(/^0+/, "")}`);
+    if (authMethod === "email" && !validateEmail(sanitizedEmail)) {
+      toast.error("Enter the email address linked to your account");
+      return;
+    }
+    if (authMethod === "phone" && !validatePhone(sanitizedPhone)) {
+      toast.error("Enter the phone number linked to your account");
+      return;
+    }
+    try {
+      otpRateLimiter.canAttempt();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Too many attempts. Please wait before requesting another code.");
       return;
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error } = authMethod === "email"
+        ? await supabase.auth.signInWithOtp({ email: sanitizedEmail, options: { shouldCreateUser: false } })
+        : await supabase.auth.signInWithOtp({ phone: sanitizedPhone, options: { shouldCreateUser: false } });
       if (error) throw error;
-      toast.success("Password reset link sent — check your email");
-    } catch (err: any) {
-      toast.error(friendlyError(err.message));
+      setRecoveryCode("");
+      setRecoveryPassword("");
+      setRecoveryCodeSent(true);
+      setOtpCountdown(60);
+      toast.success("A one-time code was requested. Enter it below to reset your password.");
+    } catch (err: unknown) {
+      toast.error(friendlyError(err instanceof Error ? err.message : ""));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRecoveryVerify = async () => {
+    if (!/^\d{6}$/.test(recoveryCode)) {
+      toast.error("Enter the 6-digit code you received");
+      return;
+    }
+    const passwordValidation = validatePassword(recoveryPassword);
+    if (!passwordValidation.valid) {
+      setPasswordErrors(passwordValidation.errors);
+      toast.error(passwordValidation.errors[0]);
+      return;
+    }
+    setVerifyingOtp(true);
+    try {
+      const sanitizedEmail = sanitizeInput(email.toLowerCase().trim());
+      const sanitizedPhone = sanitizeInput(`${selectedCountry.dial}${phoneNumber.replace(/^0+/, "")}`);
+      const { error: verifyError } = authMethod === "email"
+        ? await supabase.auth.verifyOtp({ email: sanitizedEmail, token: recoveryCode, type: "email" })
+        : await supabase.auth.verifyOtp({ phone: sanitizedPhone, token: recoveryCode, type: "sms" });
+      if (verifyError) throw verifyError;
+      const { error: passwordError } = await supabase.auth.updateUser({ password: recoveryPassword });
+      if (passwordError) throw passwordError;
+      otpRateLimiter.reset();
+      toast.success("Password updated. You are now signed in.");
+      navigate(getNextPath());
+    } catch (error: unknown) {
+      toast.error(friendlyError(error instanceof Error ? error.message : ""));
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -474,15 +524,55 @@ const AuthPage = () => {
 
           {/* Auth method toggle */}
           <div className="flex gap-2 relative z-10">
-            <button type="button" onClick={() => { setAuthMethod("email"); setOtpSent(false); }} className={`depth-press flex-1 py-2 rounded-xl text-sm font-medium ${authMethod === "email" ? "bg-primary text-primary-foreground" : "liquid-glass-subtle text-foreground"}`}>
+            <button type="button" onClick={() => { setAuthMethod("email"); setOtpSent(false); setRecoveryCodeSent(false); }} className={`depth-press flex-1 py-2 rounded-xl text-sm font-medium ${authMethod === "email" ? "bg-primary text-primary-foreground" : "liquid-glass-subtle text-foreground"}`}>
               Email
             </button>
-            <button type="button" onClick={() => { setAuthMethod("phone"); setOtpSent(false); }} className={`depth-press flex-1 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-1 ${authMethod === "phone" ? "bg-primary text-primary-foreground" : "liquid-glass-subtle text-foreground"}`}>
+            <button type="button" onClick={() => { setAuthMethod("phone"); setOtpSent(false); setRecoveryCodeSent(false); }} className={`depth-press flex-1 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-1 ${authMethod === "phone" ? "bg-primary text-primary-foreground" : "liquid-glass-subtle text-foreground"}`}>
               <Phone className="w-3 h-3" /> Phone
             </button>
           </div>
 
-          {authMethod === "email" && emailOtpSent ? (
+          {recoveringPassword ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Reset your password with a one-time code sent to your registered {authMethod === "email" ? "email" : "phone"}.</p>
+              {authMethod === "email" ? (
+                <div>
+                  <label className="text-caption text-muted-foreground block mb-1.5">Email</label>
+                  <input type="email" autoCapitalize="none" value={email} onChange={event => setEmail(event.target.value)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="you@example.com" />
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <select
+                    aria-label="Country code"
+                    value={selectedCountry.code}
+                    onChange={event => setSelectedCountry(countryCodes.find(country => country.code === event.target.value) || selectedCountry)}
+                    className="w-28 rounded-2xl bg-secondary/50 px-3 py-3 text-sm text-foreground"
+                  >
+                    {countryCodes.map(country => <option key={country.code} value={country.code}>{country.flag} {country.dial}</option>)}
+                  </select>
+                  <input type="tel" value={phoneNumber} onChange={event => setPhoneNumber(event.target.value.replace(/[^0-9]/g, ""))} className="min-w-0 flex-1 rounded-2xl bg-secondary/50 px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30" placeholder="Phone number" />
+                </div>
+              )}
+              {recoveryCodeSent && (
+                <>
+                  <div>
+                    <label className="text-caption text-muted-foreground block mb-1.5">One-time code</label>
+                    <input value={recoveryCode} onChange={event => setRecoveryCode(event.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" maxLength={6} className="w-full rounded-2xl bg-secondary/50 px-4 py-3 text-center text-lg tracking-[0.4em] text-foreground outline-none" placeholder="000000" />
+                    <label className="text-caption text-muted-foreground block mt-3 mb-1.5">New password</label>
+                    <input type="password" value={recoveryPassword} onChange={event => setRecoveryPassword(event.target.value)} className="w-full rounded-2xl bg-secondary/50 px-4 py-3 text-sm text-foreground outline-none" placeholder="At least 8 characters" />
+                    {passwordErrors.length > 0 && <p className="mt-1 text-xs text-destructive">{passwordErrors[0]}</p>}
+                  </div>
+                  <button type="button" disabled={otpCountdown > 0 || loading} onClick={handleForgotPassword} className="text-xs text-primary disabled:text-muted-foreground">
+                    {otpCountdown > 0 ? `Resend code in ${otpCountdown}s` : "Resend code"}
+                  </button>
+                </>
+              )}
+              <button type="button" disabled={loading || verifyingOtp} onClick={recoveryCodeSent ? handleRecoveryVerify : handleForgotPassword} className="depth-press w-full rounded-2xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                {loading ? "Sending code…" : verifyingOtp ? "Verifying…" : recoveryCodeSent ? "Verify code & reset password" : "Send reset code"}
+              </button>
+              <button type="button" onClick={() => { setRecoveringPassword(false); setRecoveryCodeSent(false); setRecoveryCode(""); }} className="w-full text-xs text-muted-foreground hover:text-foreground">Back to sign in</button>
+            </div>
+          ) : authMethod === "email" && emailOtpSent ? (
             <div className="space-y-4">
               <div>
                 <label className="text-caption text-muted-foreground block mb-1.5">Email verification code</label>
@@ -577,7 +667,7 @@ const AuthPage = () => {
               {!isSignUp && (
                 <button
                   type="button"
-                  onClick={handleForgotPassword}
+                  onClick={() => { setRecoveringPassword(true); setRecoveryCodeSent(false); }}
                   className="text-[11px] text-primary hover:underline"
                 >
                   Forgot password?
@@ -685,11 +775,6 @@ const AuthPage = () => {
                       ))}
                     </ul>
                   )}
-                  {!isSignUp && (
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Leave empty to sign in with an SMS code instead.
-                    </p>
-                  )}
                 </div>
               )}
               {otpSent && (
@@ -743,7 +828,7 @@ const AuthPage = () => {
                 {loading || verifyingOtp ? (
                   <>
                     <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                    {verifyingOtp ? "Verifying..." : "Sending..."}
+                    {verifyingOtp ? "Verifying..." : isSignUp ? "Sending..." : "Signing in..."}
                   </>
                 ) : otpSent ? (
                   <>
@@ -751,13 +836,18 @@ const AuthPage = () => {
                     Verify OTP
                   </>
                 ) : (
-                  "Send OTP"
+                  isSignUp ? "Send OTP" : "Sign In"
                 )}
               </button>
+              {!isSignUp && !otpSent && (
+                <button type="button" onClick={() => { setRecoveringPassword(true); setRecoveryCodeSent(false); }} className="w-full text-center text-[11px] text-primary hover:underline">
+                  Forgot password?
+                </button>
+              )}
             </div>
           )}
 
-          {!addingAccount && (
+          {!addingAccount && !recoveringPassword && (
             <button
               type="button"
               onClick={continueAsGuest}
@@ -768,11 +858,13 @@ const AuthPage = () => {
             </button>
           )}
 
-          <div className="relative z-10 text-center">
-            <button type="button" onClick={() => { setIsSignUp(!isSignUp); setOtpSent(false); }} className="text-sm text-primary hover:underline">
-              {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-            </button>
-          </div>
+          {!recoveringPassword && (
+            <div className="relative z-10 text-center">
+              <button type="button" onClick={() => { setIsSignUp(!isSignUp); setOtpSent(false); }} className="text-sm text-primary hover:underline">
+                {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>
