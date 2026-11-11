@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
-import { Home, Search, PlusSquare, User, Film, Heart, ShieldAlert } from "lucide-react";
+import { Home, Search, PlusSquare, User, Film } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const tabs = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Search, label: "Search", path: "/search" },
-  { icon: Heart, label: "Crush", path: "/crush" },
   { icon: PlusSquare, label: "Create", path: "/create" },
   { icon: Film, label: "Reels", path: "/reels" },
-  { icon: ShieldAlert, label: "18+ verified", path: "/adult" },
   { icon: User, label: "Profile", path: "/profile" },
 ];
 

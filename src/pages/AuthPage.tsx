@@ -18,6 +18,9 @@ const AuthPage = () => {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [gender, setGender] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -38,6 +41,24 @@ const AuthPage = () => {
   };
   const postAuthRedirect = () => window.location.origin + getNextPath();
 
+  const getSignupDetails = () => {
+    const cleanNickname = sanitizeName(nickname);
+    if (cleanNickname.length < 2) {
+      toast.error("Please enter a nickname");
+      return null;
+    }
+    if (!gender) {
+      toast.error("Please select your gender");
+      return null;
+    }
+    const parsedDob = new Date(`${dateOfBirth}T00:00:00Z`);
+    if (!dateOfBirth || Number.isNaN(parsedDob.getTime()) || parsedDob.toISOString().slice(0, 10) !== dateOfBirth || parsedDob > new Date()) {
+      toast.error("Please enter a valid date of birth");
+      return null;
+    }
+    return { nickname: cleanNickname, gender, date_of_birth: dateOfBirth };
+  };
+
   const friendlyError = (msg: string) => {
     const m = (msg || "").toLowerCase();
     if (m.includes("invalid login credentials")) return "Wrong email or password. Try again or reset your password.";
@@ -46,6 +67,8 @@ const AuthPage = () => {
       return "This account already exists. Switching you to sign in.";
     if (m.includes("otp") && m.includes("expired")) return "That code expired. Tap Resend to get a new one.";
     if (m.includes("token") && m.includes("invalid")) return "That code is incorrect. Please re-enter it.";
+    if (m.includes("missing oauth secret") || m.includes("unsupported provider"))
+      return "Google sign-in isn't configured yet. The Supabase project owner must add the Google OAuth client ID and secret in Auth → Providers.";
     if (m.includes("sms") || m.includes("twilio") || m.includes("messagebird") || m.includes("phone provider") || m.includes("unsupported phone provider"))
       return "Phone sign-in isn't active yet — an SMS provider must be connected. Use email or Google for now.";
     if (m.includes("signups not allowed")) return "New sign-ups are currently disabled.";
@@ -66,6 +89,7 @@ const AuthPage = () => {
       toast.error("Please enter a valid email address");
       return;
     }
+    let signupDetails: ReturnType<typeof getSignupDetails> = null;
     
     if (isSignUp) {
       const passwordValidation = validatePassword(password);
@@ -80,6 +104,8 @@ const AuthPage = () => {
         toast.error("Please enter your full name");
         return;
       }
+      signupDetails = getSignupDetails();
+      if (!signupDetails) return;
     }
     
     // Rate limiting
@@ -93,10 +119,11 @@ const AuthPage = () => {
     setLoading(true);
     try {
       if (isSignUp) {
+        if (!signupDetails) return;
         const { data, error } = await supabase.auth.signUp({
           email: sanitizedEmail,
           password,
-          options: { data: { full_name: sanitizedFullName }, emailRedirectTo: postAuthRedirect() },
+          options: { data: { full_name: sanitizedFullName, ...signupDetails }, emailRedirectTo: postAuthRedirect() },
         });
         if (error) {
           if ((error.message || "").toLowerCase().includes("already")) {
@@ -208,6 +235,7 @@ const AuthPage = () => {
       toast.error("Please enter a valid phone number");
       return;
     }
+    let signupDetails: ReturnType<typeof getSignupDetails> = null;
     
     if (isSignUp) {
       const sanitizedFullName = sanitizeName(fullName);
@@ -226,6 +254,8 @@ const AuthPage = () => {
         return;
       }
       setPasswordErrors([]);
+      signupDetails = getSignupDetails();
+      if (!signupDetails) return;
     }
     
     // Rate limiting for OTP
@@ -239,10 +269,11 @@ const AuthPage = () => {
     setLoading(true);
     try {
       if (isSignUp) {
+        if (!signupDetails) return;
         const { error } = await supabase.auth.signUp({
           phone: sanitizedPhone,
           password,
-          options: { data: { full_name: sanitizeName(fullName) } },
+          options: { data: { full_name: sanitizeName(fullName), ...signupDetails } },
         } as any);
         void logSecurityEvent("auth", "phone_signup", sanitizedPhone, { failed: !!error });
         if (error) {
@@ -306,7 +337,10 @@ const AuthPage = () => {
       // Persist the name captured during phone sign-up
       const name = sanitizeName(fullName);
       if (name.length >= 2) {
-        await supabase.auth.updateUser({ data: { full_name: name } });
+        const { error: metadataError } = await supabase.auth.updateUser({
+          data: { full_name: name, nickname: sanitizeName(nickname), gender, date_of_birth: dateOfBirth },
+        });
+        if (metadataError) throw metadataError;
       }
       toast.success("Verified!");
       otpRateLimiter.reset(); // Reset rate limiter on success
@@ -321,12 +355,33 @@ const AuthPage = () => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: postAuthRedirect() },
+        options: { redirectTo: postAuthRedirect(), skipBrowserRedirect: true },
       });
       if (error) throw error;
+      if (!data.url) throw new Error("Google sign-in did not return an authorization URL.");
+
+      const authorizationResponse = await fetch(data.url, {
+        redirect: "manual",
+      });
+      if (authorizationResponse.status >= 400) {
+        const responseBody: unknown = await authorizationResponse.json();
+        const message =
+          typeof responseBody === "object" &&
+          responseBody !== null &&
+          "msg" in responseBody &&
+          typeof responseBody.msg === "string"
+            ? responseBody.msg
+            : `Google authorization failed (HTTP ${authorizationResponse.status}).`;
+        throw new Error(message);
+      }
+      if (!authorizationResponse.ok && authorizationResponse.type !== "opaqueredirect") {
+        throw new Error(`Google authorization check failed (HTTP ${authorizationResponse.status}).`);
+      }
+
       void logSecurityEvent("auth", "google_oauth_started");
+      window.location.assign(data.url);
     } catch (err: any) {
       toast.error(friendlyError(err.message || "Google sign-in failed"));
     } finally {
@@ -460,6 +515,18 @@ const AuthPage = () => {
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
                     <label className="text-caption text-muted-foreground block mb-1.5">Full Name</label>
                     <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" placeholder="Your name" required={isSignUp} />
+                    <label className="text-caption text-muted-foreground block mt-3 mb-1.5">Nickname</label>
+                    <input type="text" value={nickname} onChange={e => setNickname(e.target.value)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" placeholder="How people will know you" required={isSignUp} minLength={2} />
+                    <label className="text-caption text-muted-foreground block mt-3 mb-1.5">Gender</label>
+                    <select value={gender} onChange={e => setGender(e.target.value)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" required={isSignUp}>
+                      <option value="">Select gender</option>
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                      <option value="non_binary">Non-binary</option>
+                      <option value="prefer_not_to_say">Prefer not to say</option>
+                    </select>
+                    <label className="text-caption text-muted-foreground block mt-3 mb-1.5">Date of birth</label>
+                    <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} max={new Date().toISOString().slice(0, 10)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" required={isSignUp} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -515,6 +582,18 @@ const AuthPage = () => {
                 <div>
                   <label className="text-caption text-muted-foreground block mb-1.5">Full Name</label>
                   <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" placeholder="Your name" />
+                  <label className="text-caption text-muted-foreground block mt-3 mb-1.5">Nickname</label>
+                  <input type="text" value={nickname} onChange={e => setNickname(e.target.value)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" placeholder="How people will know you" required minLength={2} />
+                  <label className="text-caption text-muted-foreground block mt-3 mb-1.5">Gender</label>
+                  <select value={gender} onChange={e => setGender(e.target.value)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" required>
+                    <option value="">Select gender</option>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="non_binary">Non-binary</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                  <label className="text-caption text-muted-foreground block mt-3 mb-1.5">Date of birth</label>
+                  <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} max={new Date().toISOString().slice(0, 10)} className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" required />
                 </div>
               )}
               <div>

@@ -9,8 +9,10 @@ import { toast } from "sonner";
 import CommentsSection from "@/components/CommentsSection";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import type { PostMusic } from "@/components/PostMusicPlayer";
+import { BOOSTS } from "@/lib/extreme";
 
 interface FeedPostProps {
   image: string;
@@ -65,6 +67,18 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
   const [fullPost, setFullPost] = useState(false);
   const [following, setFollowing] = useState(false);
   const [viewCount, setViewCount] = useState(views);
+  const [boostOpen, setBoostOpen] = useState(false);
+
+  const boostPost = async (tier: string) => {
+    if (!postId) return;
+    const { error } = await supabase.rpc("prime_boost", { _post_id: postId, _tier: tier });
+    if (error) {
+      toast.error(error.message || "Couldn't boost this post");
+      return;
+    }
+    toast.success("Post boost is live");
+    setBoostOpen(false);
+  };
 
   const isVideo = mediaType === "video";
   const postLink = postId ? `${window.location.origin}/?post=${postId}` : window.location.origin;
@@ -314,7 +328,7 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                navigate(`/extreme?tab=boost&post=${encodeURIComponent(postId)}`);
+                setBoostOpen(true);
               }}
               aria-label="Boost this post"
               title="Boost this post"
@@ -360,6 +374,23 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
           </p>
         </div>
       </div>
+
+      <Dialog open={boostOpen} onOpenChange={setBoostOpen}>
+        <DialogContent>
+          <DialogTitle>Boost this post</DialogTitle>
+          <div className="space-y-3">
+            {BOOSTS.map((boost) => (
+              <div key={boost.id} className="flex items-center justify-between gap-3 rounded-xl bg-secondary/60 p-3">
+                <div>
+                  <p className="font-semibold text-primary">{boost.name}</p>
+                  <p className="text-xs text-muted-foreground">{boost.views.toLocaleString()} views · {boost.perk}</p>
+                </div>
+                <Button onClick={() => void boostPost(boost.id)}>{boost.price} KES</Button>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Full-screen post */}
       <Dialog open={fullPost} onOpenChange={setFullPost}>

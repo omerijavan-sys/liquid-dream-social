@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, ChevronRight } from "lucide-react";
+import { Plus, X, ChevronRight, Play } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -63,14 +63,26 @@ const StoriesBar = () => {
   const [viewingStory, setViewingStory] = useState<StoryView | null>(null);
   const [uploading, setUploading] = useState(false);
   const [storyProgress, setStoryProgress] = useState(0);
+  const [paused, setPaused] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef<number>();
+  const storyProgressRef = useRef(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [storyDuration, setStoryDuration] = useState(5000);
-  const advance = () => {
+  const advance = useCallback(() => {
     if (!viewingStory) return;
     const index = stories.findIndex(story => story.id === viewingStory.id);
     setStoryDuration(5000);
+    storyProgressRef.current = 0;
+    setStoryProgress(0);
+    setPaused(false);
     setViewingStory(stories[index + 1] || null);
+  }, [stories, viewingStory]);
+  const openStory = (story: StoryView) => {
+    storyProgressRef.current = 0;
+    setStoryProgress(0);
+    setPaused(false);
+    setViewingStory(story);
   };
 
   // Fetch stories from DB — only those < 24 hours old
@@ -104,16 +116,16 @@ const StoriesBar = () => {
     fetchStories();
   }, []);
 
-  // Auto-close story after 5 seconds with progress
+  // Keep the remaining display time while a story is paused.
   useEffect(() => {
-    if (!viewingStory) { setStoryProgress(0); return; }
-    setStoryProgress(0);
-    const start = Date.now();
+    if (!viewingStory || paused) return;
     if (isVideoMedia(viewingStory.image_url)) return;
+    const start = Date.now() - storyProgressRef.current * storyDuration;
     const duration = storyDuration;
     const tick = () => {
       const elapsed = Date.now() - start;
       const p = Math.min(elapsed / duration, 1);
+      storyProgressRef.current = p;
       setStoryProgress(p);
       if (p < 1) {
         progressRef.current = requestAnimationFrame(tick);
@@ -123,7 +135,13 @@ const StoriesBar = () => {
     };
     progressRef.current = requestAnimationFrame(tick);
     return () => { if (progressRef.current) cancelAnimationFrame(progressRef.current); };
-  }, [viewingStory, storyDuration]);
+  }, [viewingStory, storyDuration, paused, advance]);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (paused) video.pause();
+    else void video.play().catch(() => {});
+  }, [paused, viewingStory?.id]);
   useEffect(() => {
     if (!viewingStory) return;
     const previous = document.body.style.overflow;
@@ -134,6 +152,24 @@ const StoriesBar = () => {
   }, [viewingStory]);
 
   const handleAddStory = () => fileRef.current?.click();
+
+  const handleReaction = async (emoji: string) => {
+    if (!viewingStory || !user) {
+      toast.error("Sign in to react to a story");
+      return;
+    }
+    if (viewingStory.user_id === user.id) return;
+    const { error } = await supabase.from("messages").insert({
+      sender_id: user.id,
+      receiver_id: viewingStory.user_id,
+      content: `Reacted to your story: ${emoji}`,
+    });
+    if (error) {
+      toast.error("Couldn't send your reaction");
+      return;
+    }
+    toast.success("Story reaction sent");
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -149,8 +185,8 @@ const StoriesBar = () => {
       if (error) throw error;
       toast.success("Story posted!");
       setStories(prev => [{ id: post.id, user_id: user.id, image_url: publicUrl, display_name: user.user_metadata?.full_name || "You", created_at: new Date().toISOString() }, ...prev]);
-    } catch (err: any) {
-      toast.error(err.message || "Failed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to post story");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -164,7 +200,7 @@ const StoriesBar = () => {
         <div className="flex gap-3">
           <StoryBubble name={uploading ? "Posting..." : "Your Story"} initial="+" gradient="linear-gradient(135deg, hsl(210, 100%, 60%), hsl(260, 80%, 60%))" hasNew={false} index={0} onClick={handleAddStory} isAdd />
           {stories.map((story, i) => (
-            <StoryBubble key={story.id} name={story.display_name} imageUrl={story.image_url} initial={story.display_name[0]} gradient="linear-gradient(135deg, hsl(350, 80%, 58%), hsl(280, 70%, 55%))" hasNew index={i + 1} onClick={() => setViewingStory(story)} />
+            <StoryBubble key={story.id} name={story.display_name} imageUrl={story.image_url} initial={story.display_name[0]} gradient="linear-gradient(135deg, hsl(350, 80%, 58%), hsl(280, 70%, 55%))" hasNew index={i + 1} onClick={() => openStory(story)} />
           ))}
         </div>
       </div>
@@ -198,12 +234,33 @@ const StoriesBar = () => {
               </div>
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
-              {isVideoMedia(viewingStory.image_url) ? <video key={viewingStory.id} src={viewingStory.image_url} autoPlay playsInline controls className="w-full h-full object-contain" onEnded={advance} onTimeUpdate={event => {
-                const video = event.currentTarget;
-                if (Number.isFinite(video.duration)) setStoryProgress(video.currentTime / video.duration);
-              }} /> : <Button variant="ghost" aria-label="Next story" onClick={advance} className="w-full h-full p-0 rounded-none hover:bg-transparent"><img src={viewingStory.image_url} alt="Story" className="w-full h-full object-contain" /></Button>}
+              {isVideoMedia(viewingStory.image_url) ? (
+                <button type="button" aria-label={paused ? "Resume story" : "Pause story"} onClick={() => setPaused(value => !value)} className="relative h-full w-full">
+                  <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} autoPlay playsInline className="h-full w-full object-contain" onEnded={advance} onTimeUpdate={event => {
+                    const video = event.currentTarget;
+                    if (Number.isFinite(video.duration)) {
+                      const progress = video.currentTime / video.duration;
+                      storyProgressRef.current = progress;
+                      setStoryProgress(progress);
+                    }
+                  }} />
+                  {paused && <span className="absolute inset-0 flex items-center justify-center bg-black/20"><Play className="h-12 w-12 fill-white text-white" /></span>}
+                </button>
+              ) : (
+                <button type="button" aria-label={paused ? "Resume story" : "Pause story"} onClick={() => setPaused(value => !value)} className="relative h-full w-full">
+                  <img src={viewingStory.image_url} alt="Story" className="h-full w-full object-contain" />
+                  {paused && <span className="absolute inset-0 flex items-center justify-center bg-black/20"><Play className="h-12 w-12 fill-white text-white" /></span>}
+                </button>
+              )}
             </div>
-            <Button variant="secondary" size="icon" aria-label="Next story" onClick={advance} className="absolute right-4 bottom-16 z-20"><ChevronRight /></Button>
+            <div className="absolute bottom-5 left-4 right-16 z-20 flex items-center gap-2">
+              {["❤️", "😂", "😮", "🔥", "👏"].map((emoji) => (
+                <button key={emoji} type="button" aria-label={`React ${emoji}`} disabled={viewingStory.user_id === user?.id} onClick={() => void handleReaction(emoji)} className="rounded-full bg-background/70 px-2.5 py-1.5 text-lg backdrop-blur-md disabled:opacity-50">
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <Button variant="secondary" size="icon" aria-label="Next story" onClick={advance} className="absolute right-4 bottom-5 z-20"><ChevronRight /></Button>
           </motion.div>
         )}
       </AnimatePresence>, document.body)}

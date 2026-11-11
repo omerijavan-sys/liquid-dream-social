@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Settings, Grid3X3, Bookmark, Heart, Camera } from "lucide-react";
+import { ArrowLeft, Settings, Grid3X3, Bookmark, Heart, Camera, Film } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +25,7 @@ const ProfilePage = () => {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [posts, setPosts] = useState<any[]>([]);
-  const [tab, setTab] = useState<"posts" | "saved" | "liked">("posts");
+  const [tab, setTab] = useState<"posts" | "reels" | "saved" | "liked">("posts");
   const avatarRef = useRef<HTMLInputElement>(null);
   const [myFollowing, setMyFollowing] = useState<Set<string>>(new Set());
   const [suggested, setSuggested] = useState<any[]>([]);
@@ -35,6 +35,11 @@ const ProfilePage = () => {
   useEffect(() => {
     if (!user || tab === "posts") return;
     const load = async () => {
+      if (tab === "reels") {
+        const { data } = await supabase.from("reels").select("id, video_url, caption").eq("user_id", user.id).order("created_at", { ascending: false });
+        setTabPosts((data || []).map((reel) => ({ ...reel, media_url: reel.video_url, media_type: "video" })));
+        return;
+      }
       let ids: string[] = [];
       if (tab === "saved") {
         try { ids = JSON.parse(localStorage.getItem("primegram:savedPosts") || "[]"); } catch { ids = []; }
@@ -185,12 +190,14 @@ const ProfilePage = () => {
       <div className="flex border-b border-border">
         {[
           { id: "posts" as const, icon: Grid3X3 },
+          { id: "reels" as const, icon: Film },
           { id: "saved" as const, icon: Bookmark },
           { id: "liked" as const, icon: Heart },
         ].map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
+            aria-label={t.id[0].toUpperCase() + t.id.slice(1)}
             className={`flex-1 py-3 flex justify-center relative ${tab === t.id ? "text-foreground" : "text-muted-foreground"}`}
           >
             <t.icon className="w-5 h-5" />
@@ -206,8 +213,8 @@ const ProfilePage = () => {
           <div className="w-16 h-16 rounded-3xl liquid-glass flex items-center justify-center mb-4">
             <Camera className="w-8 h-8 text-muted-foreground relative z-10" />
           </div>
-          <p className="text-foreground font-semibold mb-1">{tab === "posts" ? "No posts yet" : tab === "saved" ? "No saved posts" : "No liked posts"}</p>
-          <p className="text-sm text-muted-foreground mb-4">{tab === "posts" ? "Share your first photo or video" : tab === "saved" ? "Tap the bookmark on any post to save it" : "Posts you like will show here"}</p>
+          <p className="text-foreground font-semibold mb-1">{tab === "posts" ? "No posts yet" : tab === "reels" ? "No reels yet" : tab === "saved" ? "No saved posts" : "No liked posts"}</p>
+          <p className="text-sm text-muted-foreground mb-4">{tab === "posts" ? "Share your first photo or video" : tab === "reels" ? "Reels you post will appear here" : tab === "saved" ? "Tap the bookmark on any post to save it" : "Posts you like will show here"}</p>
           {tab === "posts" && (
           <button onClick={() => navigate("/create")} className="depth-press px-6 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold">
             Create Post

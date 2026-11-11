@@ -20,6 +20,7 @@ const Index = () => {
           .from("posts")
           .select("*")
           .neq("media_type", "story")
+          .eq("is_adult", false)
           .order("created_at", { ascending: false })
           .limit(50),
         user

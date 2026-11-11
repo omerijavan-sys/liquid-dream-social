@@ -28,6 +28,7 @@ const ExtremePage = lazy(() => import("./pages/ExtremePage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const CrushPage = lazy(() => import("./pages/CrushPage"));
 const AdultPage = lazy(() => import("./pages/AdultPage"));
+const AIBotsPage = lazy(() => import("./pages/AIBotsPage"));
 const PublicProfilePage = lazy(() => import("./pages/PublicProfilePage"));
 import GlobalRealtimeListener from "./components/GlobalRealtimeListener";
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
@@ -86,6 +87,7 @@ const App = () => (
             <Route path="/extreme" element={<ProtectedRoute><ExtremePage /></ProtectedRoute>} />
             <Route path="/crush" element={<ProtectedRoute><CrushPage /></ProtectedRoute>} />
             <Route path="/adult" element={<ProtectedRoute><AdultPage /></ProtectedRoute>} />
+            <Route path="/bots" element={<ProtectedRoute><AIBotsPage /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
             <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />

@@ -31,6 +31,8 @@ const AdultTab = () => {
   const [checking, setChecking] = useState(false);
   const [posts, setPosts] = useState<AdultPost[]>([]);
   const [open, setOpen] = useState<AdultPost | null>(null);
+  const [filter, setFilter] = useState<"all" | "photo" | "video">("all");
+  const savedDob = user?.user_metadata?.date_of_birth;
 
   useEffect(() => {
     if (!user) {
@@ -57,6 +59,12 @@ const AdultTab = () => {
   }, [user]);
 
   useEffect(() => {
+    if (typeof savedDob === "string" && /^\d{4}-\d{2}-\d{2}$/.test(savedDob)) {
+      setDob({ y: savedDob.slice(0, 4), m: String(Number(savedDob.slice(5, 7))), d: String(Number(savedDob.slice(8, 10))) });
+    }
+  }, [savedDob]);
+
+  useEffect(() => {
     if (!user || !verified) {
       setPosts([]);
       return;
@@ -80,19 +88,24 @@ const AdultTab = () => {
   }, [user, verified]);
 
   useEffect(() => {
-    if (!open) return;
+    const postId = open?.id;
+    if (!postId) return;
     let cancelled = false;
-    supabase.rpc("register_post_view", { _post_id: open.id }).then(({ data, error }) => {
+    supabase.rpc("register_post_view", { _post_id: postId }).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         toast.error("Couldn't record this view");
         return;
       }
-      setOpen((current) => current?.id === open.id ? { ...current, views_count: data } : current);
-      setPosts((current) => current.map((post) => post.id === open.id ? { ...post, views_count: data } : post));
+      setOpen((current) => current?.id === postId ? { ...current, views_count: data } : current);
+      setPosts((current) => current.map((post) => post.id === postId ? { ...post, views_count: data } : post));
     });
     return () => { cancelled = true; };
   }, [open?.id]);
+
+  const visiblePosts = posts.filter((post) =>
+    filter === "all" || (filter === "video" ? post.media_type === "video" : post.media_type !== "video"),
+  );
 
   const verify = async () => {
     const { d, m, y } = dob;
@@ -156,7 +169,7 @@ const AdultTab = () => {
           </div>
           <div>
             <p className="font-bold">18+ Only · Age Verification</p>
-            <p className="text-xs text-muted-foreground">Mature content. Verify your age to enter.</p>
+            <p className="text-xs text-muted-foreground">Mature content. Confirm your date of birth to enter.</p>
           </div>
         </div>
         <div className="flex gap-2 mb-3">
@@ -182,6 +195,7 @@ const AdultTab = () => {
           />
           I confirm I am 18 years or older and I want to see mature content. My confirmation is stored securely on the server.
         </label>
+        <p className="mb-3 text-[11px] text-muted-foreground">Age is checked from your date of birth. This flow does not scan or store face images.</p>
         <Button className="w-full gap-2" onClick={verify} disabled={checking}>
           {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           Verify & Enter
@@ -195,13 +209,20 @@ const AdultTab = () => {
       <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
         <Check className="w-3.5 h-3.5 text-primary" /> Verified 18+ · access stays active on your account
       </div>
-      {posts.length === 0 ? (
+      <div className="mb-4 flex gap-2" role="group" aria-label="Filter mature posts">
+        {(["all", "photo", "video"] as const).map((value) => (
+          <Button key={value} size="sm" variant={filter === value ? "default" : "secondary"} onClick={() => setFilter(value)}>
+            {value === "all" ? "All" : value === "photo" ? "Photos" : "Videos"}
+          </Button>
+        ))}
+      </div>
+      {visiblePosts.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-10">
-          No 18+ posts yet. Creators can mark a post as 18+ from the post composer.
+          {posts.length === 0 ? "No 18+ posts yet. Creators can mark a post as 18+ from the post composer." : "No posts match this filter."}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          {posts.map((p, i) => (
+          {visiblePosts.map((p, i) => (
             <motion.button
               key={p.id}
               initial={{ opacity: 0, scale: 0.95 }}
