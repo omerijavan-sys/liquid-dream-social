@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Phone, Eye, EyeOff, Shield, ChevronDown, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Phone, Eye, EyeOff, Shield, ChevronDown, Clock, CheckCircle2, XCircle, UserRound } from "lucide-react";
 import { logSecurityEvent } from "@/utils/audit";
 import { validateEmail, validatePhone, validatePassword, sanitizeInput, sanitizeName, authRateLimiter, otpRateLimiter } from "@/utils/security";
 import { countryCodes, getCountryByCode, type CountryCode } from "@/utils/countryCodes";
@@ -34,12 +34,22 @@ const AuthPage = () => {
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailOtp, setEmailOtp] = useState("");
   const navigate = useNavigate();
+  const addingAccount = new URLSearchParams(window.location.search).get("addAccount") === "1";
 
   const getNextPath = () => {
     const p = new URLSearchParams(window.location.search).get("next");
     return p && p.startsWith("/") && !p.startsWith("//") ? p : "/";
   };
   const postAuthRedirect = () => window.location.origin + getNextPath();
+
+  const continueAsGuest = () => {
+    try {
+      localStorage.setItem("guestMode", "true");
+      navigate("/");
+    } catch {
+      toast.error("Guest mode could not be saved in this browser.");
+    }
+  };
 
   const getSignupDetails = () => {
     const cleanNickname = sanitizeName(nickname);
@@ -433,7 +443,9 @@ const AuthPage = () => {
             <h1 className="text-2xl text-display text-foreground">Primegram</h1>
           </div>
 
-          <p className="text-sm text-muted-foreground">{isSignUp ? "Create your account" : "Welcome back"}</p>
+          <p className="text-sm text-muted-foreground">
+            {addingAccount ? "Sign in to add another account" : isSignUp ? "Create your account" : "Welcome back"}
+          </p>
         </div>
 
         <div className="liquid-glass rounded-3xl p-6 space-y-4">
@@ -743,6 +755,17 @@ const AuthPage = () => {
                 )}
               </button>
             </div>
+          )}
+
+          {!addingAccount && (
+            <button
+              type="button"
+              onClick={continueAsGuest}
+              className="depth-press relative z-10 flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/30 bg-secondary/40 py-3 text-sm font-semibold text-foreground transition-all hover:border-primary/60 hover:bg-primary/10 active:scale-[0.98]"
+            >
+              <UserRound className="h-4 w-4 text-primary" />
+              Sign in as Guest
+            </button>
           )}
 
           <div className="relative z-10 text-center">

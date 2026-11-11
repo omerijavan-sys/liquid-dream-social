@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import type { PostMusic } from "@/components/PostMusicPlayer";
 import { BOOSTS } from "@/lib/extreme";
+import CreatorTipButton from "@/components/CreatorTipButton";
 
 interface FeedPostProps {
   image: string;
@@ -350,6 +351,7 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
             </button>
             <button onClick={() => setShowComments((s) => !s)} className="depth-press" aria-label="Comments"><MessageCircle className="w-6 h-6 text-foreground" /></button>
             <button onClick={sharePost} className="depth-press" aria-label="Share"><Send className="w-6 h-6 text-foreground" /></button>
+            {authorId && <CreatorTipButton creatorId={authorId} creatorName={username} />}
             <div className="flex-1" />
             <button onClick={toggleSave} className="depth-press" aria-label={saved ? "Unsave" : "Save"}>
               <Bookmark className={`w-6 h-6 transition-colors ${saved ? "fill-foreground text-foreground" : "text-foreground"}`} />

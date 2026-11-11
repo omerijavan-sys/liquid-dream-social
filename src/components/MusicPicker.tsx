@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Disc3, Globe, Loader2, Music, Search, TrendingUp, X } from "lucide-react";
 import { tracks } from "./PrimeMusicHub";
 import { Input } from "@/components/ui/input";
+import { searchGlobalMusic } from "@/services/GlobalMusicService";
 
 export interface PickedTrack {
   title: string;
@@ -10,30 +11,6 @@ export interface PickedTrack {
   artUrl?: string | null;
   streamUrl?: string | null;
   youtubeId?: string | null;
-}
-
-let audiusHost: string | null = null;
-async function getAudiusHost(): Promise<string | null> {
-  if (audiusHost) return audiusHost;
-  try {
-    const res = await fetch("https://api.audius.co");
-    if (!res.ok) return null;
-    const j = await res.json();
-    const hosts: string[] = j?.data ?? [];
-    if (!hosts.length) return null;
-    audiusHost = hosts[Math.floor(Math.random() * hosts.length)];
-    return audiusHost;
-  } catch {
-    return null;
-  }
-}
-
-interface AudiusTrack {
-  id: string;
-  title: string;
-  duration?: number;
-  artwork?: Record<string, string>;
-  user?: { name?: string };
 }
 
 const MusicPicker = ({
@@ -78,29 +55,15 @@ const MusicPicker = ({
     setLoading(true);
     let cancelled = false;
     const t = setTimeout(async () => {
-      const host = await getAudiusHost();
-      if (!host) {
-        if (!cancelled) {
-          setSearchError("Music search is temporarily unavailable. Try again shortly.");
-          setLoading(false);
-        }
-        return;
-      }
       try {
-        const res = await fetch(
-          `${host}/v1/tracks/search?query=${encodeURIComponent(term)}&app_name=Primegram`
-        );
-        if (!res.ok) throw new Error("Music search request failed");
-        const j = await res.json();
+        const tracks = await searchGlobalMusic(term, 25);
         if (cancelled) return;
-        setResults(
-          (j.data ?? []).slice(0, 25).map((tr: AudiusTrack) => ({
-            title: tr.title,
-            artist: tr.user?.name ?? "Unknown",
-            artUrl: tr.artwork?.["480x480"] ?? tr.artwork?.["150x150"] ?? null,
-            streamUrl: `${host}/v1/tracks/${tr.id}/stream?app_name=Primegram`,
-          }))
-        );
+        setResults(tracks.map(track => ({
+          title: track.title,
+          artist: track.artist,
+          artUrl: track.artwork,
+          streamUrl: track.streamUrl,
+        })));
       } catch (error) {
         if (cancelled) return;
         setResults([]);

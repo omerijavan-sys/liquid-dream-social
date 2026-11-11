@@ -6,6 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
+import CreatorTipButton from "@/components/CreatorTipButton";
+
+const REEL_BATCH_SIZE = 20;
 
 const ReelsPage = () => {
   const navigate = useNavigate();
@@ -17,47 +20,77 @@ const ReelsPage = () => {
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [reels, setReels] = useState<any[]>([]);
+  const [loadingReels, setLoadingReels] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [muted, setMuted] = useState(false);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
+  const pageRef = useRef(0);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const reelIds = reels.map(reel => reel.id);
 
-  useEffect(() => {
-    const fetchReels = async () => {
-      const { data } = await supabase.from("reels").select("*").order("created_at", { ascending: false }).limit(50);
-      if (data) {
-        const userIds = [...new Set(data.map(r => r.user_id))];
-        const { data: profiles } = await supabase.from("profiles").select("user_id, display_name, avatar_url").in("user_id", userIds);
-        const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-        setReels(data.map(r => ({ ...r, profile: profileMap.get(r.user_id) })));
-      }
-    };
-    fetchReels();
+  const fetchReels = useCallback(async (reset = false) => {
+    if (loadingRef.current || (!reset && !hasMoreRef.current)) return;
+    loadingRef.current = true;
+    setLoadingReels(reset);
+    setLoadingMore(!reset);
+    if (reset) {
+      pageRef.current = 0;
+      hasMoreRef.current = true;
+      setHasMore(true);
+    }
+    const page = reset ? 0 : pageRef.current;
+    try {
+      const { data, error } = await supabase.from("reels").select("*")
+        .order("created_at", { ascending: false })
+        .range(page * REEL_BATCH_SIZE, page * REEL_BATCH_SIZE + REEL_BATCH_SIZE - 1);
+      if (error) throw error;
+      const batch = data ?? [];
+      const userIds = [...new Set(batch.map(reel => reel.user_id))];
+      const { data: profiles, error: profileError } = userIds.length
+        ? await supabase.from("profiles").select("user_id, display_name, avatar_url").in("user_id", userIds)
+        : { data: [], error: null };
+      if (profileError) throw profileError;
+      const profileMap = new Map(profiles?.map(profile => [profile.user_id, profile]) || []);
+      const mapped = batch.map(reel => ({ ...reel, profile: profileMap.get(reel.user_id) ?? null }));
+      setReels(current => reset ? mapped : [...current, ...mapped]);
+      pageRef.current = page + 1;
+      hasMoreRef.current = batch.length === REEL_BATCH_SIZE;
+      setHasMore(hasMoreRef.current);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't load reels");
+    } finally {
+      loadingRef.current = false;
+      setLoadingReels(false);
+      setLoadingMore(false);
+    }
   }, []);
 
-  // Snap scroll observer
+  useEffect(() => { void fetchReels(true); }, [fetchReels]);
+
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || reels.length === 0) return;
-
+    if (!container || reels.length === 0 || !hasMore) return;
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        const idx = Number(entry.target.getAttribute("data-index"));
-        const video = videoRefs.current.get(idx);
+        const index = Number(entry.target.getAttribute("data-index"));
         if (entry.isIntersecting) {
-          setCurrentIndex(idx);
-          video?.play().catch(() => {});
+          setCurrentIndex(index);
+          videoRefs.current.get(index)?.play().catch(() => {});
+          if (index >= reels.length - 5) void fetchReels();
         } else {
-          video?.pause();
+          videoRefs.current.get(index)?.pause();
         }
       });
-    }, { root: container, threshold: 0.7 });
-
-    container.querySelectorAll("[data-index]").forEach(el => observer.observe(el));
+    }, { root: container, threshold: 0.7, rootMargin: "0px 0px 500px 0px" });
+    container.querySelectorAll("[data-index]").forEach(element => observer.observe(element));
     return () => observer.disconnect();
-  }, [reels]);
+  }, [fetchReels, hasMore, reels]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,8 +115,7 @@ const ReelsPage = () => {
       if (error) throw error;
       toast.success("Reel posted!");
       setCreating(false); setCaption(""); setMusicTitle(""); setVideoFile(null); setVideoPreview(null);
-      const { data } = await supabase.from("reels").select("*").order("created_at", { ascending: false }).limit(50);
-      if (data) setReels(data);
+      await fetchReels(true);
     } catch (err: any) {
       toast.error(err.message || "Failed");
     } finally { setUploading(false); }
@@ -95,16 +127,15 @@ const ReelsPage = () => {
   const [newComment, setNewComment] = useState("");
 
   useEffect(() => {
-    if (!user || reels.length === 0) return;
-    const ids = reels.map(r => r.id);
-    supabase.from("reel_likes").select("reel_id").eq("user_id", user.id).in("reel_id", ids)
+    if (!user || reelIds.length === 0) return;
+    supabase.from("reel_likes").select("reel_id").eq("user_id", user.id).in("reel_id", reelIds)
       .then(({ data }) => setLiked(new Set((data || []).map(d => d.reel_id))));
-    supabase.from("reel_comments").select("reel_id").in("reel_id", ids).then(({ data }) => {
+    supabase.from("reel_comments").select("reel_id").in("reel_id", reelIds).then(({ data }) => {
       const c: Record<string, number> = {};
       (data || []).forEach(d => { c[d.reel_id] = (c[d.reel_id] || 0) + 1; });
       setCommentCounts(c);
     });
-  }, [user, reels.length]);
+  }, [user, reelIds.join(",")]);
 
   const toggleLike = async (id: string) => {
     if (!user) { toast.error("Sign in to like"); return; }
@@ -158,7 +189,11 @@ const ReelsPage = () => {
         </div>
       </div>
 
-      {reels.length === 0 ? (
+      {reels.length === 0 && loadingReels ? (
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-white" />
+        </div>
+      ) : reels.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-screen text-center px-6">
           <div className="w-20 h-20 rounded-3xl bg-white/10 flex items-center justify-center mb-4">
             <Film className="w-10 h-10 text-white/50" />
@@ -168,7 +203,7 @@ const ReelsPage = () => {
           <button onClick={() => setCreating(true)} className="depth-press px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm">Create Reel</button>
         </div>
       ) : (
-        <div ref={containerRef} className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-none">
+        <div ref={containerRef} className="relative h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-none">
           {reels.map((reel, i) => (
             <div
               key={reel.id}
@@ -188,7 +223,7 @@ const ReelsPage = () => {
                   loop
                   playsInline
                   muted={muted}
-                  preload={i < 3 ? "auto" : "none"}
+                  preload={Math.abs(i - currentIndex) <= 2 ? "auto" : "none"}
                 />
               )}
               {/* Overlay gradient */}
@@ -213,6 +248,7 @@ const ReelsPage = () => {
                     <Share2 className="w-6 h-6 text-white" />
                   </div>
                 </button>
+                <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
                 <button onClick={(e) => { e.stopPropagation(); setMuted(!muted); }} className="depth-press">
                   <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
                     {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
@@ -250,6 +286,11 @@ const ReelsPage = () => {
               </div>
             </div>
           ))}
+          {loadingMore && (
+            <div className="pointer-events-none absolute bottom-20 left-0 right-0 z-20 flex justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-white" />
+            </div>
+          )}
         </div>
       )}
 

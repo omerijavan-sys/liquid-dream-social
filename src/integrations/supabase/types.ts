@@ -98,6 +98,60 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_profiles: {
+        Row: {
+          created_at: string
+          monthly_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          monthly_price?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          monthly_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      creator_subscriptions: {
+        Row: {
+          amount: number
+          canceled_at: string | null
+          creator_id: string
+          expires_at: string
+          id: string
+          started_at: string
+          status: string
+          subscriber_id: string
+        }
+        Insert: {
+          amount: number
+          canceled_at?: string | null
+          creator_id: string
+          expires_at: string
+          id?: string
+          started_at?: string
+          status?: string
+          subscriber_id: string
+        }
+        Update: {
+          amount?: number
+          canceled_at?: string | null
+          creator_id?: string
+          expires_at?: string
+          id?: string
+          started_at?: string
+          status?: string
+          subscriber_id?: string
+        }
+        Relationships: []
+      }
       follows: {
         Row: {
           created_at: string
@@ -665,6 +719,8 @@ export type Database = {
       }
       bounty_create: { Args: { _deposit: number }; Returns: string }
       crush_reveal: { Args: { _crush_id: string }; Returns: string }
+      creator_cancel_subscription: { Args: { _creator_id: string }; Returns: undefined }
+      creator_subscribe: { Args: { _creator_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

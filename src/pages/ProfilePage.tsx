@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Settings, Grid3X3, Bookmark, Heart, Camera, Film } from "lucide-react";
+import { ArrowLeft, Settings, Grid3X3, Bookmark, Heart, Camera, Film, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import FollowListDialog, { FollowButton } from "@/components/FollowListDialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface Profile {
   display_name: string | null;
@@ -31,6 +32,8 @@ const ProfilePage = () => {
   const [suggested, setSuggested] = useState<any[]>([]);
   const [listMode, setListMode] = useState<"followers" | "following" | null>(null);
   const [tabPosts, setTabPosts] = useState<any[]>([]);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
 
   useEffect(() => {
     if (!user || tab === "posts") return;
@@ -133,7 +136,7 @@ const ProfilePage = () => {
         <div className="flex items-center gap-5 mb-4">
           <div className="relative">
             <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-            <button onClick={() => avatarRef.current?.click()} className="depth-press relative">
+            <button onClick={() => setAvatarOpen(true)} aria-label="View profile picture" className="depth-press relative">
               <div className="w-20 h-20 rounded-full liquid-glass flex items-center justify-center overflow-hidden">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
@@ -143,9 +146,9 @@ const ProfilePage = () => {
                   </span>
                 )}
               </div>
-              <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+            </button>
+            <button onClick={() => avatarRef.current?.click()} aria-label="Change profile picture" className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                 <Camera className="w-3 h-3 text-primary-foreground" />
-              </div>
             </button>
           </div>
           <div className="flex-1 flex justify-around text-center">
@@ -224,16 +227,44 @@ const ProfilePage = () => {
       ) : (
         <div className="grid grid-cols-3 gap-0.5 p-0.5">
           {shown.map((post, i) => (
-            <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative">
+            <motion.button type="button" key={post.id} onClick={() => setSelectedMedia(post)} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
               {post.media_type === "video" ? (
-                <video src={post.media_url} className="w-full h-full object-cover" muted />
+                <video src={post.media_url} className="w-full h-full object-cover" muted preload="metadata" />
               ) : (
                 <img src={post.media_url} alt="" className="w-full h-full object-cover" loading="lazy" />
               )}
-            </motion.div>
+              {post.media_type === "video" && <Film className="absolute right-2 top-2 h-4 w-4 text-white drop-shadow" />}
+            </motion.button>
           ))}
         </div>
       )}
+      <Dialog open={avatarOpen} onOpenChange={setAvatarOpen}>
+        <DialogContent className="flex h-dvh w-screen max-w-none items-center justify-center rounded-none border-0 bg-black p-0 [&>button]:hidden">
+          <DialogTitle className="sr-only">Profile picture</DialogTitle>
+          <button onClick={() => setAvatarOpen(false)} aria-label="Close profile picture" className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white">
+            <X className="h-5 w-5" />
+          </button>
+          {profile?.avatar_url ? <img src={profile.avatar_url} alt="Profile picture" className="max-h-full max-w-full object-contain" /> : <p className="text-white">No profile picture</p>}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!selectedMedia} onOpenChange={open => { if (!open) setSelectedMedia(null); }}>
+        <DialogContent className="flex h-dvh w-screen max-w-none flex-col rounded-none border-0 bg-background p-0 [&>button]:hidden">
+          <DialogTitle className="sr-only">{tab === "reels" ? "Reel" : "Post"}</DialogTitle>
+          <div className="flex items-center justify-end p-3">
+            <button onClick={() => setSelectedMedia(null)} aria-label="Close media" className="rounded-full p-2 text-foreground">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center bg-black/20">
+            {selectedMedia?.media_type === "video" ? (
+              <video src={selectedMedia.media_url} controls autoPlay playsInline className="max-h-full max-w-full object-contain" />
+            ) : selectedMedia?.media_url ? (
+              <img src={selectedMedia.media_url} alt="" className="max-h-full max-w-full object-contain" />
+            ) : <p className="p-6 text-center text-foreground">{selectedMedia?.caption}</p>}
+          </div>
+          {selectedMedia?.caption && <p className="p-4 text-sm text-foreground">{selectedMedia.caption}</p>}
+        </DialogContent>
+      </Dialog>
       <GlassTabBar />
     </div>
   );

@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, ShieldAlert, Bot } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, ShieldAlert, Bot, Globe, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TIERS, TIP_AMOUNTS, SOUNDS } from "@/lib/extreme";
+import { TIERS, TIP_AMOUNTS } from "@/lib/extreme";
 import AdultTab from "@/components/AdultTab";
 import MatchTab from "@/components/MatchTab";
+import { getGlobalTrendingMusic, searchGlobalMusic, type GlobalMusicTrack } from "@/services/GlobalMusicService";
 
 const card = "rounded-2xl border border-primary/30 bg-card/70 backdrop-blur-xl p-4 shadow-[0_0_30px_-12px_hsl(var(--primary)/0.6)]";
 const err = (e: any) => toast.error(e?.message || "Something went wrong");
@@ -57,10 +58,10 @@ const VerifiedTab = ({ refresh }: { refresh: () => void }) => {
     <div className="space-y-3">
       {tier && <p className="text-sm">Current tier: <b className="text-primary capitalize">{tier}</b></p>}
       {TIERS.map((t) => (
-        <div key={t.id} className={card}>
+        <div key={t.id} className={`${card} ${t.id === "all_access" ? "border-primary/60 bg-gradient-to-br from-primary/10 via-card/70 to-fuchsia-500/10 shadow-[0_0_34px_-10px_hsl(var(--primary)/.8)]" : ""}`}>
           <div className="flex items-center justify-between gap-3">
-            <div><p className="font-bold flex items-center gap-1"><BadgeCheck className={`w-4 h-4 ${t.color}`} />{t.name}</p><p className="text-sm text-muted-foreground">{t.perks}</p></div>
-            <Button onClick={() => sub(t.id)}>{t.price} KES/mo</Button>
+            <div><p className="font-bold flex items-center gap-1"><BadgeCheck className={`w-4 h-4 ${t.color}`} />{t.name}</p><p className="text-sm text-muted-foreground">{t.perks}</p>{t.id === "all_access" && <p className="mt-1 text-xs text-primary">One prepaid month · no automatic renewal</p>}</div>
+            <Button onClick={() => sub(t.id)}>{t.price.toLocaleString()} KES/mo</Button>
           </div>
         </div>
       ))}
@@ -172,12 +173,86 @@ const BountyTab = ({ refresh }: { refresh: () => void }) => {
 
 const SoundsTab = () => {
   const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const [tracks, setTracks] = useState<GlobalMusicTrack[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const found = query.trim().length >= 2
+          ? await searchGlobalMusic(query, 30)
+          : await getGlobalTrendingMusic(30);
+        if (!cancelled) setTracks(found);
+      } catch (reason) {
+        if (!cancelled) {
+          setTracks([]);
+          setError(reason instanceof Error ? reason.message : "Global music is unavailable right now.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, query.trim().length >= 2 ? 300 : 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query]);
+
+  const attachTrackToPost = (track: GlobalMusicTrack) => {
+    navigate("/create", {
+      state: {
+        track: {
+          title: track.title,
+          artist: track.artist,
+          artUrl: track.artwork,
+          streamUrl: track.streamUrl,
+        },
+      },
+    });
+  };
+
   return (
     <div className="space-y-3">
-      {SOUNDS.map((s, i) => (
-        <div key={s.title} className={`${card} flex items-center justify-between`}>
-          <div><p className="font-semibold">#{i + 1} {s.title}</p><p className="text-xs text-muted-foreground">{s.artist} · {s.uses.toLocaleString()} reels</p></div>
-          <Button size="sm" onClick={() => navigate(`/create?sound=${encodeURIComponent(s.title)}`)}>Use sound</Button>
+      <div className={`${card} space-y-3`}>
+        <div className="flex items-center gap-2">
+          <Globe className="h-5 w-5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">Worldwide Sounds</p>
+            <p className="text-xs text-muted-foreground">Search Audius’s global independent-music catalogue. Availability and rights are managed by the source.</p>
+          </div>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
+          <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search any track, artist, or genre worldwide" className="pl-9 pr-10" />
+          {query && <button onClick={() => setQuery("")} aria-label="Clear music search" className="absolute right-3 top-1/2 -translate-y-1/2"><X className="h-4 w-4 text-muted-foreground" /></button>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {["Afrobeats", "Amapiano", "Latin", "K-pop", "Arabic", "Reggae", "South Asian", "Electronic"].map(genre => (
+            <button key={genre} onClick={() => setQuery(genre)} className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${query.toLowerCase() === genre.toLowerCase() ? "border-primary/60 bg-primary/15 text-primary" : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground"}`}>{genre}</button>
+          ))}
+        </div>
+      </div>
+      {loading ? (
+        <div className={`${card} flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground`}><Loader2 className="h-4 w-4 animate-spin" />Loading worldwide sounds…</div>
+      ) : error ? (
+        <div role="alert" className={`${card} text-sm text-destructive`}>{error}</div>
+      ) : tracks.length === 0 ? (
+        <div className={`${card} text-center text-sm text-muted-foreground`}>No tracks found. Try another artist or style.</div>
+      ) : tracks.map((track, index) => (
+        <div key={track.id} className={`${card} flex items-center gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_0_24px_-12px_hsl(var(--primary)/.8)]`}>
+          {track.artwork
+            ? <img src={track.artwork} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" loading="lazy" />
+            : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10"><Music2 className="h-5 w-5 text-primary" /></span>}
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold">{index + 1}. {track.title}</p>
+            <p className="truncate text-xs text-muted-foreground">{track.artist}{track.duration ? ` · ${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, "0")}` : ""}</p>
+          </div>
+          <Button size="sm" onClick={() => attachTrackToPost(track)}>Use sound</Button>
         </div>
       ))}
     </div>

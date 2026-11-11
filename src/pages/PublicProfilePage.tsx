@@ -50,6 +50,50 @@ const PublicProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
   const [selectedViews, setSelectedViews] = useState(0);
+  const [creatorPrice, setCreatorPrice] = useState<number | null>(null);
+  const [subscribedUntil, setSubscribedUntil] = useState<string | null>(null);
+  const [subscribing, setSubscribing] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const loadSubscription = async () => {
+      const [creator, subscription] = await Promise.all([
+        supabase.from("creator_profiles").select("monthly_price").eq("user_id", userId).maybeSingle(),
+        user && user.id !== userId
+          ? supabase.from("creator_subscriptions").select("status, expires_at").eq("subscriber_id", user.id).eq("creator_id", userId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+      if (cancelled) return;
+      if (creator.error || subscription.error) {
+        toast.error("Couldn't load creator subscription details");
+        return;
+      }
+      setCreatorPrice(creator.data?.monthly_price ?? null);
+      setSubscribedUntil(
+        subscription.data?.status === "active" && new Date(subscription.data.expires_at) > new Date()
+          ? subscription.data.expires_at
+          : null,
+      );
+    };
+    void loadSubscription();
+    return () => { cancelled = true; };
+  }, [user, userId]);
+
+  const subscribe = async () => {
+    if (!user || !userId) return;
+    setSubscribing(true);
+    try {
+      const { data, error } = await supabase.rpc("creator_subscribe", { _creator_id: userId });
+      if (error) throw error;
+      setSubscribedUntil(data);
+      toast.success("Subscription started for one prepaid month");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't subscribe");
+    } finally {
+      setSubscribing(false);
+    }
+  };
 
   useEffect(() => {
     if (!userId) {
@@ -173,6 +217,17 @@ const PublicProfilePage = () => {
                   >
                     Message
                   </button>
+                  {creatorPrice !== null && (
+                    <button
+                      onClick={() => void subscribe()}
+                      disabled={subscribing || !!subscribedUntil}
+                      className="depth-press flex-1 rounded-xl bg-primary py-2 text-sm font-semibold text-primary-foreground disabled:opacity-70"
+                    >
+                      {subscribedUntil
+                        ? `Subscribed until ${new Date(subscribedUntil).toLocaleDateString()}`
+                        : subscribing ? "Starting..." : `Subscribe · ${creatorPrice.toLocaleString()} KES/month`}
+                    </button>
+                  )}
                 </div>
               )}
             </section>

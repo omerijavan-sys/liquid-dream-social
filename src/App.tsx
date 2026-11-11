@@ -49,6 +49,7 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) return <div className="min-h-screen bg-background" />;
   if (user) {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("addAccount") === "1") return <>{children}</>;
     const next = params.get("next");
     const safe = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
     return <Navigate to={safe} replace />;

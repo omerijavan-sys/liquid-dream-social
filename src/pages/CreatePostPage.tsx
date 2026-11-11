@@ -16,7 +16,7 @@ import {
   Wand2,
   Music,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -59,6 +59,7 @@ interface Overlay {
 
 const CreatePostPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [mode, setMode] = useState<Mode>("upload");
   const [textOnly, setTextOnly] = useState(false);
@@ -83,6 +84,14 @@ const CreatePostPage = () => {
   const [track, setTrack] = useState<PickedTrack | null>(null);
   const [musicOpen, setMusicOpen] = useState(false);
   const [isAdult, setIsAdult] = useState(false);
+
+  useEffect(() => {
+    const state = location.state as { track?: PickedTrack } | null;
+    if (state?.track) {
+      setTrack(state.track);
+      toast.success(`Added "${state.track.title}" to your post`);
+    }
+  }, [location.state]);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const videoStreamRef = useRef<HTMLVideoElement>(null);

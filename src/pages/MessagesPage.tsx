@@ -1,6 +1,6 @@
 import { authHeader } from "@/utils/authFetch";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Phone, Video, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,22 @@ import { useOnline } from "@/contexts/OnlineContext";
 import { Button } from "@/components/ui/button";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prime-ai-chat`;
+
+type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  onresult: ((event: SpeechResultEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+const speechRecognitionWindow = window as Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
 
 interface ChatUser {
   user_id: string;
@@ -46,6 +62,47 @@ const MessagesPage = () => {
   });
   const aiReplyingRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const [voiceSearch, setVoiceSearch] = useState(false);
+
+  useEffect(() => () => speechRecognitionRef.current?.stop(), []);
+
+  const toggleVoiceSearch = () => {
+    if (voiceSearch) {
+      speechRecognitionRef.current?.stop();
+      return;
+    }
+    const Recognition = speechRecognitionWindow.SpeechRecognition || speechRecognitionWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      toast.error("Voice search is not supported in this browser.");
+      return;
+    }
+    const recognition = new Recognition();
+    recognition.lang = navigator.language || "en-US";
+    recognition.interimResults = false;
+    recognition.onresult = event => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim();
+      if (transcript) setSearchUser(transcript);
+    };
+    recognition.onerror = () => {
+      setVoiceSearch(false);
+      toast.error("Voice search could not recognize that. Try again.");
+    };
+    recognition.onend = () => {
+      setVoiceSearch(false);
+      speechRecognitionRef.current = null;
+    };
+    speechRecognitionRef.current = recognition;
+    setVoiceSearch(true);
+    try {
+      recognition.start();
+    } catch (error) {
+      speechRecognitionRef.current = null;
+      setVoiceSearch(false);
+      toast.error(error instanceof Error ? error.message : "Voice search could not start.");
+    }
+  };
 
   const toggleAiMode = (chatId: string) => {
     setAiModeChats(prev => {
@@ -181,7 +238,7 @@ const MessagesPage = () => {
     const search = async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("user_id, display_name, username")
+        .select("user_id, display_name, username, avatar_url")
         .neq("user_id", user.id)
         .or(`username.ilike.%${searchUser}%,display_name.ilike.%${searchUser}%`)
         .limit(10);
@@ -257,22 +314,23 @@ const MessagesPage = () => {
 
   if (activeChat) {
     return (
-          <div className="h-dvh bg-background flex flex-col">
+          <div className="relative flex h-dvh flex-col overflow-hidden bg-[#050505]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_18%_28%,rgba(124,58,237,.12),transparent_35%),radial-gradient(ellipse_at_88%_22%,rgba(34,211,238,.1),transparent_35%),radial-gradient(ellipse_at_55%_100%,rgba(212,175,55,.07),transparent_44%)]" />
             <div className="liquid-glass-elevated safe-area-top">
               <div className="flex items-center gap-3 px-4 py-3 relative z-10">
-                <button onClick={() => setActiveChat(null)} className="depth-press">
-                  <ArrowLeft className="w-5 h-5 text-foreground" />
+                <button onClick={() => setActiveChat(null)} className="depth-press rounded-full p-1.5 hover:bg-amber-300/10 active:scale-90">
+                  <ArrowLeft className="w-5 h-5 text-amber-200" />
                 </button>
-                <button onClick={() => navigate(`/profile/${activeChat.user_id}`)} aria-label={`Open ${activeChat.username || "user"}'s profile`} className="w-8 h-8 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold">
+                <button onClick={() => navigate(`/profile/${activeChat.user_id}`)} aria-label={`Open ${activeChat.username || "user"}'s profile`} className="w-9 h-9 shrink-0 rounded-full border border-amber-200/30 bg-gradient-to-br from-amber-300/25 to-amber-700/20 flex items-center justify-center text-amber-200 text-sm font-semibold shadow-[0_0_14px_rgba(212,175,55,.2)]">
                   {(activeChat.display_name || "U")[0].toUpperCase()}
                 </button>
                 <button
                   onClick={() => navigate(`/profile/${activeChat.user_id}`)}
-                  className="flex-1 min-w-0 truncate text-left text-headline text-foreground text-sm"
+                  className="flex-1 min-w-0 truncate text-left text-headline text-amber-100 text-sm"
                   aria-label={`Open ${activeChat.username || activeChat.display_name || "user"}'s profile`}
                 >
                   {activeChat.display_name || activeChat.username || "User"}
-                  <span className="block text-xs text-muted-foreground">{onlineIds.includes(activeChat.user_id) ? "Online" : "Offline"}</span>
+                  <span className="flex items-center gap-1.5 text-xs text-white/55"><span className={`h-1.5 w-1.5 rounded-full ${onlineIds.includes(activeChat.user_id) ? "bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,.9)]" : "bg-white/25"}`} />{onlineIds.includes(activeChat.user_id) ? "Online" : "Offline"}</span>
                   {aiModeChats.has(activeChat.user_id) && (
                     <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">AI ON</span>
                   )}
@@ -293,7 +351,7 @@ const MessagesPage = () => {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+            <div className="relative z-10 flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
               {messages.length === 0 && (
                 <div className="text-center text-muted-foreground text-sm py-10">No messages yet. Say hello!</div>
               )}
@@ -303,12 +361,12 @@ const MessagesPage = () => {
                 return (
                 <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
                   <div className={`max-w-[75%] break-words whitespace-pre-wrap px-4 py-2.5 rounded-2xl text-sm ${
-                    mine ? "bg-primary text-primary-foreground" : "liquid-glass text-foreground relative z-10"
+                    mine ? "border border-amber-200/30 bg-gradient-to-br from-amber-300/20 to-amber-700/15 text-amber-50 shadow-[0_4px_18px_rgba(212,175,55,.12)]" : "border border-white/10 bg-white/[0.03] text-white shadow-[0_6px_20px_rgba(0,0,0,.2)] backdrop-blur-xl"
                   }`}>
                     {m.content}
                   </div>
                   {isLastMine && (
-                    <span className={`text-[10px] mt-1 ${m.read ? "text-primary" : "text-muted-foreground"}`}>
+                    <span className={`text-[10px] mt-1 ${m.read ? "text-amber-200" : "text-white/40"}`}>
                       {m.read ? "✓✓ Seen" : "✓ Sent"}
                     </span>
                   )}
@@ -317,17 +375,17 @@ const MessagesPage = () => {
               <div ref={bottomRef} />
             </div>
 
-            <div className="px-4 py-3 safe-area-bottom">
-              <div className="flex gap-2">
+            <div className="relative z-10 px-4 py-3 safe-area-bottom">
+              <div className="flex gap-2 rounded-2xl border border-amber-200/20 bg-black/55 p-1.5 shadow-[0_0_22px_rgba(212,175,55,.1)] backdrop-blur-xl">
                 <input
                   value={msg}
                   onChange={(e) => setMsg(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                   placeholder="Message..."
-                  className="flex-1 min-w-0 px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none"
+                  className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none"
                 />
-                <button onClick={sendMessage} className="depth-press w-11 h-11 rounded-2xl bg-primary flex items-center justify-center">
-                  <Send className="w-4 h-4 text-primary-foreground" />
+                <button onClick={sendMessage} aria-label="Send message" className="depth-press flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-500 text-black shadow-[0_0_14px_rgba(252,211,77,.3)] transition-transform hover:scale-105 active:scale-90">
+                  <Send className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -338,26 +396,34 @@ const MessagesPage = () => {
   const displayList = searchUser.trim() ? searchResults : conversations;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen overflow-hidden bg-[#050505] pb-24">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_15%_25%,rgba(124,58,237,.12),transparent_36%),radial-gradient(ellipse_at_85%_18%,rgba(34,211,238,.11),transparent_36%),radial-gradient(ellipse_at_58%_92%,rgba(212,175,55,.07),transparent_42%)]" />
       <div className="liquid-glass-elevated safe-area-top">
         <div className="flex items-center gap-3 px-5 py-4 relative z-10">
-          <button onClick={() => navigate("/")} aria-label="Back to home" className="depth-press"><ArrowLeft className="w-5 h-5 text-foreground" /></button>
-          <span className="text-headline text-foreground text-base flex-1">Messages</span>
+          <button onClick={() => navigate("/")} aria-label="Back to home" className="depth-press rounded-full p-1.5 hover:bg-amber-300/10 active:scale-90"><ArrowLeft className="w-5 h-5 text-amber-200" /></button>
+          <span className="text-headline text-amber-100 text-base flex-1">Messages</span>
         </div>
       </div>
 
-      <div className="px-4 py-3">
+      <div className="relative z-10 px-4 py-3">
+        <div className="flex items-center gap-2 rounded-full border border-amber-200/25 bg-white/[0.035] px-3 shadow-[0_0_22px_rgba(212,175,55,.1)] backdrop-blur-xl transition-all focus-within:border-amber-200/55 focus-within:shadow-[0_0_28px_rgba(212,175,55,.18)]">
+          <Search className="h-4 w-4 shrink-0 text-amber-200" />
         <input
+          ref={searchInputRef}
           value={searchUser}
           onChange={(e) => setSearchUser(e.target.value)}
           placeholder="Search users..."
-          className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none"
+          className="min-w-0 flex-1 bg-transparent py-3 text-sm text-white placeholder:text-white/40 outline-none"
         />
+          <button onClick={toggleVoiceSearch} aria-label={voiceSearch ? "Stop voice search" : "Search by voice"} className={`depth-press flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-90 ${voiceSearch ? "bg-amber-300/20 text-amber-100 shadow-[0_0_14px_rgba(252,211,77,.5)]" : "text-amber-200 hover:bg-amber-300/10"}`}>
+            {voiceSearch ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4 drop-shadow-[0_0_6px_rgba(252,211,77,.8)]" />}
+          </button>
+        </div>
       </div>
 
-      <div className="px-4 space-y-2">
+      <div className="relative z-10 space-y-2 px-4">
         {displayList.length === 0 && (
-          <div className="text-center text-muted-foreground text-sm py-10">
+          <div className="text-center text-white/50 text-sm py-10">
             {searchUser.trim() ? "No users found" : "No conversations yet. Search for users to start chatting!"}
           </div>
         )}
@@ -367,24 +433,37 @@ const MessagesPage = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="liquid-glass rounded-2xl p-4 flex items-center gap-3 w-full relative z-10"
+            className="group w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex items-center gap-3 shadow-[inset_0_1px_0_rgba(252,211,77,.13),0_8px_24px_rgba(0,0,0,.2)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-200/35 hover:shadow-[inset_0_1px_0_rgba(252,211,77,.2),0_0_24px_rgba(212,175,55,.12)] active:scale-[.99]"
           >
-            <button onClick={() => navigate(`/profile/${conv.user_id}`)} aria-label={`Open ${conv.username || "user"}'s profile`} className="w-12 h-12 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-              {(conv.display_name || conv.username || "U")[0].toUpperCase()}
+            <button onClick={() => navigate(`/profile/${conv.user_id}`)} aria-label={`Open ${conv.username || "user"}'s profile`} className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-amber-200/25 bg-gradient-to-br from-amber-300/25 to-amber-700/20 text-lg font-semibold text-amber-100 shadow-[0_0_14px_rgba(212,175,55,.12)]">
+              {conv.avatar_url ? <img src={conv.avatar_url} alt="" className="h-full w-full object-cover" /> : (conv.display_name || conv.username || "U")[0].toUpperCase()}
+              {onlineIds.includes(conv.user_id) && <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#090909] bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,.9)]" />}
             </button>
             <div className="flex-1 min-w-0">
-              <button onClick={() => navigate(`/profile/${conv.user_id}`)} className="text-left text-sm font-semibold text-foreground">
+              <button onClick={() => navigate(`/profile/${conv.user_id}`)} className="text-left text-sm font-semibold text-amber-100 transition-colors group-hover:text-amber-200">
                 {conv.display_name || conv.username || "User"}
               </button>
-              <button onClick={() => setActiveChat(conv)} className="block w-full text-left text-sm text-muted-foreground truncate">
+              <button onClick={() => setActiveChat(conv)} className="block w-full truncate text-left text-sm text-white/80">
                 {conv.lastMsg || `@${conv.username || "user"}`}
               </button>
-              {onlineIds.includes(conv.user_id) && <span className="text-xs text-primary">Online</span>}
+              {onlineIds.includes(conv.user_id) && <span className="text-[10px] text-amber-200/70">Online now</span>}
             </div>
-            {!!conv.unread && <button onClick={() => setActiveChat(conv)} aria-label={`${conv.unread} unread messages`} className="bg-primary text-primary-foreground rounded-full px-2 py-1 text-xs">{conv.unread}</button>}
+            {!!conv.unread && <button onClick={() => setActiveChat(conv)} aria-label={`${conv.unread} unread messages`} className="rounded-full border border-amber-200/30 bg-amber-300/15 px-2.5 py-1 text-xs font-semibold text-amber-100 shadow-[0_0_12px_rgba(252,211,77,.25)]">{conv.unread}</button>}
           </motion.div>
         ))}
       </div>
+      <button
+        type="button"
+        aria-label="Compose message"
+        title="Compose message"
+        onClick={() => {
+          searchInputRef.current?.focus();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+        className="depth-press fixed bottom-6 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-200/35 bg-black/70 text-amber-200 shadow-[inset_0_1px_0_rgba(255,255,255,.14),0_0_24px_rgba(212,175,55,.28)] backdrop-blur-xl transition-transform hover:scale-105 hover:shadow-[0_0_32px_rgba(252,211,77,.4)] active:scale-90"
+      >
+        <PenLine className="h-5 w-5 drop-shadow-[0_0_7px_rgba(252,211,77,.9)]" />
+      </button>
     </div>
   );
 };

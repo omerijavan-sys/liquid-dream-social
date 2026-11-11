@@ -94,18 +94,20 @@ const FloatingActions = () => {
   }, [openAI]);
 
   const actions = [
-    { label: "Create post", icon: Plus, run: () => navigate("/create") },
-    { label: "Open chat", icon: MessageCircle, run: () => navigate("/messages") },
-    { label: "Quick search", icon: Search, run: () => navigate("/search") },
-    { label: "AI assistant", icon: Sparkles, run: () => { void openAI(); } },
-    { label: "Online calls", icon: Video, run: () => { setCallsOpen(true); setMenuOpen(false); } },
-    { label: "Prime Hub", icon: Layers, run: () => { setHubOpen(true); setMenuOpen(false); } },
+    { label: "Create post", icon: Plus, run: () => navigate("/create"), position: [0.76, 0.72] },
+    { label: "Open chat", icon: MessageCircle, run: () => navigate("/messages"), position: [0.28, 0.76] },
+    { label: "Quick search", icon: Search, run: () => navigate("/search"), position: [0.14, 0.5] },
+    { label: "AI assistant", icon: Sparkles, run: () => { void openAI(); }, position: [0.32, 0.25] },
+    { label: "Online calls", icon: Video, run: () => setCallsOpen(true), position: [0.7, 0.25] },
+    { label: "Prime Hub", icon: Layers, run: () => setHubOpen(true), position: [0.88, 0.48] },
     { label: "Hide floating actions", icon: EyeOff, run: () => {
       localStorage.setItem("primegram:floatingActionsHidden", "true");
       setHidden(true);
       setMenuOpen(false);
-    } },
+    }, position: [0.52, 0.55] },
   ];
+  const originX = window.innerWidth - 44;
+  const originY = window.innerHeight - 96;
 
   return (
     <>
@@ -123,23 +125,47 @@ const FloatingActions = () => {
           <Eye className="h-5 w-5" />
         </button>
       ) : (
-      <div className="fixed bottom-24 right-4 z-[55] flex flex-col items-end gap-3">
+      <>
         <AnimatePresence>
-          {menuOpen && actions.map((action, index) => (
+          {menuOpen && (
             <motion.button
-              key={action.label}
-              initial={{ opacity: 0, y: 12, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 420, damping: 30, delay: index * 0.025 }}
-              onClick={action.run}
-              className="depth-press flex items-center gap-3 rounded-2xl liquid-glass-elevated px-4 py-3 text-sm font-medium text-foreground shadow-lg"
-            >
-              <action.icon className="h-4 w-4 text-primary" />
-              {action.label}
-            </motion.button>
-          ))}
+              type="button"
+              aria-label="Close quick actions"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-[54] bg-background/20 backdrop-blur-[2px]"
+            />
+          )}
         </AnimatePresence>
+        <AnimatePresence>
+          {menuOpen && actions.map((action, index) => {
+            const targetX = Math.max(40, Math.min(window.innerWidth - 40, window.innerWidth * action.position[0]));
+            const targetY = Math.max(84, Math.min(window.innerHeight - 110, window.innerHeight * action.position[1]));
+            return (
+              <motion.button
+                key={action.label}
+                type="button"
+                aria-label={action.label}
+                title={action.label}
+                initial={{ opacity: 0, scale: 0.35, x: originX - targetX, y: originY - targetY }}
+                animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+                exit={{ opacity: 0, scale: 0.35, x: originX - targetX, y: originY - targetY }}
+                transition={{ type: "spring", stiffness: 380, damping: 28, delay: index * 0.035 }}
+                onClick={() => { setMenuOpen(false); action.run(); }}
+                style={{ left: targetX, top: targetY, translate: "-50% -50%" }}
+                className="depth-press fixed z-[56] flex h-14 w-14 items-center justify-center rounded-full liquid-glass-elevated text-primary shadow-xl"
+              >
+                <action.icon className="h-5 w-5" />
+                <span className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-background/90 px-2 py-1 text-[10px] font-medium text-foreground shadow">
+                  {action.label}
+                </span>
+              </motion.button>
+            );
+          })}
+        </AnimatePresence>
+      <div className="fixed bottom-24 right-4 z-[60]">
         <motion.button
           type="button"
           aria-label={menuOpen ? "Close quick actions" : "Open quick actions"}
@@ -147,16 +173,17 @@ const FloatingActions = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.92 }}
           onClick={() => setMenuOpen((open) => !open)}
-          className="depth-press flex h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg"
+          className="depth-press flex h-14 w-14 items-center justify-center rounded-full liquid-glass-elevated text-primary shadow-lg"
           style={{ boxShadow: "0 4px 24px hsla(280, 80%, 60%, 0.38)" }}
         >
           <motion.span animate={{ rotate: menuOpen ? 45 : 0 }} className="flex">
             {menuOpen
-              ? <X className="h-6 w-6 text-primary-foreground" />
-              : <Plus className="h-6 w-6 text-primary-foreground" />}
+              ? <X className="h-6 w-6" />
+              : <Plus className="h-6 w-6" />}
           </motion.span>
         </motion.button>
       </div>
+      </>
       )}
 
       <PrimeHubPanel open={hubOpen} onClose={() => setHubOpen(false)} />

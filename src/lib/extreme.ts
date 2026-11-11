@@ -8,6 +8,7 @@ export const TIERS = [
   { id: "blue", name: "Prime Blue", price: 199, color: "text-brand-blue", perks: "Blue tick, search boost, DM Garage sellers" },
   { id: "gold", name: "Prime Gold", price: 499, color: "text-primary", perks: "Gold business tick, shop link, priority" },
   { id: "black", name: "Founder Black", price: 999, color: "text-foreground", perks: "Black aura, top spotlight, every perk" },
+  { id: "all_access", name: "Prime All Access", price: 10000, color: "text-primary", perks: "Access to all Primegram Extreme features for 30 days" },
 ] as const;
 
 export const TIP_AMOUNTS = [5, 20, 50, 100, 500, 1000] as const;
