@@ -1,4 +1,4 @@
-const CACHE_NAME = 'primegram-v1';
+const CACHE_NAME = 'primegram-v2';
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -10,32 +10,43 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            void caches.open(CACHE_NAME).then(cache => cache.put('/', response.clone()));
+          }
           return response;
-        }
-        return fetch(event.request);
-      })
+        })
+        .catch(async () => (await caches.match('/', { cacheName: CACHE_NAME })) || Response.error())
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request, { cacheName: CACHE_NAME })
+      .then(response => response || fetch(request))
   );
 });
 
 self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (!cacheWhitelist.includes(cacheName)) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys()
+      .then(cacheNames => Promise.all(
+        cacheNames
+          .filter(cacheName => cacheName !== CACHE_NAME)
+          .map(cacheName => caches.delete(cacheName))
+      ))
+      .then(() => self.clients.claim())
   );
 });
