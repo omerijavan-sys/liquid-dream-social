@@ -12,7 +12,7 @@ import AdultTab from "@/components/AdultTab";
 import MatchTab from "@/components/MatchTab";
 import { getGlobalTrendingMusic, searchGlobalMusic, type GlobalMusicTrack } from "@/services/GlobalMusicService";
 
-const card = "rounded-2xl border border-primary/30 bg-card/70 backdrop-blur-xl p-4 shadow-[0_0_30px_-12px_hsl(var(--primary)/0.6)]";
+const card = "rounded-2xl border border-amber-300/20 bg-[#0b0c0f]/75 p-4 shadow-[0_10px_30px_rgba(0,0,0,.24)] backdrop-blur-xl";
 const err = (e: any) => toast.error(e?.message || "Something went wrong");
 
 type Profile = { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null };
@@ -73,15 +73,24 @@ const VerifiedTab = ({ balance, refresh }: { balance: number | null; refresh: ()
   return (
     <div className="space-y-3">
       {tier && <p className="text-sm">Current tier: <b className="text-primary capitalize">{tier}</b></p>}
-      <div className={`${card} flex items-center justify-between gap-3`}>
-        <p className="text-sm">Wallet balance: <b>{balance === null ? "Loading…" : `${balance.toLocaleString()} KES`}</b></p>
+      <div className={`${card} flex items-center justify-between gap-3 border-amber-200/30`}>
+        <p className="text-sm text-white/75">Wallet balance: <b className="text-amber-100">{balance === null ? "Loading…" : `${balance.toLocaleString()} KES`}</b></p>
         <Button size="sm" variant="secondary" onClick={() => navigate("/wallet")}>Top up wallet</Button>
       </div>
       {TIERS.map((t) => (
-        <div key={t.id} className={`${card} ${t.id === "all_access" ? "border-primary/60 bg-gradient-to-br from-primary/10 via-card/70 to-fuchsia-500/10 shadow-[0_0_34px_-10px_hsl(var(--primary)/.8)]" : ""}`}>
-          <div className="flex items-center justify-between gap-3">
-            <div><p className="font-bold flex items-center gap-1"><BadgeCheck className={`w-4 h-4 ${t.color}`} />{t.name}</p><p className="text-sm text-muted-foreground">{t.perks}</p>{t.id === "all_access" && <p className="mt-1 text-xs text-primary">One prepaid month · no automatic renewal</p>}</div>
-            <Button disabled={subscribing !== null} onClick={() => balance !== null && balance < t.price ? navigate("/wallet") : void sub(t.id)}>
+        <div key={t.id} className={`relative min-h-[132px] overflow-hidden ${card} ${t.id === "gold" ? "border-amber-300/55 shadow-[0_0_28px_rgba(234,179,8,.13)]" : ""} ${t.id === "all_access" ? "border-amber-300/60 bg-gradient-to-br from-amber-200/[0.08] via-[#0b0c0f]/80 to-fuchsia-500/[0.08]" : ""}`}>
+          <div className="relative z-10 flex min-h-[96px] items-start justify-between gap-3">
+            <div>
+              <p className="flex items-center gap-1.5 font-bold text-white"><BadgeCheck className={`h-4 w-4 ${t.color}`} />{t.name}</p>
+              <p className="mt-1 text-sm text-white/65">{t.perks}</p>
+              {t.id === "all_access" && <p className="mt-1 text-xs text-amber-200/80">One prepaid month · no automatic renewal</p>}
+            </div>
+            <Button
+              variant="outline"
+              className="shrink-0 rounded-full border-amber-200/50 bg-black/45 text-amber-100 shadow-[0_0_14px_rgba(234,179,8,.13)] hover:bg-amber-200/10 hover:text-white"
+              disabled={subscribing !== null}
+              onClick={() => balance !== null && balance < t.price ? navigate("/wallet") : void sub(t.id)}
+            >
               {subscribing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : balance !== null && balance < t.price ? "Top up" : `${t.price.toLocaleString()} KES/mo`}
             </Button>
           </div>
@@ -324,15 +333,15 @@ export default function ExtremePage() {
   const requestedTab = new URLSearchParams(location.search).get("tab");
   const defaultTab = tabs.some(({ v }) => v === requestedTab) ? requestedTab! : "verified";
   return (
-    <div className="min-h-screen bg-background pb-28">
-      <header className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3 bg-background/80 backdrop-blur-xl border-b border-primary/20">
-        <button onClick={() => navigate(-1)} aria-label="Back"><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="font-black tracking-wide text-primary">PRIME EXTREME</h1>
-        <button onClick={() => navigate("/wallet")} className="ml-auto rounded-full border border-primary/40 px-3 py-1 text-sm">{bal === null ? "…" : `${bal.toLocaleString()} KES`}</button>
+    <div className="prime-extreme min-h-screen pb-28">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-amber-200/20 bg-[#070809]/90 px-3 py-2.5 backdrop-blur-xl">
+        <button onClick={() => navigate(-1)} aria-label="Back" className="text-amber-100"><ArrowLeft className="h-4 w-4" /></button>
+        <h1 className="text-sm font-black tracking-wide text-amber-300">PRIME EXTREME</h1>
+        <button onClick={() => navigate("/wallet")} className="ml-auto rounded-full border border-amber-200/50 bg-black/50 px-3 py-1 text-xs font-semibold text-amber-100 shadow-[0_0_12px_rgba(234,179,8,.18)]">{bal === null ? "…" : `${bal.toLocaleString()} KES`}</button>
       </header>
-      <Tabs defaultValue={defaultTab} className="px-4 pt-4">
-        <TabsList className="w-full flex overflow-x-auto justify-start bg-card/60 h-auto p-1">
-          {tabs.map(({ v, l, i: I }) => <TabsTrigger key={v} value={v} className="flex-1 gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><I className="w-3.5 h-3.5" />{l}</TabsTrigger>)}
+      <Tabs defaultValue={defaultTab} className="px-2 pt-2">
+        <TabsList className="prime-extreme-tabs flex h-auto w-full justify-start gap-1 overflow-x-auto bg-transparent p-0.5">
+          {tabs.map(({ v, l, i: I }) => <TabsTrigger key={v} value={v} className="min-w-max flex-1 gap-1 rounded-full border border-amber-200/30 bg-black/45 px-3 py-1.5 text-[11px] text-white/80 data-[state=active]:border-amber-100/70 data-[state=active]:bg-amber-400 data-[state=active]:text-[#17120a] data-[state=active]:shadow-[0_0_14px_rgba(234,179,8,.36)]"><I className="h-3 w-3" />{l}</TabsTrigger>)}
         </TabsList>
         <div className="mt-4">
           <TabsContent value="verified"><VerifiedTab balance={bal} refresh={refresh} /></TabsContent>

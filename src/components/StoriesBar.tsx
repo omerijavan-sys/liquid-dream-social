@@ -18,32 +18,33 @@ interface StoryBubbleProps {
   index: number;
   onClick?: () => void;
   isAdd?: boolean;
+  homeStyle?: boolean;
 }
 
-const StoryBubble = ({ name, imageUrl, initial, gradient, hasNew = true, index, onClick, isAdd }: StoryBubbleProps) => (
+const StoryBubble = ({ name, imageUrl, initial, gradient, hasNew = true, index, onClick, isAdd, homeStyle = false }: StoryBubbleProps) => (
   <motion.button
     initial={{ opacity: 0, scale: 0.8 }}
     animate={{ opacity: 1, scale: 1 }}
     transition={{ delay: index * 0.05, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-    className="flex flex-col items-center gap-1.5 min-w-[4.5rem] depth-press"
+    className={`depth-press flex min-w-[4.5rem] flex-col items-center gap-1.5 ${homeStyle ? "min-w-[4rem]" : ""}`}
     onClick={onClick}
   >
-    <div className={`relative w-16 h-16 rounded-full ${hasNew ? "p-[2px]" : "p-[1px]"}`}
+    <div className={`relative h-16 w-16 rounded-full ${hasNew ? "p-[2px]" : "p-[1px]"} ${homeStyle ? "h-[3.5rem] w-[3.5rem]" : ""}`}
       style={{ background: hasNew ? gradient : "hsla(var(--glass-border) / 0.15)" }}
     >
-      <div className="w-full h-full rounded-full bg-background p-[2px]">
-        <div className="w-full h-full rounded-full liquid-glass flex items-center justify-center overflow-hidden">
+      <div className={`h-full w-full rounded-full p-[2px] ${homeStyle ? "bg-[#090b12]" : "bg-background"}`}>
+        <div className={`flex h-full w-full items-center justify-center overflow-hidden rounded-full ${homeStyle ? "border border-white/10 bg-[#11131e]" : "liquid-glass"}`}>
           {imageUrl ? (
             <img src={imageUrl} alt={name} className="w-full h-full object-cover rounded-full" />
           ) : isAdd ? (
-            <Plus className="w-6 h-6 text-primary relative z-10" />
+            <Plus className={`relative z-10 h-6 w-6 ${homeStyle ? "text-rose-400" : "text-primary"}`} />
           ) : (
-            <span className="text-lg font-semibold text-foreground relative z-10">{initial}</span>
+            <span className={`relative z-10 text-lg font-semibold ${homeStyle ? "text-rose-100" : "text-foreground"}`}>{initial}</span>
           )}
         </div>
       </div>
     </div>
-    <span className="text-caption text-foreground/70 truncate w-full text-center">{name}</span>
+    <span className={`text-caption w-full truncate text-center ${homeStyle ? "text-white/75" : "text-foreground/70"}`}>{name}</span>
   </motion.button>
 );
 
@@ -56,7 +57,7 @@ interface StoryView {
   progress?: number;
 }
 
-const StoriesBar = () => {
+const StoriesBar = ({ homeStyle = false }: { homeStyle?: boolean }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stories, setStories] = useState<StoryView[]>([]);
@@ -196,11 +197,11 @@ const StoriesBar = () => {
   return (
     <>
       <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileSelect} />
-      <div className="overflow-x-auto scrollbar-none py-3 px-4">
+      <div className={`scrollbar-none overflow-x-auto px-4 py-3 ${homeStyle ? "md:py-2" : ""}`}>
         <div className="flex gap-3">
-          <StoryBubble name={uploading ? "Posting..." : "Your Story"} initial="+" gradient="linear-gradient(135deg, hsl(210, 100%, 60%), hsl(260, 80%, 60%))" hasNew={false} index={0} onClick={handleAddStory} isAdd />
+          <StoryBubble name={uploading ? "Posting..." : "Your Story"} initial="+" gradient={homeStyle ? "linear-gradient(135deg, #fb7185, #ef4444)" : "linear-gradient(135deg, hsl(210, 100%, 60%), hsl(260, 80%, 60%))"} hasNew={false} index={0} onClick={handleAddStory} isAdd homeStyle={homeStyle} />
           {stories.map((story, i) => (
-            <StoryBubble key={story.id} name={story.display_name} imageUrl={story.image_url} initial={story.display_name[0]} gradient="linear-gradient(135deg, hsl(350, 80%, 58%), hsl(280, 70%, 55%))" hasNew index={i + 1} onClick={() => openStory(story)} />
+            <StoryBubble key={story.id} name={story.display_name} imageUrl={story.image_url} initial={story.display_name[0]} gradient={homeStyle ? "conic-gradient(from 25deg, #fb7185, #f43f5e, #22d3ee, #a855f7, #fb7185)" : "linear-gradient(135deg, hsl(350, 80%, 58%), hsl(280, 70%, 55%))"} hasNew index={i + 1} onClick={() => openStory(story)} homeStyle={homeStyle} />
           ))}
         </div>
       </div>

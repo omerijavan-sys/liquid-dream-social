@@ -68,7 +68,7 @@ const PrimeHubPanel = ({ open, onClose }: { open: boolean; onClose: () => void }
   );
 };
 
-const FloatingActions = () => {
+const FloatingActions = ({ homeStyle = false }: { homeStyle?: boolean }) => {
   const [callsOpen, setCallsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
@@ -120,7 +120,7 @@ const FloatingActions = () => {
             localStorage.setItem("primegram:floatingActionsHidden", "false");
             setHidden(false);
           }}
-          className="fixed bottom-24 right-4 z-[55] flex h-11 w-11 items-center justify-center rounded-full liquid-glass-elevated text-foreground shadow-lg"
+          className={`fixed bottom-24 right-4 z-[55] flex h-11 w-11 items-center justify-center rounded-full text-foreground shadow-lg ${homeStyle ? "border border-rose-300/30 bg-[#100910]/90" : "liquid-glass-elevated"}`}
         >
           <Eye className="h-5 w-5" />
         </button>
@@ -155,7 +155,7 @@ const FloatingActions = () => {
                 transition={{ type: "spring", stiffness: 380, damping: 28, delay: index * 0.035 }}
                 onClick={() => { setMenuOpen(false); action.run(); }}
                 style={{ left: targetX, top: targetY, translate: "-50% -50%" }}
-                className="depth-press fixed z-[56] flex h-14 w-14 items-center justify-center rounded-full liquid-glass-elevated text-primary shadow-xl"
+                className={`depth-press fixed z-[56] flex h-14 w-14 items-center justify-center rounded-full shadow-xl ${homeStyle ? "border border-rose-300/30 bg-[#140a12]/95 text-rose-300" : "liquid-glass-elevated text-primary"}`}
               >
                 <action.icon className="h-5 w-5" />
                 <span className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-background/90 px-2 py-1 text-[10px] font-medium text-foreground shadow">
@@ -173,8 +173,8 @@ const FloatingActions = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.92 }}
           onClick={() => setMenuOpen((open) => !open)}
-          className="depth-press flex h-14 w-14 items-center justify-center rounded-full liquid-glass-elevated text-primary shadow-lg"
-          style={{ boxShadow: "0 4px 24px hsla(280, 80%, 60%, 0.38)" }}
+          className={`depth-press flex h-14 w-14 items-center justify-center rounded-full shadow-lg ${homeStyle ? "border border-rose-300/45 bg-[#11080d]/90 text-rose-300 backdrop-blur-xl" : "liquid-glass-elevated text-primary"}`}
+          style={{ boxShadow: homeStyle ? "0 4px 28px rgba(244, 63, 94, .36)" : "0 4px 24px hsla(280, 80%, 60%, 0.38)" }}
         >
           <motion.span animate={{ rotate: menuOpen ? 45 : 0 }} className="flex">
             {menuOpen

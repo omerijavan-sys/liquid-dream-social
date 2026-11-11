@@ -126,21 +126,21 @@ const ProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <div className="liquid-glass-elevated safe-area-top">
-        <div className="flex items-center gap-3 px-5 py-4 relative z-10">
-          <button onClick={() => navigate(-1)} className="depth-press"><ArrowLeft className="w-5 h-5 text-foreground" /></button>
-          <span className="text-headline text-foreground text-base flex-1 flex items-center gap-1">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} /></span>
-          <button onClick={() => navigate("/settings")} className="depth-press"><Settings className="w-5 h-5 text-foreground" /></button>
+    <div className="prime-profile min-h-screen pb-24">
+      <div className="sticky top-0 z-30 border-b border-amber-200/20 bg-[#08090d]/85 backdrop-blur-xl safe-area-top">
+        <div className="relative z-10 flex items-center gap-3 px-3 py-2.5">
+          <button onClick={() => navigate(-1)} aria-label="Back" className="depth-press text-amber-100"><ArrowLeft className="h-4 w-4" /></button>
+          <span className="flex flex-1 items-center gap-1 text-sm font-bold text-white">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} /></span>
+          <button onClick={() => navigate("/settings")} aria-label="Settings" className="depth-press text-amber-200"><Settings className="h-5 w-5" /></button>
         </div>
       </div>
 
-      <div className="p-5">
-        <div className="flex items-center gap-5 mb-4">
+      <div className="prime-profile-header px-3 pb-3 pt-4 md:px-5">
+        <div className="mb-3 flex items-center gap-4">
           <div className="relative">
             <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
             <button onClick={() => setAvatarOpen(true)} aria-label="View profile picture" className="depth-press relative">
-              <div className="w-20 h-20 rounded-full liquid-glass flex items-center justify-center overflow-hidden">
+              <div className="prime-profile-avatar flex h-16 w-16 items-center justify-center overflow-hidden rounded-full">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
@@ -154,34 +154,34 @@ const ProfilePage = () => {
                 <Camera className="w-3 h-3 text-primary-foreground" />
             </button>
           </div>
-          <div className="flex-1 flex justify-around text-center">
-            <div><p className="text-lg font-bold text-foreground">{posts.length}</p><p className="text-caption text-muted-foreground">Posts</p></div>
-            <button onClick={() => setListMode("followers")} className="depth-press"><p className="text-lg font-bold text-foreground">{followersCount}</p><p className="text-caption text-muted-foreground">Followers</p></button>
-            <button onClick={() => setListMode("following")} className="depth-press"><p className="text-lg font-bold text-foreground">{myFollowing.size}</p><p className="text-caption text-muted-foreground">Following</p></button>
+          <div className="flex flex-1 items-center justify-around text-center">
+            <div className="prime-profile-post-count flex h-[4.5rem] w-[4.5rem] flex-col items-center justify-center rounded-full"><p className="text-base font-bold text-white">{posts.length}</p><p className="text-[10px] text-white/65">Posts</p></div>
+            <button onClick={() => setListMode("followers")} className="depth-press"><p className="text-base font-bold text-white">{followersCount}</p><p className="text-[10px] text-white/65">Followers</p></button>
+            <button onClick={() => setListMode("following")} className="depth-press"><p className="text-base font-bold text-white">{myFollowing.size}</p><p className="text-[10px] text-white/65">Following</p></button>
           </div>
         </div>
-        <p className="text-sm font-semibold text-foreground">{profile?.display_name || "User"}</p>
-        <p className="text-sm text-muted-foreground mt-1">{profile?.bio || "No bio yet"}</p>
+        <p className="text-sm font-bold text-white">{profile?.display_name || "User"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} /></p>
+        <p className="mt-1 text-xs text-white/60">{profile?.bio || "No bio yet"}</p>
 
-        <div className="flex gap-2 mt-4">
-          <button onClick={() => navigate("/settings")} className="depth-press flex-1 py-2.5 rounded-2xl liquid-glass text-sm font-semibold text-foreground relative z-10">
+        <div className="mt-3 flex gap-2">
+          <button onClick={() => navigate("/settings")} className="prime-profile-action depth-press relative z-10 flex-1 rounded-xl py-2 text-xs font-semibold">
             Edit Profile
           </button>
-          <button onClick={() => { const url = window.location.origin + "/profile"; navigator.share ? navigator.share({ url }).catch(() => {}) : (navigator.clipboard.writeText(url), toast.success("Link copied")); }} className="depth-press flex-1 py-2.5 rounded-2xl liquid-glass text-sm font-semibold text-foreground relative z-10">
+          <button onClick={() => { const url = window.location.origin + "/profile"; navigator.share ? navigator.share({ url }).catch(() => {}) : (navigator.clipboard.writeText(url), toast.success("Link copied")); }} className="prime-profile-action depth-press relative z-10 flex-1 rounded-xl py-2 text-xs font-semibold">
             Share Profile
           </button>
         </div>
 
         {suggested.length > 0 && (
-          <div className="mt-6">
-            <p className="text-sm font-semibold text-muted-foreground mb-3">Suggested for you</p>
-            <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold text-white/65">Suggested for you</p>
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               {suggested.map(s => (
-                <div key={s.user_id} className="flex flex-col items-center gap-1 w-20 shrink-0">
-                <button onClick={() => navigate(`/profile/${s.user_id}`)} aria-label={`Open ${s.username || "user"}'s profile`} className="w-14 h-14 rounded-full bg-secondary overflow-hidden flex items-center justify-center font-bold">
+                <div key={s.user_id} className="prime-suggested-card flex w-[88px] shrink-0 flex-col items-center gap-1 rounded-xl p-1.5">
+                <button onClick={() => navigate(`/profile/${s.user_id}`)} aria-label={`Open ${s.username || "user"}'s profile`} className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-secondary font-bold">
                     {s.avatar_url ? <img src={s.avatar_url} alt="" className="w-full h-full object-cover" /> : (s.username || "U")[0].toUpperCase()}
                 </button>
-                <button onClick={() => navigate(`/profile/${s.user_id}`)} className="text-xs text-foreground truncate w-full text-center">{s.username || s.display_name}</button>
+                <button onClick={() => navigate(`/profile/${s.user_id}`)} className="w-full truncate text-center text-[10px] text-white/85">{s.username || s.display_name}</button>
                   <FollowButton targetId={s.user_id} following={myFollowing.has(s.user_id)} onChange={v => {
                     const n = new Set(myFollowing); v ? n.add(s.user_id) : n.delete(s.user_id); setMyFollowing(n);
                   }} />
@@ -193,7 +193,7 @@ const ProfilePage = () => {
       </div>
       {listMode && <FollowListDialog open onOpenChange={o => !o && setListMode(null)} mode={listMode} userId={user.id} myFollowing={myFollowing} setMyFollowing={setMyFollowing} />}
 
-      <div className="flex border-b border-border">
+      <div className="prime-profile-tabs flex border-y border-white/10 bg-black/20">
         {[
           { id: "posts" as const, icon: Grid3X3 },
           { id: "reels" as const, icon: Film },
@@ -204,11 +204,11 @@ const ProfilePage = () => {
             key={t.id}
             onClick={() => setTab(t.id)}
             aria-label={t.id[0].toUpperCase() + t.id.slice(1)}
-            className={`flex-1 py-3 flex justify-center relative ${tab === t.id ? "text-foreground" : "text-muted-foreground"}`}
+            className={`relative flex flex-1 justify-center py-2.5 ${tab === t.id ? "text-amber-200" : "text-white/45"}`}
           >
             <t.icon className="w-5 h-5" />
             {tab === t.id && (
-              <motion.div layoutId="profile-tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
+              <motion.div layoutId="profile-tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-200 to-transparent shadow-[0_0_8px_rgba(234,179,8,.6)]" />
             )}
           </button>
         ))}
@@ -228,7 +228,7 @@ const ProfilePage = () => {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-0.5 p-0.5">
+        <div className="prime-profile-grid grid grid-cols-3 gap-0.5 p-0.5">
           {shown.map((post, i) => (
             <motion.button type="button" key={post.id} onClick={() => setSelectedMedia(post)} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
               {post.media_type === "video" ? (
@@ -268,7 +268,7 @@ const ProfilePage = () => {
           {selectedMedia?.caption && <p className="p-4 text-sm text-foreground">{selectedMedia.caption}</p>}
         </DialogContent>
       </Dialog>
-      <GlassTabBar />
+      <GlassTabBar goldStyle />
     </div>
   );
 };

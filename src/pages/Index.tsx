@@ -103,14 +103,14 @@ const Index = () => {
   }, [fetchPosts, hasMore, loading]);
 
   return (
-    <div className="min-h-screen bg-background relative">
-      <TopNavBar />
+    <div className="home-dashboard relative min-h-screen">
+      <TopNavBar homeStyle />
 
-      <main className="relative z-10 pt-14 pb-24">
-        <div className="mt-2 mb-4">
-          <StoriesBar />
+      <main className="relative z-10 pb-28 pt-12">
+        <div className="mx-auto mb-2 max-w-[1440px]">
+          <StoriesBar homeStyle />
         </div>
-        <div className="px-4">
+        <div className="mx-auto w-full max-w-[1440px] px-0">
           {posts.length === 0 && loading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
           ) : posts.length === 0 ? (
@@ -134,6 +134,7 @@ const Index = () => {
                 comments={0}
                 timeAgo={timeAgo(post.created_at)}
                 index={i}
+                variant="home"
                 postId={post.id}
                 authorId={post.user_id}
                 isVerified={post.profile?.is_verified}
@@ -157,8 +158,8 @@ const Index = () => {
         </div>
       </main>
 
-      <FloatingActions />
-      <GlassTabBar />
+      <FloatingActions homeStyle />
+      <GlassTabBar homeStyle />
     </div>
   );
 };
