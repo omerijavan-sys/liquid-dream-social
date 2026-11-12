@@ -4,16 +4,16 @@
 
 ## Public identity
 
-- Canonical website: https://primegram-extreme.vercel.app/
+- Canonical website: https://primegram.com/
 - Product name: Primegram Extreme
 - Category: Social networking, short-form video, messaging, music discovery, creator communities
 - Primary language: English
-- Public crawl policy: https://primegram-extreme.vercel.app/robots.txt
-- Sitemap: https://primegram-extreme.vercel.app/sitemap.xml
+- Public crawl policy: https://primegram.com/robots.txt
+- Sitemap: https://primegram.com/sitemap.xml
 
 ## Public description
 
-Primegram Extreme brings social posts, Reels, direct messages, music discovery, creator profiles, sports, movies, and community features into one mobile-friendly web experience. The public home page is the authoritative overview of the product. An Android APK is available at https://primegram-extreme.vercel.app/primegram-extreme.apk.
+Primegram Extreme brings social posts, Reels, direct messages, music discovery, creator profiles, sports, movies, and community features into one mobile-friendly web experience. The public home page is the authoritative overview of the product. An Android APK is available at https://primegram.com/primegram-extreme.apk.
 
 ## Important access note
 

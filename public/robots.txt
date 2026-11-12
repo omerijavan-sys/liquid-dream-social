@@ -21,4 +21,4 @@ Disallow: /sports
 Disallow: /movies
 Disallow: /discover
 
-Sitemap: https://primegram-extreme.vercel.app/sitemap.xml
+Sitemap: https://primegram.com/sitemap.xml
