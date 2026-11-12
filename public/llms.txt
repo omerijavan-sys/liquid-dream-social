@@ -13,7 +13,7 @@
 
 ## Public description
 
-Primegram Extreme brings social posts, Reels, direct messages, music discovery, creator profiles, sports, movies, and community features into one mobile-friendly web experience. The public home page is the authoritative overview of the product.
+Primegram Extreme brings social posts, Reels, direct messages, music discovery, creator profiles, sports, movies, and community features into one mobile-friendly web experience. The public home page is the authoritative overview of the product. An Android APK is available at https://primegram-extreme.vercel.app/primegram-extreme.apk.
 
 ## Important access note
 
