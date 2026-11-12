@@ -24,7 +24,9 @@ const ReelsPage = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [muted, setMuted] = useState(false);
+  // Start muted so browsers allow scroll-triggered autoplay. Users can enable
+  // sound with the volume button after playback has started.
+  const [muted, setMuted] = useState(true);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -75,19 +77,19 @@ const ReelsPage = () => {
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || reels.length === 0 || !hasMore) return;
+    if (!container || reels.length === 0) return;
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         const index = Number(entry.target.getAttribute("data-index"));
         if (entry.isIntersecting) {
           setCurrentIndex(index);
           videoRefs.current.get(index)?.play().catch(() => {});
-          if (index >= reels.length - 5) void fetchReels();
+          if (hasMoreRef.current && index >= reels.length - 5) void fetchReels();
         } else {
           videoRefs.current.get(index)?.pause();
         }
       });
-    }, { root: container, threshold: 0.7, rootMargin: "0px 0px 500px 0px" });
+    }, { root: container, threshold: 0.7 });
     container.querySelectorAll("[data-index]").forEach(element => observer.observe(element));
     return () => observer.disconnect();
   }, [fetchReels, hasMore, reels]);
@@ -227,6 +229,7 @@ const ReelsPage = () => {
                     loop
                     playsInline
                     muted={muted}
+                    autoPlay={i === 0}
                     preload={Math.abs(i - currentIndex) <= 1 ? "auto" : "none"}
                   />
                 )}
