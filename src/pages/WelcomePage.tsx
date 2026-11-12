@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import PrimeLogo from "@/components/PrimeLogo";
+import AndroidDownloadCard from "@/components/AndroidDownloadCard";
 
 const WelcomePage = () => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ const WelcomePage = () => {
       <div className="mt-8 h-1 w-40 rounded-full bg-secondary overflow-hidden">
         <motion.div className="h-full bg-primary" initial={{ width: "0%" }} animate={{ width: "100%" }} transition={{ duration: 2.4, ease: "easeInOut" }} />
       </div>
+      <div className="mt-6 w-[min(92vw,26rem)]"><AndroidDownloadCard compact /></div>
       <p className="absolute bottom-8 text-xs text-muted-foreground">Created by Java Prime · Sponsored by JP7 ULTRA</p>
     </div>
   );

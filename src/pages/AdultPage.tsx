@@ -1,7 +1,7 @@
 import { ArrowLeft, ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import AdultTab from "@/components/AdultTab";
+import AdultHubVerified from "@/components/AdultHubVerified";
 import GlassTabBar from "@/components/GlassTabBar";
 
 const AdultPage = () => {
@@ -21,7 +21,7 @@ const AdultPage = () => {
       </header>
       <main className="mx-auto max-w-lg p-4 pt-5">
         {user ? (
-          <AdultTab />
+          <AdultHubVerified />
         ) : (
           <div className="rounded-2xl border border-primary/30 bg-card/70 p-5 text-center">
             <p className="font-semibold text-foreground">Sign in to verify your age</p>

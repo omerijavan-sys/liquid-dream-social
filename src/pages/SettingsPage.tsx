@@ -10,6 +10,7 @@ import { readPreference, savePreference, Theme } from "@/utils/preferences";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
+import AndroidDownloadCard from "@/components/AndroidDownloadCard";
 
 type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions";
 
@@ -583,6 +584,8 @@ const SettingsPage = () => {
                 ))}
               </div>
             </section>
+
+            <AndroidDownloadCard />
 
             <section className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur-xl">
               <div className="mb-3 flex items-center gap-2"><Music2 className="h-4 w-4 text-pink-300" /><h2 className="text-xs font-semibold text-foreground">Global Music Preferences</h2></div>
