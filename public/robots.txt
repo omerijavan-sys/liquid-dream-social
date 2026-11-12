@@ -1,4 +1,24 @@
 User-agent: *
 Allow: /
+Disallow: /auth
+Disallow: /welcome
+Disallow: /reset-password
+Disallow: /messages
+Disallow: /settings
+Disallow: /notifications
+Disallow: /wallet
+Disallow: /create
+Disallow: /reels
+Disallow: /profile
+Disallow: /call
+Disallow: /search
+Disallow: /admin
+Disallow: /adult
+Disallow: /crush
+Disallow: /bots
+Disallow: /extreme
+Disallow: /sports
+Disallow: /movies
+Disallow: /discover
 
 Sitemap: https://primegram-extreme.vercel.app/sitemap.xml
