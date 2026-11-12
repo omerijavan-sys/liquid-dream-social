@@ -415,33 +415,14 @@ const AuthPage = () => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: postAuthRedirect(), skipBrowserRedirect: true },
+        // Let Supabase/browser perform the cross-origin redirect directly.
+        // Fetching the provider URL first is blocked by OAuth CORS policies.
+        options: { redirectTo: postAuthRedirect() },
       });
       if (error) throw error;
-      if (!data.url) throw new Error("Google sign-in did not return an authorization URL.");
-
-      const authorizationResponse = await fetch(data.url, {
-        redirect: "manual",
-      });
-      if (authorizationResponse.status >= 400) {
-        const responseBody: unknown = await authorizationResponse.json();
-        const message =
-          typeof responseBody === "object" &&
-          responseBody !== null &&
-          "msg" in responseBody &&
-          typeof responseBody.msg === "string"
-            ? responseBody.msg
-            : `Google authorization failed (HTTP ${authorizationResponse.status}).`;
-        throw new Error(message);
-      }
-      if (!authorizationResponse.ok && authorizationResponse.type !== "opaqueredirect") {
-        throw new Error(`Google authorization check failed (HTTP ${authorizationResponse.status}).`);
-      }
-
       void logSecurityEvent("auth", "google_oauth_started");
-      window.location.assign(data.url);
     } catch (err: any) {
       toast.error(friendlyError(err.message || "Google sign-in failed"));
     } finally {
