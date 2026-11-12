@@ -42,6 +42,14 @@ dependencies {
     implementation project(':capacitor-cordova-android-plugins')
 }
 
+// Capacitor's Android dependency graph can bring both the merged Kotlin
+// standard library and the legacy jdk7/jdk8 split artifacts. Keep the merged
+// library and exclude the legacy duplicates so Gradle can package the APK.
+configurations.configureEach {
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+}
+
 apply from: 'capacitor.build.gradle'
 
 try {
