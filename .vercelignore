@@ -1,0 +1,7 @@
+.android-tools
+android/.gradle
+android/build
+android/app/build
+dist
+node_modules
+electron
