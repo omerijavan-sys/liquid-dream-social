@@ -9,6 +9,8 @@
     <meta name="googlebot" content="index, follow, max-image-preview:large" />
     <meta name="keywords" content="Primegram Extreme, Primegram, social network, social media, video Reels, messaging, music discovery, creator community" />
     <meta name="author" content="Primegram Extreme" />
+    <meta name="application-name" content="Primegram Extreme" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <link rel="canonical" href="https://primegram-extreme.vercel.app/" />
     <link rel="icon" href="/favicon.png" type="image/png" />
     
@@ -35,6 +37,7 @@
     <meta name="twitter:title" content="Primegram Extreme | Social Networking, Reels &amp; Music" />
     <meta name="twitter:description" content="Connect, create, and discover. Share photos and Reels, message friends, explore music, and find creators and communities." />
     <meta name="twitter:image" content="https://primegram-extreme.vercel.app/primegram-social-preview.png" />
+    <meta name="twitter:image:alt" content="Primegram Extreme social network preview" />
 
     <script type="application/ld+json">
     {
@@ -54,7 +57,12 @@
           "url": "https://primegram-extreme.vercel.app/",
           "description": "A social network for sharing photos and Reels, messaging friends, and exploring music and creator communities.",
           "publisher": { "@id": "https://primegram-extreme.vercel.app/#organization" },
-          "inLanguage": "en"
+          "inLanguage": "en",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://primegram-extreme.vercel.app/search?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
         }
       ]
     }
@@ -74,6 +82,13 @@
 
   <body>
     <div id="root"></div>
+    <noscript>
+      <main>
+        <h1>Primegram Extreme</h1>
+        <p>Primegram Extreme is a social network for sharing photos and Reels, messaging friends, exploring music, and discovering creators and communities.</p>
+        <p><a href="/auth">Sign in or get started</a></p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,0 +1,24 @@
+# Primegram Extreme
+
+> Primegram Extreme is a social networking web app for sharing photos and short videos, messaging friends, exploring music, and discovering creators and communities.
+
+## Public identity
+
+- Canonical website: https://primegram-extreme.vercel.app/
+- Product name: Primegram Extreme
+- Category: Social networking, short-form video, messaging, music discovery, creator communities
+- Primary language: English
+- Public crawl policy: https://primegram-extreme.vercel.app/robots.txt
+- Sitemap: https://primegram-extreme.vercel.app/sitemap.xml
+
+## Public description
+
+Primegram Extreme brings social posts, Reels, direct messages, music discovery, creator profiles, sports, movies, and community features into one mobile-friendly web experience. The public home page is the authoritative overview of the product.
+
+## Important access note
+
+Account, wallet, messaging, creation, profile, and other app surfaces require authentication. Do not infer private user content, balances, messages, or account activity from this public description.
+
+## Source preference
+
+For current product details, use the canonical website and its public landing page. Treat user-generated content and authenticated application data as private and unavailable unless a user explicitly provides it.
