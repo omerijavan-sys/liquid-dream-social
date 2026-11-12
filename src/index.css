@@ -166,6 +166,18 @@
 }
 
 @layer base {
+  :root[data-color-theme="sapphire"] { --primary: 214 92% 58%; --accent: 199 95% 52%; --ring: 214 92% 58%; --brand-blue: 214 92% 58%; --brand-red: 276 72% 58%; }
+  :root[data-color-theme="emerald"] { --primary: 152 72% 46%; --accent: 166 80% 42%; --ring: 152 72% 46%; --brand-green: 152 72% 46%; --brand-blue: 184 78% 48%; }
+  :root[data-color-theme="amethyst"] { --primary: 266 86% 68%; --accent: 286 82% 62%; --ring: 266 86% 68%; --brand-blue: 266 86% 68%; --brand-red: 326 78% 62%; }
+  :root[data-color-theme="sunset"] { --primary: 20 96% 58%; --accent: 338 88% 62%; --ring: 20 96% 58%; --brand-yellow: 28 96% 58%; --brand-red: 338 88% 62%; }
+  :root[data-color-theme="ruby"] { --primary: 350 88% 58%; --accent: 8 88% 58%; --ring: 350 88% 58%; --brand-red: 350 88% 58%; --brand-yellow: 26 90% 54%; }
+  :root[data-color-theme="ocean"] { --primary: 186 86% 52%; --accent: 174 74% 46%; --ring: 186 86% 52%; --brand-blue: 186 86% 52%; --brand-green: 174 74% 46%; }
+  :root[data-color-theme="rose"] { --primary: 330 84% 66%; --accent: 292 78% 66%; --ring: 330 84% 66%; --brand-red: 330 84% 66%; --brand-blue: 292 78% 66%; }
+  :root[data-color-theme="amber"] { --primary: 38 96% 56%; --accent: 24 92% 54%; --ring: 38 96% 56%; --brand-yellow: 38 96% 56%; --brand-red: 24 92% 54%; }
+  :root[data-color-theme="lime"] { --primary: 82 78% 52%; --accent: 112 66% 46%; --ring: 82 78% 52%; --brand-green: 82 78% 52%; --brand-yellow: 58 88% 54%; }
+}
+
+@layer base {
   :root.light {
     --background: 0 0% 97%;
     --foreground: 220 15% 12%;

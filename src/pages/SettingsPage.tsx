@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRoles } from "@/hooks/useRole";
-import { readPreference, savePreference, Theme } from "@/utils/preferences";
+import { readPreference, savePreference, ColorTheme, Theme } from "@/utils/preferences";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
@@ -54,9 +54,11 @@ const SettingsPage = () => {
   const [privToggles, setPrivToggles] = useState({ private: false, activity: true, tags: true, dms: true });
   const [reduceAnimations, setReduceAnimations] = useState(() => readPreference("reduce-motion", false));
   const [theme, setThemeState] = useState<Theme>(() => readPreference("theme", "dark"));
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(() => readPreference("color-theme", "obsidian"));
   const darkMode = theme !== "light";
   const setTheme = (value: Theme) => { setThemeState(value); savePreference("theme", value); };
   const setDarkMode = (value: boolean) => setTheme(value ? "dark" : "light");
+  const updateColorTheme = (value: ColorTheme) => { setColorTheme(value); savePreference("color-theme", value); };
   const [changingPassword, setChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [creatorPrice, setCreatorPrice] = useState("50");
@@ -343,6 +345,34 @@ const SettingsPage = () => {
                     {t}
                   </Button>
                 ))}
+              </div>
+              <div className="mt-5 border-t border-white/10 pt-4">
+                <div className="mb-3 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Accent palette</p>
+                    <p className="text-[11px] text-muted-foreground">Choose a color mood for your liquid-glass interface.</p>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 text-[10px] capitalize text-white/70">{colorTheme}</span>
+                </div>
+                <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+                  {([
+                    ["obsidian", "Obsidian", "from-slate-400 to-slate-700"],
+                    ["sapphire", "Sapphire", "from-blue-300 to-blue-700"],
+                    ["emerald", "Emerald", "from-emerald-300 to-emerald-700"],
+                    ["amethyst", "Amethyst", "from-violet-300 to-violet-700"],
+                    ["sunset", "Sunset", "from-orange-300 to-pink-600"],
+                    ["ruby", "Ruby", "from-red-300 to-red-700"],
+                    ["ocean", "Ocean", "from-cyan-300 to-teal-700"],
+                    ["rose", "Rose", "from-pink-300 to-fuchsia-700"],
+                    ["amber", "Amber", "from-yellow-200 to-amber-600"],
+                    ["lime", "Lime", "from-lime-200 to-green-600"],
+                  ] as const).map(([value, label, gradient]) => (
+                    <button key={value} type="button" onClick={() => updateColorTheme(value)} aria-label={`${label} color theme`} className={`group flex flex-col items-center gap-1.5 rounded-xl border p-1.5 transition hover:-translate-y-0.5 hover:bg-white/[0.08] ${colorTheme === value ? "border-white/70 bg-white/[0.12] shadow-[0_0_16px_rgba(255,255,255,.16)]" : "border-white/10 bg-white/[0.035]"}`}>
+                      <span className={`h-7 w-7 rounded-full bg-gradient-to-br ${gradient} shadow-inner shadow-white/30`} />
+                      <span className="text-[8px] text-white/65">{label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="liquid-glass rounded-2xl p-4 flex items-center justify-between relative z-10">
