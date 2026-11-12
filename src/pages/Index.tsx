@@ -7,12 +7,14 @@ import FeedPost from "@/components/FeedPost";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { timeAgo } from "@/utils/timeAgo";
-import { Loader2 } from "lucide-react";
+import { Compass, Film, Loader2, MessageCircle, Plus, WalletCards } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 const FEED_PAGE_SIZE = 20;
 
 const Index = () => {
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -103,12 +105,36 @@ const Index = () => {
   }, [fetchPosts, hasMore, loading]);
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(ellipse_at_12%_8%,hsl(280_70%_45%_/_0.18),transparent_32%),radial-gradient(ellipse_at_92%_18%,hsl(190_80%_45%_/_0.14),transparent_30%),hsl(var(--background))]">
       <TopNavBar />
 
       <main className="relative z-10 pt-14 pb-24">
         <div className="mt-2 mb-4">
           <StoriesBar />
+        </div>
+        <div className="mb-5 px-4">
+          <div className="liquid-glass-elevated rounded-[2rem] p-4">
+            <div className="relative z-10 mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-primary/70">Primegram now</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">Your world, in one liquid space</p>
+              </div>
+              <Compass className="h-5 w-5 text-primary" />
+            </div>
+            <div className="relative z-10 grid grid-cols-4 gap-2">
+              {[
+                { label: "Create", icon: Plus, path: "/create", color: "text-amber-300 bg-amber-300/15" },
+                { label: "Messages", icon: MessageCircle, path: "/messages", color: "text-cyan-300 bg-cyan-300/15" },
+                { label: "Wallet", icon: WalletCards, path: "/wallet", color: "text-emerald-300 bg-emerald-300/15" },
+                { label: "Reels", icon: Film, path: "/reels", color: "text-fuchsia-300 bg-fuchsia-300/15" },
+              ].map(({ label, icon: Icon, path, color }) => (
+                <button key={label} onClick={() => navigate(path)} className="depth-press flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-black/10 p-2.5 text-[10px] text-muted-foreground">
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${color}`}><Icon className="h-4 w-4" /></span>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="px-4">
           {posts.length === 0 && loading ? (

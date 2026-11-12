@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, Plus, X, CreditCard, History, Smartphone, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, Plus, X, CreditCard, History, Smartphone, Loader2, CheckCircle2, XCircle, Banknote } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
@@ -25,7 +25,7 @@ const WalletPage = () => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState<"send" | "receive" | "topup" | null>(null);
+  const [modal, setModal] = useState<"send" | "receive" | "topup" | "withdraw" | null>(null);
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [phone, setPhone] = useState("");
@@ -142,6 +142,11 @@ const WalletPage = () => {
 
     if (modal === "topup") { handleTopUp(); return; }
 
+    if (modal === "withdraw") {
+      toast.info("Withdrawals require M-Pesa B2C payout setup. Your wallet balance was not changed.");
+      return;
+    }
+
     // "Receive" is not a client action: funds arrive when another user sends them.
     if (modal === "receive") {
       toast.info("Share your username so others can send you funds.");
@@ -189,10 +194,11 @@ const WalletPage = () => {
             <p className="text-xs text-muted-foreground mt-1">{transactions.length} transactions · real money via M-Pesa</p>
           </div>
           <div className="flex justify-center gap-5">
-            {[
+              {[
               { icon: Plus, label: "Top Up", action: () => setModal("topup") },
               { icon: ArrowUpRight, label: "Send", action: () => setModal("send") },
               { icon: ArrowDownLeft, label: "Receive", action: () => setModal("receive") },
+                { icon: Banknote, label: "Withdraw", action: () => setModal("withdraw") },
             ].map(({ icon: Icon, label, action }) => (
               <button key={label} onClick={action} className="depth-press flex flex-col items-center gap-1.5">
                 <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center">
@@ -244,7 +250,7 @@ const WalletPage = () => {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] bg-background/90 backdrop-blur-xl flex items-end justify-center" onClick={closeModal}>
             <motion.div initial={{ y: 200 }} animate={{ y: 0 }} exit={{ y: 200 }} className="liquid-glass-elevated rounded-t-3xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center relative z-10">
-                <h3 className="text-lg font-semibold text-foreground capitalize">{modal === "topup" ? "Top Up with M-Pesa" : modal}</h3>
+                <h3 className="text-lg font-semibold text-foreground capitalize">{modal === "topup" ? "Top Up with M-Pesa" : modal === "withdraw" ? "Withdraw funds" : modal}</h3>
                 <button onClick={closeModal} className="depth-press w-8 h-8 rounded-full liquid-glass-subtle flex items-center justify-center"><X className="w-4 h-4 text-foreground" /></button>
               </div>
 
@@ -294,6 +300,15 @@ const WalletPage = () => {
                       <input value={recipient} onChange={e => setRecipient(e.target.value)} placeholder="Username" className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                   )}
+                  {modal === "withdraw" && (
+                    <div className="relative z-10 space-y-3">
+                      <div className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.06] p-3 text-xs text-muted-foreground">
+                        M-Pesa withdrawals are not enabled yet. B2C payout credentials must be configured before money can leave the wallet.
+                      </div>
+                      <label className="text-caption text-muted-foreground block">M-Pesa phone number</label>
+                      <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="0712 345 678" inputMode="tel" className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+                    </div>
+                  )}
                   <div className="relative z-10">
                     <label className="text-caption text-muted-foreground block mb-1.5">Amount (KES)</label>
                     <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" min={modal === "topup" ? 10 : 0} step="1" className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-2xl font-bold outline-none focus:ring-2 focus:ring-primary/30 text-center" />
@@ -313,7 +328,7 @@ const WalletPage = () => {
                     className="depth-press w-full py-3.5 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold relative z-10 flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {modal === "topup" ? "Pay with M-Pesa" : modal === "send" ? "Send Money" : "Confirm"}
+                    {modal === "topup" ? "Pay with M-Pesa" : modal === "send" ? "Send Money" : modal === "withdraw" ? "Check withdrawal setup" : "Confirm"}
                   </button>
                   {modal === "topup" && (
                     <p className="text-xs text-muted-foreground text-center relative z-10">You'll get an STK push — enter your M-Pesa PIN to confirm.</p>
