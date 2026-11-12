@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { Download } from "lucide-react";
 import PrimeLogo from "@/components/PrimeLogo";
-import AndroidDownloadCard from "@/components/AndroidDownloadCard";
+import AndroidDownloadCard, { ANDROID_APK_URL } from "@/components/AndroidDownloadCard";
 
 const WelcomePage = () => {
   const navigate = useNavigate();
@@ -14,6 +15,14 @@ const WelcomePage = () => {
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-background overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 50% 45%, hsl(var(--primary) / 0.25), transparent 55%)" }} />
+      <a
+        href={ANDROID_APK_URL}
+        download
+        aria-label="Download Primegram Extreme Android app"
+        className="liquid-glass depth-press absolute right-5 top-5 z-20 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300/30 text-emerald-200 shadow-[0_0_24px_hsl(145_70%_50%/0.18)] transition hover:scale-105 hover:text-emerald-100"
+      >
+        <Download className="h-5 w-5" />
+      </a>
       <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} className="relative">
         <motion.div className="absolute -inset-8 rounded-full border border-primary/40" animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 6, ease: "linear" }} />
         <PrimeLogo size={96} />
