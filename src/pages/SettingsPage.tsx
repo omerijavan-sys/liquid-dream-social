@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
 import AndroidDownloadCard from "@/components/AndroidDownloadCard";
+import AccountManagement from "@/components/AccountManagement";
 
 type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions";
 
@@ -531,22 +532,14 @@ const SettingsPage = () => {
                   </div>
                   <button onClick={() => setActivePanel("accounts")} className="mt-2 text-[10px] text-cyan-200 hover:text-cyan-100">Manage linked accounts</button>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                  <p className="mb-2 text-[10px] font-semibold text-white/75">2. Switch Account / Manage Profiles</p>
-                  <div className="space-y-1.5">
-                    {savedAccounts.filter(account => account.userId !== user?.id).map(account => (
-                      <button key={account.userId} onClick={async () => {
-                        try { await switchAccount(account.userId); toast.success(`Switched to ${account.label}`); }
-                        catch (error) { toast.error(error instanceof Error ? error.message : "Couldn't switch accounts"); }
-                      }} className="flex w-full items-center gap-2 rounded-lg bg-black/25 px-2 py-1.5 text-left text-[10px] text-white/80 hover:bg-white/10">
-                        <UserRound className="h-3.5 w-3.5 text-cyan-200" /> Switch to {account.label}
-                      </button>
-                    ))}
-                    <button onClick={() => setActivePanel("accounts")} className="w-full rounded-lg border border-white/10 px-2 py-1.5 text-[10px] text-white/70 hover:bg-white/5">
-                      {savedAccounts.length >= 2 ? "Manage saved profiles" : "Add another account"}
-                    </button>
-                  </div>
-                </div>
+                <AccountManagement
+                  user={user}
+                  savedAccounts={savedAccounts}
+                  switchAccount={switchAccount}
+                  onManageProfiles={() => setActivePanel("accounts")}
+                  onSwitched={label => toast.success(`Switched to ${label}`)}
+                  onSwitchError={error => toast.error(error instanceof Error ? error.message : "Couldn't switch accounts")}
+                />
               </div>
               <div className="grid border-t border-white/10 sm:grid-cols-2">
                 <button onClick={() => setActivePanel("privacy")} className="flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.035]">
