@@ -57,6 +57,11 @@ const VerifiedTab = ({ balance, refresh }: { balance: number | null; refresh: ()
   const load = () => user && supabase.rpc("prime_tier", { _user_id: user.id }).then(({ data }) => setTier((data as string) ?? null));
   useEffect(() => { load(); }, [user]);
   const sub = async (tierId: string) => {
+    const selectedTier = TIERS.find((item) => item.id === tierId);
+    if (!selectedTier || balance === null || balance < selectedTier.price) {
+      toast.error(balance === null ? "Wallet balance is still loading" : "Add funds to your wallet before subscribing");
+      return;
+    }
     setSubscribing(tierId);
     try {
       const { error } = await supabase.rpc("prime_subscribe", { _tier: tierId });
@@ -85,14 +90,20 @@ const VerifiedTab = ({ balance, refresh }: { balance: number | null; refresh: ()
               <p className="mt-1 text-sm text-white/65">{t.perks}</p>
               {t.id === "all_access" && <p className="mt-1 text-xs text-amber-200/80">One prepaid month · no automatic renewal</p>}
             </div>
-            <Button
-              variant="outline"
-              className="shrink-0 rounded-full border-amber-200/50 bg-black/45 text-amber-100 shadow-[0_0_14px_rgba(234,179,8,.13)] hover:bg-amber-200/10 hover:text-white"
-              disabled={subscribing !== null}
-              onClick={() => balance !== null && balance < t.price ? navigate("/wallet") : void sub(t.id)}
-            >
-              {subscribing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : balance !== null && balance < t.price ? "Top up" : `${t.price.toLocaleString()} KES/mo`}
-            </Button>
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <span className="rounded-full border border-amber-200/50 bg-black/55 px-3 py-1.5 text-xs font-semibold text-amber-100 shadow-[0_0_14px_rgba(234,179,8,.13)]">
+                {t.price.toLocaleString()} KES/mo
+              </span>
+              <Button
+                variant="outline"
+                className="rounded-full border-amber-200/35 bg-black/35 px-3 text-xs text-amber-100 hover:bg-amber-200/10 hover:text-white disabled:opacity-40"
+                disabled={subscribing !== null || balance === null || balance < t.price}
+                onClick={() => void sub(t.id)}
+                title={balance === null ? "Wallet balance is loading" : balance < t.price ? "Insufficient wallet balance" : `Subscribe to ${t.name}`}
+              >
+                {subscribing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Subscribe"}
+              </Button>
+            </div>
           </div>
         </div>
       ))}

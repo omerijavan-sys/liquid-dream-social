@@ -34,7 +34,6 @@ interface FeedPostProps {
   bio?: string | null;
   music?: PostMusic | null;
   views?: number;
-  variant?: "default" | "home";
 }
 
 const SAVED_KEY = "primegram:savedPosts";
@@ -49,7 +48,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
     <div className={`${size} rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold`}>{avatar}</div>
   );
 
-const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, music, views = 0, variant = "default" }: FeedPostProps) => {
+const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, music, views = 0 }: FeedPostProps) => {
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
   const [me, setMe] = useState<string | null>(null);
@@ -83,7 +82,6 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
   };
 
   const isVideo = mediaType === "video";
-  const homeStyle = variant === "home";
   const postLink = postId ? `${window.location.origin}/?post=${postId}` : window.location.origin;
 
   // Load my like + follow state and the real comment count.
@@ -227,26 +225,24 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index, 5) * 0.08, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className={homeStyle ? "mb-3 md:mb-4" : "mb-6"}
+      className="mb-6"
     >
-      <div className={homeStyle
-        ? "overflow-hidden border-y border-rose-300/20 bg-white/[0.035] shadow-[0_12px_42px_rgba(0,0,0,.32)] backdrop-blur-xl md:mx-3 md:rounded-2xl md:border"
-        : "liquid-glass overflow-hidden rounded-[1.5rem]"}>
-        <div className={`relative z-10 flex items-center gap-3 ${homeStyle ? "border-b border-white/5 px-3 py-2.5 md:px-4" : "p-4"}`}>
+      <div className="liquid-glass rounded-[1.5rem] overflow-hidden">
+        <div className="flex items-center gap-3 p-4 relative z-10">
           <button onClick={openProfile} aria-label={`Open ${username}'s profile`} className="depth-press">
             <Avatar avatar={avatar} username={username} />
           </button>
           <button onClick={openProfile} className="flex-1 min-w-0 text-left">
-            <p className={`flex items-center gap-1 truncate text-sm font-semibold ${homeStyle ? "text-rose-100" : "text-foreground"}`}>
+            <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1">
               {username}
               <VerifiedBadge isVerified={isVerified} isOfficial={isOfficial} />
             </p>
-            <p className={`text-caption ${homeStyle ? "text-slate-400" : "text-muted-foreground"}`}>{timeAgo}</p>
+            <p className="text-caption text-muted-foreground">{timeAgo}</p>
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button aria-label="Post options" className={`depth-press flex h-8 w-8 items-center justify-center rounded-full ${homeStyle ? "border border-rose-300/20 bg-black/30" : "liquid-glass-subtle"}`}>
-                <MoreHorizontal className={`h-4 w-4 ${homeStyle ? "text-rose-200" : "text-muted-foreground"}`} />
+              <button aria-label="Post options" className="depth-press w-8 h-8 flex items-center justify-center rounded-full liquid-glass-subtle">
+                <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
@@ -263,17 +259,17 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
           </DropdownMenu>
         </div>
 
-        <div className={`relative flex items-center justify-center ${homeStyle ? "min-h-[min(60vh,520px)] border-b border-rose-400/20 bg-[#090b12]/90 px-2 py-2 md:min-h-[min(62vh,560px)]" : "bg-background/40"}`} onClick={handleTap}>
+        <div className="relative bg-background/40 flex items-center justify-center" onClick={handleTap}>
           {mediaType === "text" || !image ? (
             <div className="w-full min-h-40 px-6 py-10 flex items-center justify-center">
               <p className="max-w-prose whitespace-pre-wrap text-center text-lg text-foreground">{caption}</p>
             </div>
           ) : isVideo ? (
-            <div className={`relative ${homeStyle ? "w-full max-w-[520px] overflow-hidden border border-rose-400/40 shadow-[0_0_26px_rgba(244,63,94,.12)]" : "w-full"}`}>
+            <div className="relative w-full">
               <video
                 ref={videoRef}
                 src={image}
-                className={`w-full h-auto ${homeStyle ? "max-h-[min(62vh,560px)] object-contain bg-black" : "max-h-[75vh] object-contain bg-background"}`}
+                className="w-full h-auto max-h-[75vh] object-contain bg-background"
                 playsInline
                 muted={muted}
                 loop
@@ -313,7 +309,7 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
             </div>
           ) : (
             // Natural aspect ratio: square, portrait, landscape and panoramas all show whole.
-            <img src={image} alt={`Post by ${username}`} className={homeStyle ? "h-auto max-h-[min(62vh,560px)] w-auto max-w-full border-x border-rose-400/40 object-contain shadow-[0_0_28px_rgba(244,63,94,.12)]" : "w-full h-auto max-h-[75vh] object-contain"} loading="lazy" decoding="async" />
+            <img src={image} alt={`Post by ${username}`} className="w-full h-auto max-h-[75vh] object-contain" loading="lazy" decoding="async" />
           )}
           <AnimatePresence>
             {showHeart && (
@@ -337,48 +333,30 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
               }}
               aria-label="Boost this post"
               title="Boost this post"
-              className={`absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-background/80 shadow-lg backdrop-blur-md ${homeStyle ? "text-rose-300" : "text-primary"}`}
+              className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-background/80 text-primary shadow-lg backdrop-blur-md"
             >
               <Rocket className="h-4 w-4" />
             </button>
-          )}
-          {homeStyle && (
-            <div className="absolute right-2 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-3 md:right-4">
-              <button onClick={(event) => { event.stopPropagation(); void setLike(!liked); }} className="flex flex-col items-center gap-0.5 rounded-full bg-black/55 p-2 text-rose-100 backdrop-blur-md" aria-label={liked ? "Unlike" : "Like"}>
-                <Heart className={`h-5 w-5 ${liked ? "fill-rose-400 text-rose-400" : ""}`} />
-                <span className="text-[10px]">{likeCount.toLocaleString()}</span>
-              </button>
-              <button onClick={(event) => { event.stopPropagation(); setShowComments((shown) => !shown); }} className="rounded-full bg-black/55 p-2 text-rose-100 backdrop-blur-md" aria-label="Comments">
-                <MessageCircle className="h-5 w-5" />
-              </button>
-              {authorId && <div className="rounded-full bg-black/55 p-1 backdrop-blur-md"><CreatorTipButton creatorId={authorId} creatorName={username} compact /></div>}
-              <button onClick={(event) => { event.stopPropagation(); sharePost(); }} className="rounded-full bg-black/55 p-2 text-rose-100 backdrop-blur-md" aria-label="Share">
-                <Send className="h-5 w-5" />
-              </button>
-              <button onClick={(event) => { event.stopPropagation(); toggleSave(); }} className="rounded-full bg-black/55 p-2 text-rose-100 backdrop-blur-md" aria-label={saved ? "Unsave" : "Save"}>
-                <Bookmark className={`h-5 w-5 ${saved ? "fill-current" : ""}`} />
-              </button>
-            </div>
           )}
         </div>
 
         {music?.title && <PostMusicPlayer music={music} />}
 
-        <div className={`relative z-10 ${homeStyle ? "px-3 py-3 md:px-4" : "p-4"}`}>
-          {!homeStyle && <div className="mb-3 flex items-center gap-4">
+        <div className="p-4 relative z-10">
+          <div className="flex items-center gap-4 mb-3">
             <button onClick={() => setLike(!liked)} className="depth-press" aria-label={liked ? "Unlike" : "Like"}>
               <motion.div animate={liked ? { scale: [1, 1.3, 0.9, 1] } : {}} transition={{ duration: 0.4 }}>
-                <Heart className={`w-6 h-6 transition-colors ${liked ? "fill-like text-like" : homeStyle ? "text-rose-200" : "text-foreground"}`} />
+                <Heart className={`w-6 h-6 transition-colors ${liked ? "fill-like text-like" : "text-foreground"}`} />
               </motion.div>
             </button>
-            <button onClick={() => setShowComments((s) => !s)} className="depth-press" aria-label="Comments"><MessageCircle className={`w-6 h-6 ${homeStyle ? "text-rose-200" : "text-foreground"}`} /></button>
-            <button onClick={sharePost} className="depth-press" aria-label="Share"><Send className={`w-6 h-6 ${homeStyle ? "text-rose-200" : "text-foreground"}`} /></button>
+            <button onClick={() => setShowComments((s) => !s)} className="depth-press" aria-label="Comments"><MessageCircle className="w-6 h-6 text-foreground" /></button>
+            <button onClick={sharePost} className="depth-press" aria-label="Share"><Send className="w-6 h-6 text-foreground" /></button>
             {authorId && <CreatorTipButton creatorId={authorId} creatorName={username} />}
             <div className="flex-1" />
             <button onClick={toggleSave} className="depth-press" aria-label={saved ? "Unsave" : "Save"}>
-              <Bookmark className={`w-6 h-6 transition-colors ${saved ? "fill-foreground text-foreground" : homeStyle ? "text-rose-200" : "text-foreground"}`} />
+              <Bookmark className={`w-6 h-6 transition-colors ${saved ? "fill-foreground text-foreground" : "text-foreground"}`} />
             </button>
-          </div>}
+          </div>
           <p className="text-sm font-semibold text-foreground mb-1">{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</p>
           {caption && (
             <p className="text-sm text-foreground/90">

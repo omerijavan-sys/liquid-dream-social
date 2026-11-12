@@ -11,7 +11,7 @@ const tabs = [
   { icon: User, label: "Profile", path: "/profile" },
 ];
 
-const GlassTabBar = ({ homeStyle = false, goldStyle = false }: { homeStyle?: boolean; goldStyle?: boolean }) => {
+const GlassTabBar = ({ goldStyle = false }: { goldStyle?: boolean }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { scrollY } = useScroll();
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ const GlassTabBar = ({ homeStyle = false, goldStyle = false }: { homeStyle?: boo
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
     >
       <motion.nav
-        className={`flex items-center gap-0.5 px-1 ${homeStyle ? "border border-rose-300/25 bg-[#090b12]/90 shadow-[0_0_26px_rgba(244,63,94,.12)] backdrop-blur-2xl" : goldStyle ? "border border-amber-200/30 bg-[#090b12]/90 shadow-[0_0_26px_rgba(234,179,8,.12)] backdrop-blur-2xl" : "liquid-glass-elevated"}`}
+        className={`flex items-center gap-0.5 px-1 ${goldStyle ? "border border-amber-200/30 bg-[#090b12]/90 shadow-[0_0_26px_rgba(234,179,8,.12)] backdrop-blur-2xl" : "liquid-glass-elevated"}`}
         animate={collapsed ? {
           borderRadius: "2rem", paddingLeft: "0.75rem", paddingRight: "0.75rem",
           paddingTop: "0.5rem", paddingBottom: "0.5rem",
@@ -52,7 +52,7 @@ const GlassTabBar = ({ homeStyle = false, goldStyle = false }: { homeStyle?: boo
               onClick={() => navigate(tab.path)}
               aria-label={tab.label}
               title={tab.label}
-              className={`depth-press relative flex min-w-0 flex-1 items-center justify-center rounded-2xl transition-colors ${isActive ? homeStyle ? "text-rose-300" : goldStyle ? "text-amber-200" : "text-primary" : "text-muted-foreground"}`}
+              className={`depth-press relative flex min-w-0 flex-1 items-center justify-center rounded-2xl transition-colors ${isActive ? goldStyle ? "text-amber-200" : "text-primary" : "text-muted-foreground"}`}
               animate={collapsed ? { width: 40, height: 40, flex: "0 0 40px" } : { width: "auto", height: 48, flex: "1 1 0%" }}
               layout
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
@@ -60,7 +60,7 @@ const GlassTabBar = ({ homeStyle = false, goldStyle = false }: { homeStyle?: boo
               {isActive && (
                 <motion.div
                   layoutId="tab-indicator"
-                  className={`absolute inset-0 rounded-2xl ${homeStyle ? "border border-rose-300/20 bg-rose-500/[0.08]" : goldStyle ? "border border-amber-200/20 bg-amber-300/[0.08]" : "liquid-glass-subtle"}`}
+                  className={`absolute inset-0 rounded-2xl ${goldStyle ? "border border-amber-200/20 bg-amber-300/[0.08]" : "liquid-glass-subtle"}`}
                   transition={{ type: "spring", stiffness: 500, damping: 35 }}
                 />
               )}

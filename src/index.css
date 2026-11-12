@@ -2,17 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-.home-dashboard {
-  min-height: 100vh;
-  color: #f8fafc;
-  background-color: #070910;
-  background-image:
-    radial-gradient(ellipse at 18% 24%, rgba(114, 46, 112, 0.18), transparent 34%),
-    radial-gradient(ellipse at 80% 47%, rgba(18, 83, 101, 0.14), transparent 38%),
-    radial-gradient(ellipse at 52% 85%, rgba(103, 28, 54, 0.13), transparent 42%);
-  background-attachment: fixed;
-}
-
 .prime-extreme,
 .prime-profile {
   color: #f8fafc;
