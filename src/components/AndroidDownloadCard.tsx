@@ -1,7 +1,7 @@
 import { Download, ExternalLink, Smartphone } from "lucide-react";
 
 export const ANDROID_APK_URL = "/primegram-extreme.apk";
-export const PRIMEGRAM_ISA_DEV_URL = "https://primegram.is-a.dev";
+export const PRIMEGRAM_ISA_DEV_URL = "https://primegram-extreme.is-a.dev";
 
 const AndroidDownloadCard = ({ compact = false }: { compact?: boolean }) => (
   <section className={`liquid-glass relative z-10 rounded-2xl border border-emerald-300/20 ${compact ? "p-3" : "p-4"}`}>
