@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Download } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
 import PrimeLogo from "@/components/PrimeLogo";
-import AndroidDownloadCard, { ANDROID_APK_URL } from "@/components/AndroidDownloadCard";
+import AndroidDownloadCard, { ANDROID_APK_URL, PRIMEGRAM_ISA_DEV_URL } from "@/components/AndroidDownloadCard";
 
 const WelcomePage = () => {
   const navigate = useNavigate();
@@ -22,6 +22,15 @@ const WelcomePage = () => {
         className="liquid-glass depth-press absolute right-5 top-5 z-20 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300/30 text-emerald-200 shadow-[0_0_24px_hsl(145_70%_50%/0.18)] transition hover:scale-105 hover:text-emerald-100"
       >
         <Download className="h-5 w-5" />
+      </a>
+      <a
+        href={PRIMEGRAM_ISA_DEV_URL}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Open Primegram Extreme web app"
+        className="liquid-glass depth-press absolute left-5 top-5 z-20 inline-flex h-12 items-center gap-2 rounded-2xl border border-cyan-300/30 px-3 text-[10px] font-semibold text-cyan-100 shadow-[0_0_24px_hsl(190_70%_50%/0.18)] transition hover:scale-105 hover:text-cyan-50"
+      >
+        <span className="hidden sm:inline">Open web app</span><ExternalLink className="h-4 w-4" />
       </a>
       <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} className="relative">
         <motion.div className="absolute -inset-8 rounded-full border border-primary/40" animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 6, ease: "linear" }} />
