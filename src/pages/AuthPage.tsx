@@ -10,6 +10,8 @@ import { countryCodes, getCountryByCode, type CountryCode } from "@/utils/countr
 import AuthCinematic, { Figure } from "@/components/AuthCinematic";
 import PrimeLogo from "@/components/PrimeLogo";
 
+const PRIMEGRAM_SITE_ORIGIN = "https://primegram-extreme.vercel.app";
+
 const AuthPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [showIntro, setShowIntro] = useState(() => !sessionStorage.getItem("authIntroSeen"));
@@ -44,7 +46,7 @@ const AuthPage = () => {
     const p = new URLSearchParams(window.location.search).get("next");
     return p && p.startsWith("/") && !p.startsWith("//") ? p : "/";
   };
-  const postAuthRedirect = () => window.location.origin + getNextPath();
+  const postAuthRedirect = () => new URL(getNextPath(), PRIMEGRAM_SITE_ORIGIN).toString();
 
   const continueAsGuest = () => {
     try {
@@ -207,6 +209,7 @@ const AuthPage = () => {
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: sanitizeInput(email.toLowerCase().trim()),
+        options: { emailRedirectTo: postAuthRedirect() },
       });
       if (error) throw error;
       void logSecurityEvent("otp", "email_otp_resent", sanitizeInput(email.toLowerCase().trim()));
@@ -240,7 +243,7 @@ const AuthPage = () => {
     setLoading(true);
     try {
       const { error } = authMethod === "email"
-        ? await supabase.auth.signInWithOtp({ email: sanitizedEmail, options: { shouldCreateUser: false } })
+        ? await supabase.auth.signInWithOtp({ email: sanitizedEmail, options: { shouldCreateUser: false, emailRedirectTo: postAuthRedirect() } })
         : await supabase.auth.signInWithOtp({ phone: sanitizedPhone, options: { shouldCreateUser: false } });
       if (error) throw error;
       setRecoveryCode("");
