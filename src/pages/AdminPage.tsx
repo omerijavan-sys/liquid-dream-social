@@ -97,6 +97,27 @@ const AdminPage = () => {
     },
   });
 
+  const { data: tickets } = useQuery({
+    queryKey: ["admin", "tickets"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_tickets" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const resolveTicket = async (id: string) => {
+    const { error } = await supabase.from("support_tickets" as any).update({ status: "resolved" }).eq("id", id);
+    if (error) { toast.error("Couldn't update ticket"); return; }
+    toast.success("Ticket resolved");
+    qc.invalidateQueries({ queryKey: ["admin", "tickets"] });
+  };
+
   const { data: audit } = useQuery({
     queryKey: ["admin", "audit"],
     enabled,
@@ -251,6 +272,7 @@ const AdminPage = () => {
               <TabsTrigger value="content">Content</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+              <TabsTrigger value="tickets">Support ({(tickets ?? []).filter((t: any) => t.status === "open").length})</TabsTrigger>
               <TabsTrigger value="audit">Audit log</TabsTrigger>
             </TabsList>
 
@@ -388,6 +410,28 @@ const AdminPage = () => {
                   </CardContent>
                 </Card>
               ))}
+            </TabsContent>
+
+            <TabsContent value="tickets" className="mt-4 space-y-3">
+              {(tickets ?? []).map((t: any) => (
+                <Card key={t.id} className={glass}>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium">{t.subject}</span>
+                      <Badge variant="secondary" className="capitalize">{t.kind}</Badge>
+                      <Badge variant={t.status === "open" ? "destructive" : "secondary"} className="capitalize">{t.status}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{t.message}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {usernameFor(t.user_id)} · {new Date(t.created_at).toLocaleString()}
+                    </p>
+                    {t.status === "open" && (
+                      <Button size="sm" variant="secondary" onClick={() => resolveTicket(t.id)}>Mark resolved</Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+              {(tickets ?? []).length === 0 && <p className="text-sm text-muted-foreground">No support tickets.</p>}
             </TabsContent>
 
             <TabsContent value="audit" className="mt-4 space-y-2">
