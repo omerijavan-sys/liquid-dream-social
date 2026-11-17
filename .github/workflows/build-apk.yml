@@ -27,6 +27,9 @@ jobs:
       - name: Build web assets
         run: npm run build
 
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
