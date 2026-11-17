@@ -2,7 +2,7 @@ import { authHeader } from "@/utils/authFetch";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Music, Search, Play, Pause, SkipForward, SkipBack, Youtube, Download, Heart, Volume2, Wifi, WifiOff, TrendingUp, Globe, DownloadCloud } from "lucide-react";
-import YouTubePlayer from "./YouTubePlayer";
+import { searchGlobalMusic } from "../services/GlobalMusicService";
 import { youtubeService, YouTubeSearchResult, DownloadProgress } from "../services/YouTubeService";
 
 interface Track {
@@ -12,6 +12,7 @@ interface Track {
   duration: string;
   genre: string;
   youtubeId: string;
+  streamUrl?: string;
   isOffline?: boolean;
   downloadUrl?: string;
   playCount?: number;
@@ -440,7 +441,13 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   const [isSearching, setIsSearching] = useState(false);
   const [downloads, setDownloads] = useState<Map<string, DownloadProgress>>(new Map());
   const [activeTab, setActiveTab] = useState<'library' | 'youtube' | 'trending'>('library');
-  const playerRef = useRef<HTMLIFrameElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [audioStatus, setAudioStatus] = useState<'idle' | 'loading' | 'playing' | 'paused' | 'error'>('idle');
+  const [audioTime, setAudioTime] = useState({ current: 0, total: 0 });
+  const streamCache = useRef<Map<string, string>>(new Map());
+  const nextTrackRef = useRef<() => void>(() => {});
+  const repeatRef = useRef(repeatMode);
+  repeatRef.current = repeatMode;
 
   // IndexedDB setup
   useEffect(() => {
@@ -671,9 +678,9 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
         return newMap;
       });
 
-      const blob = await youtubeService.downloadVideo(
-        youtubeResult.youtubeId,
-        youtubeResult.title,
+      if (!youtubeResult.streamUrl) throw new Error('No audio source');
+      const blob = await youtubeService.downloadAudio(
+        youtubeResult.streamUrl,
         (progress) => {
           setDownloads(prev => {
             const newMap = new Map(prev);
@@ -733,18 +740,60 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   // Play YouTube track
   const playYouTubeTrack = (youtubeResult: YouTubeSearchResult) => {
     const track: Track = {
-      id: parseInt(youtubeResult.youtubeId.replace(/[^0-9]/g, '')) || Date.now(),
+      id: parseInt(youtubeResult.youtubeId.replace(/[^0-9]/g, '').slice(0, 9)) || Date.now(),
       title: youtubeResult.title,
       artist: youtubeResult.artist,
       duration: youtubeResult.duration,
-      genre: 'YouTube',
-      youtubeId: youtubeResult.youtubeId
+      genre: 'Discover',
+      youtubeId: youtubeResult.youtubeId,
+      streamUrl: youtubeResult.streamUrl
     };
     
     setPlaying(track);
     setShowPlayer(true);
     saveTrack(track);
   };
+
+  // Audio-only playback: resolve a stream URL, then play through a hidden <audio> element.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!playing || !audio) return;
+    let cancelled = false;
+    setAudioStatus('loading');
+    setAudioTime({ current: 0, total: 0 });
+    (async () => {
+      try {
+        const key = `${playing.title}|${playing.artist}`;
+        let url = playing.streamUrl || streamCache.current.get(key);
+        if (!url) {
+          const clean = (v: string) => v.replace(/\(.*?\)|\[.*?\]|ft\.?.*|feat\.?.*/gi, '').trim();
+          const hits = await searchGlobalMusic(`${clean(playing.title)} ${clean(playing.artist)}`, 5);
+          url = hits[0]?.streamUrl || (await searchGlobalMusic(clean(playing.title), 5))[0]?.streamUrl;
+          if (url) streamCache.current.set(key, url);
+        }
+        if (cancelled) return;
+        if (!url) { setAudioStatus('error'); return; }
+        audio.src = url;
+        audio.volume = volume;
+        await audio.play();
+      } catch {
+        if (!cancelled) setAudioStatus('error');
+      }
+    })();
+    return () => { cancelled = true; audio.pause(); };
+  }, [playing]);
+
+  useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
+  useEffect(() => { if (!open) audioRef.current?.pause(); }, [open]);
+  useEffect(() => { nextTrackRef.current = nextTrack; });
+
+  const togglePlayPause = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) void audio.play().catch(() => setAudioStatus('error')); else audio.pause();
+  };
+
+  const fmtTime = (secs: number) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, '0')}`;
 
   // Load trending music on component mount and tab change
   useEffect(() => {
@@ -763,6 +812,21 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
           className="fixed inset-0 z-[60] bg-background flex flex-col"
         >
+          <audio
+            ref={audioRef}
+            preload="none"
+            onPlay={() => setAudioStatus('playing')}
+            onPause={() => setAudioStatus(a => (a === 'loading' || a === 'error' ? a : 'paused'))}
+            onWaiting={() => setAudioStatus('loading')}
+            onPlaying={() => setAudioStatus('playing')}
+            onError={() => setAudioStatus('error')}
+            onTimeUpdate={e => setAudioTime({ current: e.currentTarget.currentTime, total: e.currentTarget.duration || 0 })}
+            onLoadedMetadata={e => setAudioTime({ current: 0, total: e.currentTarget.duration || 0 })}
+            onEnded={() => {
+              if (repeatRef.current === 'one' && audioRef.current) { audioRef.current.currentTime = 0; void audioRef.current.play(); }
+              else nextTrackRef.current();
+            }}
+          />
           <div className="liquid-glass-elevated safe-area-top">
             <div className="flex items-center justify-between px-5 py-4 relative z-10">
               <div className="flex items-center gap-2">
@@ -799,7 +863,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                 {tab === 'youtube' && <Globe className="w-3 h-3" />}
                 {tab === 'trending' && <TrendingUp className="w-3 h-3" />}
                 {tab === 'library' && 'Library'}
-                {tab === 'youtube' && 'YouTube'}
+                {tab === 'youtube' && 'Discover'}
                 {tab === 'trending' && 'Trending'}
               </button>
             ))}
@@ -829,7 +893,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                   value={youtubeSearch}
                   onChange={e => setYoutubeSearch(e.target.value)}
                   onKeyPress={e => e.key === 'Enter' && handleYouTubeSearch()}
-                  placeholder="Search YouTube music..."
+                  placeholder="Search any song or artist..."
                   className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
                 />
                 <button
@@ -869,31 +933,34 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                     </button>
                   </div>
                   
-                  {/* Full YouTube Player */}
-                  <AnimatePresence>
-                    {showPlayer && playing && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="px-5 overflow-hidden"
-                      >
-                        <div className="rounded-2xl overflow-hidden aspect-video mb-2 relative">
-                          <iframe
-                            ref={playerRef}
-                            key={playing.youtubeId}
-                            src={`https://www.youtube.com/embed/${playing.youtubeId}?autoplay=1&controls=1&modestbranding=1&rel=0&showinfo=0`}
-                            title={playing.title}
-                            className="w-full h-full"
-                            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                            allowFullScreen
-                          />
-                          {/* Overlay Controls */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-black/20 to-black/40 pointer-events-none" />
-                        </div>
-                      </motion.div>
+                  {/* Audio-only controls */}
+                  <div className="px-1 pb-1">
+                    {audioStatus === 'error' && (
+                      <p className="mb-2 text-xs text-destructive">Couldn't find playable audio for this track. Try another or use Discover search.</p>
                     )}
-                  </AnimatePresence>
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(1, Math.floor(audioTime.total))}
+                      value={Math.floor(audioTime.current)}
+                      onChange={e => { if (audioRef.current) audioRef.current.currentTime = Number(e.target.value); }}
+                      className="w-full accent-primary"
+                      aria-label="Seek"
+                    />
+                    <div className="mb-2 flex justify-between text-[10px] text-muted-foreground">
+                      <span>{fmtTime(audioTime.current)}</span>
+                      <span>{audioStatus === 'loading' ? 'Loading…' : fmtTime(audioTime.total)}</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-4">
+                      <button onClick={() => setIsShuffled(v => !v)} className={`depth-press text-[10px] ${isShuffled ? 'text-primary' : 'text-muted-foreground'}`}>Shuffle</button>
+                      <button onClick={prevTrack} aria-label="Previous" className="depth-press w-9 h-9 rounded-full liquid-glass-subtle flex items-center justify-center"><SkipBack className="w-4 h-4 text-foreground" /></button>
+                      <button onClick={togglePlayPause} aria-label={audioStatus === 'playing' ? 'Pause' : 'Play'} className="depth-press w-11 h-11 rounded-full bg-primary flex items-center justify-center">
+                        {audioStatus === 'playing' ? <Pause className="w-5 h-5 text-primary-foreground" /> : <Play className="w-5 h-5 text-primary-foreground" />}
+                      </button>
+                      <button onClick={nextTrack} aria-label="Next" className="depth-press w-9 h-9 rounded-full liquid-glass-subtle flex items-center justify-center"><SkipForward className="w-4 h-4 text-foreground" /></button>
+                      <button onClick={toggleRepeat} className={`depth-press text-[10px] ${repeatMode !== 'off' ? 'text-primary' : 'text-muted-foreground'}`}>Repeat{repeatMode === 'one' ? ' 1' : repeatMode === 'all' ? ' all' : ''}</button>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -992,7 +1059,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                   >
                     <Download className="w-3.5 h-3.5 text-foreground" />
                   </button>
-                  <Youtube className="w-3 h-3 text-destructive" />
+                  
                   <span className="text-caption text-muted-foreground">{track.duration}</span>
                 </div>
               </motion.button>
@@ -1018,7 +1085,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{result.duration}</span>
                       <span>•</span>
-                      <span>{result.viewCount} views</span>
+                      <span>Full track</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1082,7 +1149,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{result.duration}</span>
                       <span>•</span>
-                      <span>{result.viewCount} views</span>
+                      <span>Full track</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
