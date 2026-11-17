@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2 } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2, Paperclip, Square, Play as PlayIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,9 @@ interface Message {
   content: string;
   created_at: string;
   read?: boolean;
+  media_url?: string | null;
+  media_type?: "image" | "video" | "audio" | "post" | "reel" | null;
+  shared_ref?: string | null;
 }
 
 const MessagesPage = () => {
@@ -291,6 +294,64 @@ const MessagesPage = () => {
     setLoadingOlderMessages(false);
   };
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadAndSend = async (blob: Blob, ext: string, type: "image" | "video" | "audio") => {
+    if (!activeChat || !user) return;
+    if (blob.size > 50 * 1024 * 1024) { toast.error("File is too large (50 MB max)."); return; }
+    setUploading(true);
+    try {
+      const path = `${user.id}/dm_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const label = type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice message";
+      const { data, error } = await supabase.from("messages").insert({
+        sender_id: user.id, receiver_id: activeChat.user_id, content: label, media_url: publicUrl, media_type: type,
+      } as never).select().single();
+      if (error) throw error;
+      if (data) setMessages(prev => prev.some(m => m.id === (data as Message).id) ? prev : [...prev, data as Message]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't send. Try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const isVideo = file.type.startsWith("video/");
+    if (!isVideo && !file.type.startsWith("image/")) { toast.error("Choose a photo or video."); return; }
+    void uploadAndSend(file, file.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg"), isVideo ? "video" : "image");
+  };
+
+  const toggleVoiceNote = async () => {
+    if (recording) { recorderRef.current?.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = ev => { if (ev.data.size) chunks.push(ev.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        setRecording(false);
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        if (blob.size > 0) void uploadAndSend(blob, blob.type.includes("mp4") ? "m4a" : "webm", "audio");
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+    } catch {
+      toast.error("Microphone permission is needed to record a voice message.");
+    }
+  };
+
   const sendMessage = async () => {
     if (!msg.trim() || !activeChat || !user) return;
     const content = msg.trim();
@@ -366,7 +427,21 @@ const MessagesPage = () => {
                   <div className={`max-w-[75%] break-words whitespace-pre-wrap px-4 py-2.5 rounded-2xl text-sm ${
                     mine ? "border border-amber-200/30 bg-gradient-to-br from-amber-300/20 to-amber-700/15 text-amber-50 shadow-[0_4px_18px_rgba(212,175,55,.12)]" : "border border-white/10 bg-white/[0.03] text-white shadow-[0_6px_20px_rgba(0,0,0,.2)] backdrop-blur-xl"
                   }`}>
-                    {m.content}
+                    {m.media_type === "image" && m.media_url && <a href={m.media_url} target="_blank" rel="noreferrer"><img src={m.media_url} alt="Photo" className="mb-1 max-h-64 rounded-xl object-cover" /></a>}
+                    {m.media_type === "video" && m.media_url && <video src={m.media_url} controls playsInline className="mb-1 max-h-64 rounded-xl" />}
+                    {m.media_type === "audio" && m.media_url && <audio src={m.media_url} controls className="h-10 max-w-full" />}
+                    {(m.media_type === "post" || m.media_type === "reel") && (
+                      <button
+                        onClick={() => navigate(m.media_type === "reel" ? `/reels?r=${m.shared_ref}` : `/?post=${m.shared_ref}`)}
+                        className="mb-1 block w-56 overflow-hidden rounded-xl border border-white/10 bg-black/30 text-left"
+                      >
+                        {m.media_url && (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(m.media_url)
+                          ? <video src={m.media_url} className="h-36 w-full object-cover" muted playsInline />
+                          : <img src={m.media_url} alt="" className="h-36 w-full object-cover" />)}
+                        <span className="flex items-center gap-1 px-2 py-1.5 text-[11px] text-white/80"><PlayIcon className="h-3 w-3" />Open {m.media_type}</span>
+                      </button>
+                    )}
+                    {!(m.media_type === "image" || m.media_type === "video" || m.media_type === "audio") && m.content}
                   </div>
                   {isLastMine && (
                     <span className={`text-[10px] mt-1 ${m.read ? "text-amber-200" : "text-white/40"}`}>
@@ -380,6 +455,13 @@ const MessagesPage = () => {
 
             <div className="relative z-10 px-4 py-3 safe-area-bottom">
               <div className="flex gap-2 rounded-2xl border border-amber-200/20 bg-black/55 p-1.5 shadow-[0_0_22px_rgba(212,175,55,.1)] backdrop-blur-xl">
+                <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={onPickFile} />
+                <button onClick={() => fileRef.current?.click()} disabled={uploading || recording} aria-label="Attach photo or video" className="depth-press flex h-10 w-10 items-center justify-center rounded-xl text-amber-200 hover:bg-amber-300/10 disabled:opacity-40">
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                </button>
+                <button onClick={() => void toggleVoiceNote()} disabled={uploading} aria-label={recording ? "Stop and send voice message" : "Record voice message"} className={`depth-press flex h-10 w-10 items-center justify-center rounded-xl ${recording ? "bg-red-500 text-white animate-pulse" : "text-amber-200 hover:bg-amber-300/10"}`}>
+                  {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
                 <input
                   value={msg}
                   onChange={(e) => setMsg(e.target.value)}

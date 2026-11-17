@@ -1,3 +1,4 @@
+import ShareSheet from "@/components/ShareSheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2 } from "lucide-react";
@@ -35,6 +36,24 @@ const ReelsPage = () => {
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const reelIds = reels.map(reel => reel.id);
+  const deepLinkDone = useRef(false);
+
+  // Deep link: /reels?r=<id> scrolls to the shared reel once loaded.
+  useEffect(() => {
+    if (deepLinkDone.current || reels.length === 0) return;
+    const target = new URLSearchParams(window.location.search).get("r");
+    if (!target) { deepLinkDone.current = true; return; }
+    const idx = reels.findIndex(r => r.id === target);
+    if (idx >= 0) {
+      deepLinkDone.current = true;
+      requestAnimationFrame(() => {
+        const el = containerRef.current?.children[idx] as HTMLElement | undefined;
+        el?.scrollIntoView({ block: "start" });
+      });
+    } else if (hasMoreRef.current && !loadingRef.current) {
+      void fetchReels(false);
+    }
+  }, [reels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchReels = useCallback(async (reset = false) => {
     if (loadingRef.current || (!reset && !hasMoreRef.current)) return;
@@ -168,14 +187,8 @@ const ReelsPage = () => {
     loadComments(openComments);
   };
 
-  const shareReel = async (reel: any) => {
-    const url = `${window.location.origin}/reels?r=${reel.id}`;
-    try {
-      if (navigator.share) await navigator.share({ title: "Primegram Reel", text: reel.caption || "Watch this reel", url });
-      else { await navigator.clipboard.writeText(url); toast.success("Link copied"); }
-    } catch { /* cancelled */ }
-  };
-
+  const [shareReelTarget, setShareReelTarget] = useState<any | null>(null);
+  const shareReel = (reel: any) => { setShareReelTarget(reel); };
   return (
     <div className="min-h-screen overflow-hidden bg-[#080b14] text-white [background-image:radial-gradient(ellipse_at_24%_16%,rgba(168,85,247,.2),transparent_35%),radial-gradient(ellipse_at_88%_22%,rgba(34,211,238,.18),transparent_33%),radial-gradient(ellipse_at_73%_88%,rgba(212,175,55,.16),transparent_36%)]">
       {/* Header */}
@@ -369,6 +382,13 @@ const ReelsPage = () => {
         )}
       </AnimatePresence>
       <GlassTabBar />
+      {shareReelTarget && (
+        <ShareSheet
+          open
+          onOpenChange={o => { if (!o) setShareReelTarget(null); }}
+          target={{ kind: "reel", id: shareReelTarget.id, mediaUrl: shareReelTarget.video_url, mediaType: "video", caption: shareReelTarget.caption, username: shareReelTarget.profile?.username, link: `${window.location.origin}/reels?r=${shareReelTarget.id}` }}
+        />
+      )}
     </div>
   );
 };

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Music2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
+import { searchGlobalMusic } from "@/services/GlobalMusicService";
 
 export interface PostMusic {
   title: string;
@@ -17,86 +18,62 @@ let currentUrl: string | null = null;
 
 const BAR_HEIGHTS = [10, 18, 26, 14, 22, 30, 16, 24, 12, 20, 28, 15, 22, 11, 19, 27];
 
+const streamCache = new Map<string, string>();
+
+const resolveStream = async (music: PostMusic): Promise<string | null> => {
+  if (music.stream_url) return music.stream_url;
+  const key = `${music.title}|${music.artist ?? ""}`;
+  const cached = streamCache.get(key);
+  if (cached) return cached;
+  const clean = (v: string) => v.replace(/\(.*?\)|\[.*?\]/g, "").trim();
+  const hits = await searchGlobalMusic(`${clean(music.title)} ${clean(music.artist ?? "")}`.trim(), 5);
+  const url = hits[0]?.streamUrl ?? (await searchGlobalMusic(clean(music.title), 5))[0]?.streamUrl ?? null;
+  if (url) streamCache.set(key, url);
+  return url;
+};
+
 const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
   const [playing, setPlaying] = useState(false);
-  const ytRef = useRef<HTMLIFrameElement>(null);
+  const [loading, setLoading] = useState(false);
+  const activeKey = useRef<string>("");
 
-  const ytId = music.youtube_id || null;
+  // Stop if another post's player takes over the shared audio element.
+  useEffect(() => () => {
+    if (sharedAudio && currentUrl && activeKey.current === currentUrl) sharedAudio.pause();
+  }, []);
 
-  // Mark the hidden YouTube iframe ready so play commands are accepted.
-  useEffect(() => {
-    if (!ytId) return;
-    const onMsg = (e: MessageEvent) => {
-      if (e.origin !== "https://www.youtube.com") return;
-      try {
-        const d = JSON.parse(e.data);
-        if (d?.event === "onReady" || d?.event === "infoDelivery") {
-          ytRef.current?.contentWindow?.postMessage(
-            JSON.stringify({ event: "command", func: playing ? "playVideo" : "pauseVideo", args: [] }),
-            "https://www.youtube.com"
-          );
-        }
-      } catch {
-        /* non-JSON frame message */
-      }
-    };
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ytId]);
-
-  const toggle = () => {
-    if (music.stream_url) {
-      if (sharedAudio && currentUrl !== music.stream_url) {
-        sharedAudio.pause();
-        sharedAudio = null;
-      }
-      if (!sharedAudio) {
-        sharedAudio = new Audio(music.stream_url);
-        currentUrl = music.stream_url;
-        sharedAudio.addEventListener("ended", () => setPlaying(false));
-        sharedAudio.addEventListener("error", () => {
-          setPlaying(false);
-          if (currentUrl === music.stream_url) toast.error("This track could not be played.");
-        });
-      }
-      if (playing) {
-        sharedAudio.pause();
-        setPlaying(false);
-      } else {
-        sharedAudio
-          .play()
-          .then(() => setPlaying(true))
-          .catch(error => {
-            setPlaying(false);
-            toast.error(error instanceof Error ? error.message : "This track could not be played.");
-          });
-      }
-    } else if (ytId) {
-      const win = ytRef.current?.contentWindow;
-      if (!win) return;
-      win.postMessage(
-        JSON.stringify({ event: "command", func: playing ? "pauseVideo" : "playVideo", args: [] }),
-        "https://www.youtube.com"
-      );
-      setPlaying(!playing);
+  const toggle = async () => {
+    if (playing && sharedAudio && activeKey.current === currentUrl) {
+      sharedAudio.pause();
+      setPlaying(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const url = await resolveStream(music);
+      if (!url) { toast.error("No playable audio found for this track."); return; }
+      if (sharedAudio) sharedAudio.pause();
+      sharedAudio = new Audio(url);
+      currentUrl = url;
+      activeKey.current = url;
+      sharedAudio.addEventListener("ended", () => setPlaying(false));
+      sharedAudio.addEventListener("pause", () => setPlaying(false));
+      sharedAudio.addEventListener("error", () => { setPlaying(false); toast.error("This track could not be played."); });
+      await sharedAudio.play();
+      setPlaying(true);
+    } catch (error) {
+      setPlaying(false);
+      toast.error(error instanceof Error ? error.message : "This track could not be played.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="mx-4 mb-3 rounded-2xl border border-primary/30 bg-card/70 backdrop-blur-xl px-3 py-2.5 flex items-center gap-3 relative z-10">
-      {ytId && (
-        <iframe
-          ref={ytRef}
-          src={`https://www.youtube.com/embed/${ytId}?enablejsapi=1&origin=${window.location.origin}`}
-          title={music.title}
-          className="absolute w-px h-px opacity-0 pointer-events-none"
-          tabIndex={-1}
-          aria-hidden="true"
-        />
-      )}
       <button
-        onClick={toggle}
+        onClick={() => void toggle()}
+        disabled={loading}
         aria-label={playing ? "Pause track" : "Play track"}
         className="depth-press w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0"
       >

@@ -17,8 +17,16 @@ export const GOOGLE_STUN_URLS = [
   "stun:stun1.l.google.com:19305",
 ];
 
+// Public TURN relay (Open Relay Project) so calls still connect across strict
+// NATs / mobile networks where STUN alone fails.
+export const TURN_SERVERS: RTCIceServer[] = [
+  { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+];
+
 export const GOOGLE_RTC_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: GOOGLE_STUN_URLS }],
+  iceServers: [{ urls: GOOGLE_STUN_URLS }, ...TURN_SERVERS],
   // Pre-gather candidates against Google STUN before the offer is created.
   iceCandidatePoolSize: 8,
   bundlePolicy: "max-bundle",
@@ -29,5 +37,5 @@ export const GOOGLE_RTC_CONFIG: RTCConfiguration = {
 /** Fresh copy so callers can extend without mutating the shared object. */
 export const getRtcConfig = (): RTCConfiguration => ({
   ...GOOGLE_RTC_CONFIG,
-  iceServers: [{ urls: [...GOOGLE_STUN_URLS] }],
+  iceServers: [{ urls: [...GOOGLE_STUN_URLS] }, ...TURN_SERVERS],
 });

@@ -7,7 +7,7 @@ import FeedPost from "@/components/FeedPost";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { timeAgo } from "@/utils/timeAgo";
-import { Compass, Film, Loader2, MessageCircle, Plus, WalletCards } from "lucide-react";
+import { Compass, Film, Heart, Loader2, MessageCircle, Play, Plus, WalletCards } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -36,7 +36,10 @@ const Index = () => {
     }
     const page = reset ? 0 : pageRef.current;
     try {
-      const [{ data, error }, { data: follows, error: followsError }] = await Promise.all([
+      const reelsPromise = page === 0
+        ? supabase.from("reels").select("*").is("source_post_id", null).order("created_at", { ascending: false }).limit(15)
+        : Promise.resolve({ data: [] as any[] });
+      const [{ data, error }, { data: follows, error: followsError }, { data: reelRows }] = await Promise.all([
         supabase
           .from("posts")
           .select("*")
@@ -47,12 +50,17 @@ const Index = () => {
         currentUserId
           ? supabase.from("follows").select("following_id").eq("follower_id", currentUserId)
           : Promise.resolve({ data: [], error: null }),
+        reelsPromise,
       ]);
 
       if (error) throw error;
       if (followsError) throw followsError;
-      const rows = data ?? [];
-      hasMoreRef.current = rows.length === FEED_PAGE_SIZE;
+      const postRows = data ?? [];
+      const rows = [
+        ...postRows,
+        ...((reelRows ?? []) as any[]).map(r => ({ ...r, _reel: true, media_url: r.video_url, media_type: "video" })),
+      ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+      hasMoreRef.current = postRows.length === FEED_PAGE_SIZE;
       setHasMore(hasMoreRef.current);
       pageRef.current = page + 1;
       if (rows.length) {
@@ -90,6 +98,7 @@ const Index = () => {
     void fetchPosts(true);
     const channel = supabase.channel("home-posts")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => void fetchPosts(true))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reels" }, () => void fetchPosts(true))
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [fetchPosts]);
@@ -148,7 +157,32 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">No posts yet. Create your first post to get started.</p>
             </div>
           ) : (
-            posts.map((post, i) => (
+            posts.map((post, i) => post._reel ? (
+              <button
+                key={`reel-${post.id}`}
+                onClick={() => navigate(`/reels?r=${post.id}`)}
+                className="liquid-glass mb-6 block w-full overflow-hidden rounded-[1.5rem] text-left"
+              >
+                <div className="relative z-10 flex items-center gap-2 p-4">
+                  <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-secondary text-sm font-semibold">
+                    {post.profile?.avatar_url ? <img src={post.profile.avatar_url} alt="" className="h-full w-full object-cover" /> : (post.profile?.display_name || "U")[0].toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">{post.profile?.display_name || "User"}</p>
+                    <p className="text-[11px] text-muted-foreground">{timeAgo(post.created_at)}</p>
+                  </div>
+                  <span className="flex items-center gap-1 rounded-full bg-fuchsia-400/15 px-2 py-1 text-[10px] font-semibold text-fuchsia-300"><Film className="h-3 w-3" />Reel</span>
+                </div>
+                <div className="relative aspect-[4/5] w-full bg-black">
+                  <video src={post.video_url} className="h-full w-full object-cover" autoPlay muted loop playsInline preload="metadata" />
+                  <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 backdrop-blur"><Play className="h-4 w-4 text-white" /></span>
+                </div>
+                <div className="relative z-10 flex items-center gap-3 p-4">
+                  <span className="flex items-center gap-1 text-sm text-foreground"><Heart className="h-4 w-4" />{post.likes_count ?? 0}</span>
+                  {post.caption && <p className="truncate text-sm text-foreground/80">{post.caption}</p>}
+                </div>
+              </button>
+            ) : (
               <FeedPost
                 key={post.id}
                 image={post.media_url || ""}

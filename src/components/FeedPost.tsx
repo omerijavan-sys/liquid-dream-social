@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
+import ShareSheet from "@/components/ShareSheet";
 import type { PostMusic } from "@/components/PostMusicPlayer";
 import { BOOSTS } from "@/lib/extreme";
 import CreatorTipButton from "@/components/CreatorTipButton";
@@ -145,13 +146,8 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
     toast.success(saved ? "Removed from saved" : "Saved");
   };
 
-  const sharePost = async () => {
-    const text = `${username} on Primegram: ${caption}`;
-    try {
-      if (navigator.share) await navigator.share({ title: "Primegram", text, url: postLink });
-      else { await navigator.clipboard.writeText(postLink); toast.success("Link copied"); }
-    } catch { /* cancelled */ }
-  };
+  const [shareOpen, setShareOpen] = useState(false);
+  const sharePost = () => { if (postId) setShareOpen(true); else void navigator.clipboard.writeText(postLink).then(() => toast.success("Link copied")); };
 
   const copyLink = async () => {
     try { await navigator.clipboard.writeText(postLink); toast.success("Link copied"); } catch { toast.error("Couldn't copy link"); }
@@ -428,6 +424,7 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
           </div>
         </DialogContent>
       </Dialog>
+      {postId && <ShareSheet open={shareOpen} onOpenChange={setShareOpen} target={{ kind: "post", id: postId, mediaUrl: image, mediaType, caption, username, link: postLink }} />}
     </motion.div>
   );
 };

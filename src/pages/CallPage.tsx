@@ -293,8 +293,8 @@ const CallPage = () => {
 
   return (
     <div className="h-dvh bg-background flex flex-col relative overflow-hidden">
-      {/* Liquid glass blobs — blue · red · green */}
-      <div className="absolute inset-0 -z-10">
+      {/* Liquid glass blobs — only while ringing/connecting so the live call stays clear */}
+      <div className={`absolute inset-0 -z-10 transition-opacity duration-500 ${status === "connected" ? "opacity-0" : "opacity-100"}`}>
         <motion.div
           className="absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full"
           style={{ background: "radial-gradient(circle, hsl(var(--brand-blue) / 0.5), transparent 70%)", filter: "blur(60px)" }}
@@ -317,15 +317,19 @@ const CallPage = () => {
 
       <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
       {status !== "connected" && <div className="absolute inset-0 bg-background/40 backdrop-blur-md" />}
+      {status === "connected" && <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 to-transparent" />}
+      {status === "connected" && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 to-transparent" />}
 
       <div className="relative z-10 safe-area-top p-6">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-auto max-w-sm liquid-glass-elevated rounded-3xl px-6 py-4 text-center"
+          className={status === "connected" ? "flex flex-col items-center text-center" : "mx-auto max-w-sm liquid-glass-elevated rounded-3xl px-6 py-4 text-center"}
         >
-          <p className="text-display text-foreground text-2xl relative z-10">{peerName}</p>
-          <p className="text-sm text-primary mt-1 font-mono relative z-10">{formatTime(callTime)}</p>
+          <p className={`relative z-10 font-semibold text-white drop-shadow ${status === "connected" ? "text-lg" : "text-display text-2xl text-foreground"}`}>{peerName}</p>
+          <p className="relative z-10 mt-1 font-mono text-sm text-white/90 drop-shadow">
+            {status === "ringing" ? (isCallee ? "Incoming call…" : "Ringing…") : status === "connecting" ? "Connecting…" : status === "ended" ? "Call ended" : formatTime(callTime)}
+          </p>
         </motion.div>
       </div>
 
@@ -336,9 +340,9 @@ const CallPage = () => {
           transition={{ delay: 0.3, type: "spring" }}
           drag
           dragConstraints={{ left: -220, right: 0, top: -420, bottom: 0 }}
-          className="w-32 h-44 rounded-3xl overflow-hidden liquid-glass-elevated border border-white/20 shadow-2xl cursor-grab active:cursor-grabbing"
+          className="w-24 h-36 rounded-2xl overflow-hidden border-2 border-white/40 bg-black shadow-2xl cursor-grab active:cursor-grabbing"
         >
-          <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover mirror relative z-10" />
+          <video ref={localVideoRef} autoPlay playsInline muted className={`w-full h-full object-cover relative z-10 ${facing === "user" ? "mirror" : ""}`} />
         </motion.div>
       </div>
 
@@ -347,28 +351,28 @@ const CallPage = () => {
         animate={{ y: 0, opacity: 1 }}
         className="relative z-10 safe-area-bottom pb-8"
       >
-        <div className="mx-auto max-w-sm liquid-glass-elevated rounded-full py-3 px-4">
+        <div className="mx-auto max-w-sm rounded-full bg-black/55 py-3 px-4 backdrop-blur-sm">
           <div className="flex justify-center gap-3 relative z-10">
             <Button variant="ghost" size="icon"
               onClick={toggleMute}
               aria-label="Toggle microphone"
-              className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${muted ? "bg-destructive/30" : "liquid-glass-subtle"}`}
+              className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${muted ? "bg-red-500/40" : "bg-white/15"}`}
             >
-              {muted ? <MicOff className="w-6 h-6 text-destructive" /> : <Mic className="w-6 h-6 text-foreground" />}
+              {muted ? <MicOff className="w-6 h-6 text-destructive" /> : <Mic className="w-6 h-6 text-white" />}
             </Button>
             <Button variant="ghost" size="icon" disabled={audioOnly}
               onClick={toggleVideo}
               aria-label="Toggle camera"
-              className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${!videoOn ? "bg-destructive/30" : "liquid-glass-subtle"}`}
+              className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${!videoOn ? "bg-red-500/40" : "bg-white/15"}`}
             >
-              {videoOn ? <Video className="w-6 h-6 text-foreground" /> : <VideoOff className="w-6 h-6 text-destructive" />}
+              {videoOn ? <Video className="w-6 h-6 text-white" /> : <VideoOff className="w-6 h-6 text-destructive" />}
             </Button>
             <Button variant="ghost" size="icon" disabled={audioOnly}
               onClick={flipCamera}
               aria-label="Switch camera"
-              className="depth-press w-14 h-14 rounded-full liquid-glass-subtle flex items-center justify-center"
+              className="depth-press w-14 h-14 rounded-full bg-white/15 flex items-center justify-center"
             >
-              <RefreshCw className="w-6 h-6 text-foreground" />
+              <RefreshCw className="w-6 h-6 text-white" />
             </Button>
             <Button variant="destructive" size="icon"
               onClick={hangUp}

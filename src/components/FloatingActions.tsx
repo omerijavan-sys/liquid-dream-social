@@ -93,6 +93,15 @@ const FloatingActions = () => {
     return () => window.removeEventListener("prime:openOrb", handleOpenAssistant);
   }, [openAI]);
 
+  const grads: Record<string, string> = {
+    "Create post": "linear-gradient(135deg,#ff6bd6,#7c4dff)",
+    "Open chat": "linear-gradient(135deg,#38bdf8,#6366f1)",
+    "Quick search": "linear-gradient(135deg,#34d399,#06b6d4)",
+    "AI assistant": "linear-gradient(135deg,#a78bfa,#ec4899)",
+    "Online calls": "linear-gradient(135deg,#4ade80,#16a34a)",
+    "Prime Hub": "linear-gradient(135deg,#fbbf24,#f97316)",
+    "Hide floating actions": "linear-gradient(135deg,#64748b,#334155)",
+  };
   const actions = [
     { label: "Create post", icon: Plus, run: () => navigate("/create"), position: [0.76, 0.72] },
     { label: "Open chat", icon: MessageCircle, run: () => navigate("/messages"), position: [0.28, 0.76] },
@@ -155,9 +164,13 @@ const FloatingActions = () => {
                 transition={{ type: "spring", stiffness: 380, damping: 28, delay: index * 0.035 }}
                 onClick={() => { setMenuOpen(false); action.run(); }}
                 style={{ left: targetX, top: targetY, translate: "-50% -50%" }}
-                className="depth-press fixed z-[56] flex h-14 w-14 items-center justify-center rounded-full liquid-glass-elevated text-primary shadow-xl"
+                whileHover={{ scale: 1.12 }}
+                whileTap={{ scale: 0.9 }}
+                className="fixed z-[56] flex h-14 w-14 items-center justify-center rounded-full text-white ring-1 ring-white/40"
               >
-                <action.icon className="h-5 w-5" />
+                <span aria-hidden className="absolute inset-0 -z-10 rounded-full" style={{ background: grads[action.label], boxShadow: "0 8px 22px rgba(0,0,0,0.28), 0 0 18px rgba(167,139,250,0.45), inset 0 1px 1px rgba(255,255,255,0.55)" }} />
+                <span aria-hidden className="pointer-events-none absolute inset-x-2 top-1 h-4 rounded-full bg-white/30 blur-[2px]" />
+                <action.icon className="h-6 w-6 drop-shadow" />
                 <span className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-background/90 px-2 py-1 text-[10px] font-medium text-foreground shadow">
                   {action.label}
                 </span>
@@ -173,9 +186,10 @@ const FloatingActions = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.92 }}
           onClick={() => setMenuOpen((open) => !open)}
-          className="depth-press flex h-14 w-14 items-center justify-center rounded-full liquid-glass-elevated text-primary shadow-lg"
-          style={{ boxShadow: "0 4px 24px hsla(280, 80%, 60%, 0.38)" }}
+          className="relative flex h-14 w-14 items-center justify-center rounded-full text-white ring-1 ring-white/40"
+          style={{ background: "linear-gradient(135deg,#ff6bd6 0%,#7c4dff 55%,#38bdf8 100%)", boxShadow: "0 8px 28px rgba(124,77,255,0.55), inset 0 1px 1px rgba(255,255,255,0.6)" }}
         >
+          {!menuOpen && <motion.span aria-hidden className="absolute inset-0 rounded-full ring-2 ring-fuchsia-400/60" animate={{ scale: [1, 1.5], opacity: [0.7, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }} />}
           <motion.span animate={{ rotate: menuOpen ? 45 : 0 }} className="flex">
             {menuOpen
               ? <X className="h-6 w-6" />

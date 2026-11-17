@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Settings, Grid3X3, Bookmark, Heart, Camera, Film, X } from "lucide-react";
+import { ArrowLeft, Settings, Sparkles, BarChart3, Grid3X3, Bookmark, Heart, Camera, Film, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import FollowListDialog, { FollowButton } from "@/components/FollowListDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { AuraDialog, AnalyticsDialog } from "@/components/ProfileDashboards";
 
 interface Profile {
   display_name: string | null;
@@ -36,6 +37,8 @@ const ProfilePage = () => {
   const [listMode, setListMode] = useState<"followers" | "following" | null>(null);
   const [tabPosts, setTabPosts] = useState<any[]>([]);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [auraOpen, setAuraOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
 
   useEffect(() => {
@@ -131,6 +134,8 @@ const ProfilePage = () => {
         <div className="relative z-10 flex items-center gap-3 px-3 py-2.5">
           <button onClick={() => navigate(-1)} aria-label="Back" className="depth-press text-amber-100"><ArrowLeft className="h-4 w-4" /></button>
           <span className="flex flex-1 items-center gap-1 text-sm font-bold text-white">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} /></span>
+          <button onClick={() => setAuraOpen(true)} aria-label="Aura dashboard" className="depth-press text-amber-200"><Sparkles className="h-5 w-5" /></button>
+          <button onClick={() => setAnalyticsOpen(true)} aria-label="Analytics dashboard" className="depth-press text-amber-200"><BarChart3 className="h-5 w-5" /></button>
           <button onClick={() => navigate("/settings")} aria-label="Settings" className="depth-press text-amber-200"><Settings className="h-5 w-5" /></button>
         </div>
       </div>
@@ -191,6 +196,8 @@ const ProfilePage = () => {
           </div>
         )}
       </div>
+      <AuraDialog userId={user.id} open={auraOpen} onOpenChange={setAuraOpen} />
+      <AnalyticsDialog userId={user.id} isOwner open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
       {listMode && <FollowListDialog open onOpenChange={o => !o && setListMode(null)} mode={listMode} userId={user.id} myFollowing={myFollowing} setMyFollowing={setMyFollowing} />}
 
       <div className="prime-profile-tabs flex border-y border-white/10 bg-black/20">

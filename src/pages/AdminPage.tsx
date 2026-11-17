@@ -230,6 +230,9 @@ const AdminPage = () => {
     { label: "Reels", value: reels?.length ?? 0, icon: Video },
     { label: "Open reports", value: (reports ?? []).filter((r: any) => r.status === "open").length, icon: Flag },
     { label: "Pending withdrawals", value: (withdrawals ?? []).filter((w: any) => w.status === "pending").length, icon: Banknote },
+    { label: "Payout queue (KES)", value: (withdrawals ?? []).filter((w: any) => w.status === "pending").reduce((a: number, w: any) => a + Number(w.amount || 0), 0).toLocaleString(), icon: Banknote },
+    { label: "New users (7d)", value: (profiles ?? []).filter((p: any) => p.created_at && Date.now() - new Date(p.created_at).getTime() < 7 * 864e5).length, icon: Users },
+    { label: "Open tickets", value: ((tickets ?? []) as any[]).filter((t: any) => t.status !== "resolved").length, icon: Flag },
   ];
 
   const glass = "border-white/10 bg-white/5 backdrop-blur-2xl";

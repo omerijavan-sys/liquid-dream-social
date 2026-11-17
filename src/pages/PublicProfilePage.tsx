@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Eye, Grid3X3, Loader2, X } from "lucide-react";
+import { ArrowLeft, Sparkles, BarChart3, Eye, Grid3X3, Loader2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { FollowButton } from "@/components/FollowListDialog";
 import CommentsSection from "@/components/CommentsSection";
+import { AuraDialog, AnalyticsDialog } from "@/components/ProfileDashboards";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -43,6 +44,8 @@ const PublicProfilePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [auraOpen, setAuraOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [posts, setPosts] = useState<ProfilePost[]>([]);
   const [followers, setFollowers] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -194,9 +197,17 @@ const PublicProfilePage = () => {
           <h1 className="text-headline text-foreground">
             {profile?.username ? `@${profile.username}` : "Profile"}
           </h1>
+          {userId && (
+            <div className="ml-auto flex items-center gap-3">
+              <button onClick={() => setAuraOpen(true)} aria-label="Aura dashboard" className="depth-press"><Sparkles className="h-5 w-5 text-primary" /></button>
+              <button onClick={() => setAnalyticsOpen(true)} aria-label="Analytics dashboard" className="depth-press"><BarChart3 className="h-5 w-5 text-primary" /></button>
+            </div>
+          )}
         </div>
       </header>
 
+      {userId && <AuraDialog userId={userId} open={auraOpen} onOpenChange={setAuraOpen} />}
+      {userId && <AnalyticsDialog userId={userId} isOwner={user?.id === userId} open={analyticsOpen} onOpenChange={setAnalyticsOpen} />}
       <main className="mx-auto max-w-3xl">
         {loading ? (
           <div className="flex justify-center py-16 text-muted-foreground">
