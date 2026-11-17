@@ -87,6 +87,6 @@ jobs:
           git add public/primegram-extreme.apk
           if git diff --cached --quiet; then echo "No APK change"; else
             git commit -m "Update Android APK download [skip actions]"
-            git pull --rebase origin main
+            git pull --rebase --autostash origin main
             git push origin HEAD:main
           fi
