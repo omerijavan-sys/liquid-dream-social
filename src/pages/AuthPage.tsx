@@ -28,7 +28,7 @@ const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(countryCodes[0]);
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(countryCodes.find(c => c.code === "KE") ?? countryCodes[0]);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(0);
