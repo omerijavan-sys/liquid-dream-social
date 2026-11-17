@@ -1,4 +1,6 @@
-import { ArrowRight, Bot, Film, Globe2, MessageCircle, Music2, ShieldCheck, Sparkles } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { ArrowRight, Bot, Download, Film, Globe2, MessageCircle, Music2, ShieldCheck, Sparkles } from "lucide-react";
+import { ANDROID_APK_URL } from "@/components/AndroidDownloadCard";
 
 const features = [
   {
@@ -35,9 +37,22 @@ const PublicLandingPage = () => (
         <Sparkles className="h-5 w-5" />
         PRIMEGRAM EXTREME
       </a>
-      <a href="/auth" className="rounded-full border border-primary/40 px-4 py-2 text-sm font-semibold transition-colors hover:bg-primary/10">
-        Sign in
-      </a>
+      <div className="flex items-center gap-2">
+        {!Capacitor.isNativePlatform() && (
+          <a
+            href={ANDROID_APK_URL}
+            download
+            aria-label="Download Primegram Extreme for Android"
+            title="Download APK"
+            className="inline-flex size-10 items-center justify-center rounded-full border border-emerald-300/30 text-emerald-200 transition-colors hover:bg-emerald-400/10 hover:text-emerald-100"
+          >
+            <Download className="size-4" />
+          </a>
+        )}
+        <a href="/auth" className="rounded-full border border-primary/40 px-4 py-2 text-sm font-semibold transition-colors hover:bg-primary/10">
+          Sign in
+        </a>
+      </div>
     </header>
 
     <section className="relative z-10 mx-auto grid min-h-[65vh] w-full max-w-6xl items-center gap-10 px-5 py-16 md:grid-cols-[1.2fr_.8fr] md:py-24">
