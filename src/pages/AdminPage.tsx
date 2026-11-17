@@ -366,6 +366,9 @@ const AdminPage = () => {
                       <span className="text-sm font-medium">KES {Number(w.amount).toLocaleString()}</span>
                       <span className="text-sm text-muted-foreground">{usernameFor(w.user_id)} · {w.phone}</span>
                       <Badge variant="secondary" className="capitalize">{w.status}</Badge>
+                      {(w.risk_flags ?? []).map((f: string) => (
+                        <Badge key={f} variant="destructive" className="text-[10px]">{f.replace(/_/g, " ")}</Badge>
+                      ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Requested {new Date(w.created_at).toLocaleString()}

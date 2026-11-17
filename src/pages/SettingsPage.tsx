@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
 import AndroidDownloadCard from "@/components/AndroidDownloadCard";
 import AccountManagement from "@/components/AccountManagement";
+import { enablePush, disablePush } from "@/utils/pushSubscribe";
 import { PrivacyPanel, BlockedPanel, SecurityExtras, HelpPanel, WalletShortcut } from "@/components/SettingsExtras";
 
 type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions" | "blocked";
@@ -284,9 +285,10 @@ const SettingsPage = () => {
                 <span className="text-sm text-foreground capitalize">{key.replace(/([A-Z])/g, " $1")} Notifications</span>
                 <Toggle on={val} onToggle={async () => {
                   if (key === "push" && !val) {
-                    if (!("Notification" in window)) { toast.error("Browser notifications are unavailable."); return; }
-                    if (await Notification.requestPermission() !== "granted") { toast.error("Allow notifications in your browser settings."); return; }
+                    try { await enablePush(user!.id); toast.success("Push notifications enabled on this device"); }
+                    catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't enable push"); return; }
                   }
+                  if (key === "push" && val) { void disablePush(); }
                   const next = { ...notifToggles, [key]: !val };
                   setNotifToggles(next); savePreference("notifications", next);
                 }} />
