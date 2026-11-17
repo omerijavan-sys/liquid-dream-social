@@ -27,17 +27,22 @@ jobs:
       - name: Build web assets
         run: npm run build
 
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew

@@ -1,4 +1,6 @@
-import logo from "@/assets/p-logo-lux.png";
+import { Capacitor } from "@capacitor/core";
+import appLogo from "@/assets/primegram-app-p-logo.png";
+import webLogo from "@/assets/p-logo-lux.png";
 
 interface PrimeLogoProps {
   size?: number;
@@ -9,26 +11,30 @@ interface PrimeLogoProps {
 /**
  * Architectural liquid-glass "P" mark with metallic accents.
  */
-const PrimeLogo = ({ size = 44, className = "", glow = true }: PrimeLogoProps) => (
-  <div
-    className={`relative inline-flex items-center justify-center rounded-2xl liquid-glass ${className}`}
-    style={{
-      width: size,
-      height: size,
-      boxShadow: glow
-        ? "0 0 28px hsla(var(--brand-blue) / 0.28), 0 0 60px hsla(var(--brand-green) / 0.12)"
-        : undefined,
-    }}
-  >
-    <img
-      src={logo}
-      alt="Primegram logo"
-      width={size}
-      height={size}
-      className="relative z-10 object-contain"
-      style={{ width: size * 0.68, height: size * 0.68 }}
-    />
-  </div>
-);
+const PrimeLogo = ({ size = 44, className = "", glow = true }: PrimeLogoProps) => {
+  const logo = Capacitor.isNativePlatform() ? appLogo : webLogo;
+
+  return (
+    <div
+      className={`relative inline-flex items-center justify-center rounded-2xl liquid-glass ${className}`}
+      style={{
+        width: size,
+        height: size,
+        boxShadow: glow
+          ? "0 0 28px hsla(var(--brand-blue) / 0.28), 0 0 60px hsla(var(--brand-green) / 0.12)"
+          : undefined,
+      }}
+    >
+      <img
+        src={logo}
+        alt="Primegram logo"
+        width={size}
+        height={size}
+        className="relative z-10 object-contain"
+        style={{ width: size * 0.68, height: size * 0.68 }}
+      />
+    </div>
+  );
+};
 
 export default PrimeLogo;

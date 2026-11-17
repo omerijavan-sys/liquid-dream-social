@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
+import { Capacitor } from "@capacitor/core";
 import { useNavigate } from "react-router-dom";
 import { Download, ExternalLink } from "lucide-react";
 import PrimeLogo from "@/components/PrimeLogo";
@@ -15,14 +16,16 @@ const WelcomePage = () => {
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-background overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 50% 45%, hsl(var(--primary) / 0.25), transparent 55%)" }} />
-      <a
-        href={ANDROID_APK_URL}
-        download
-        aria-label="Download Primegram Extreme Android app"
-        className="liquid-glass depth-press absolute right-5 top-5 z-20 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300/30 text-emerald-200 shadow-[0_0_24px_hsl(145_70%_50%/0.18)] transition hover:scale-105 hover:text-emerald-100"
-      >
-        <Download className="h-5 w-5" />
-      </a>
+      {!Capacitor.isNativePlatform() && (
+        <a
+          href={ANDROID_APK_URL}
+          download
+          aria-label="Download Primegram Extreme Android app"
+          className="liquid-glass depth-press absolute right-5 top-5 z-20 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300/30 text-emerald-200 shadow-[0_0_24px_hsl(145_70%_50%/0.18)] transition hover:scale-105 hover:text-emerald-100"
+        >
+          <Download className="h-5 w-5" />
+        </a>
+      )}
       <a
         href={PRIMEGRAM_ISA_DEV_URL}
         target="_blank"
