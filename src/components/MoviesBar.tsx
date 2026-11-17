@@ -81,7 +81,7 @@ const MoviesBar = () => {
                 <span>{selectedMovie.genre}</span>
                 <span className="flex items-center gap-1 text-primary"><Star className="w-3 h-3" />{selectedMovie.rating}</span>
               </div>
-              <button className="depth-press w-full py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2">
+              <button onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(`${selectedMovie.title} ${selectedMovie.year} official trailer`)}`, "_blank", "noopener,noreferrer")} className="depth-press w-full py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2">
                 <Play className="w-4 h-4" /> Watch Trailer
               </button>
             </motion.div>

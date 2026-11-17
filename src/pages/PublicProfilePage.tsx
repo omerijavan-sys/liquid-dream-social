@@ -242,6 +242,16 @@ const PublicProfilePage = () => {
                   >
                     Message
                   </button>
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm("Block this account? They won't be able to message you.")) return;
+                      const { error } = await supabase.from("user_blocks" as never).upsert({ blocker_id: user.id, blocked_id: userId } as never);
+                      if (error) toast.error("Couldn't block this account"); else { toast.success("Blocked. Manage in Settings → Blocked Accounts."); navigate(-1); }
+                    }}
+                    className="depth-press rounded-xl liquid-glass px-3 py-2 text-sm font-semibold text-red-300"
+                  >
+                    Block
+                  </button>
                   {creatorPrice !== null && (
                     <button
                       onClick={() => {

@@ -13,8 +13,36 @@ interface Transaction {
   type: "send" | "receive" | "topup";
   amount: number;
   counterparty: string | null;
+  note: string | null;
   created_at: string;
 }
+
+interface Withdrawal {
+  id: string;
+  amount: number;
+  phone: string;
+  status: "pending" | "paid" | "rejected" | "cancelled";
+  mpesa_receipt: string | null;
+  admin_note: string | null;
+  created_at: string;
+}
+
+const WITHDRAWAL_STATUS: Record<Withdrawal["status"], { label: string; cls: string }> = {
+  pending: { label: "Pending", cls: "text-amber-300" },
+  paid: { label: "Paid", cls: "text-green-400" },
+  rejected: { label: "Rejected — refunded", cls: "text-red-400" },
+  cancelled: { label: "Cancelled — refunded", cls: "text-muted-foreground" },
+};
+
+const txLabel = (tx: Pick<Transaction, "type" | "note">) => {
+  const note = tx.note || "";
+  if (note.startsWith("Withdrawal cancelled")) return "Withdrawal refund";
+  if (note.startsWith("Withdrawal rejected")) return "Withdrawal refund";
+  if (note.startsWith("Withdrawal")) return "Withdrawal";
+  if (tx.type === "topup") return "M-Pesa Top Up";
+  if (note) return note.replace(/\s*\(5% fee\)$/, "");
+  return tx.type === "send" ? "Sent" : tx.type === "receive" ? "Received" : tx.type;
+};
 
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
 
@@ -24,6 +52,7 @@ const WalletPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<"send" | "receive" | "topup" | "withdraw" | null>(null);
   const [amount, setAmount] = useState("");
@@ -39,14 +68,30 @@ const WalletPage = () => {
   const load = async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("wallet_transactions")
-      .select("id, type, amount, counterparty, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    if (error) toast.error("Failed to load wallet");
-    else setTransactions((data as Transaction[]) || []);
+    const [txRes, wdRes] = await Promise.all([
+      supabase
+        .from("wallet_transactions")
+        .select("id, type, amount, counterparty, note, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("withdrawal_requests" as any)
+        .select("id, amount, phone, status, mpesa_receipt, admin_note, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20),
+    ]);
+    if (txRes.error) toast.error("Failed to load wallet");
+    else setTransactions((txRes.data as Transaction[]) || []);
+    if (!wdRes.error) setWithdrawals((wdRes.data as unknown as Withdrawal[]) || []);
     setLoading(false);
+  };
+
+  const cancelWithdrawal = async (id: string) => {
+    const { error } = await supabase.rpc("wallet_cancel_withdrawal" as any, { _id: id });
+    if (error) { toast.error(error.message || "Could not cancel withdrawal"); return; }
+    toast.success("Withdrawal cancelled — funds returned to your wallet.");
+    load();
   };
 
   useEffect(() => { load(); }, [user]);
@@ -143,7 +188,18 @@ const WalletPage = () => {
     if (modal === "topup") { handleTopUp(); return; }
 
     if (modal === "withdraw") {
-      toast.info("Withdrawals require M-Pesa B2C payout setup. Your wallet balance was not changed.");
+      const amt = parseFloat(amount);
+      if (!amt || amt < 50) { toast.error("Minimum withdrawal is KES 50"); return; }
+      if (amt > balance) { toast.error("That is more than your wallet balance"); return; }
+      const digits = phone.replace(/\D/g, "").replace(/^254/, "").replace(/^0/, "");
+      if (!/^(7|1)\d{8}$/.test(digits)) { toast.error("Enter your Safaricom number, e.g. 0712 345 678"); return; }
+      setPaying(true);
+      const { error } = await supabase.rpc("wallet_request_withdrawal" as any, { _amount: amt, _phone: phone });
+      setPaying(false);
+      if (error) { toast.error(error.message || "Withdrawal request failed"); return; }
+      toast.success(`Withdrawal of ${kes(amt)} requested. It will be sent to your M-Pesa once approved.`);
+      closeModal();
+      load();
       return;
     }
 
@@ -210,6 +266,33 @@ const WalletPage = () => {
           </div>
         </motion.div>
 
+        {withdrawals.length > 0 && (
+          <div className="liquid-glass rounded-2xl relative z-10">
+            <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+              <Banknote className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Withdrawals</span>
+            </div>
+            <div className="divide-y divide-border/20">
+              {withdrawals.map(w => (
+                <div key={w.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{kes(Number(w.amount))} → {w.phone}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className={WITHDRAWAL_STATUS[w.status].cls}>{WITHDRAWAL_STATUS[w.status].label}</span>
+                      {w.mpesa_receipt ? ` · Receipt ${w.mpesa_receipt}` : ""}
+                      {w.status === "rejected" && w.admin_note ? ` · ${w.admin_note}` : ""}
+                      {" · "}{new Date(w.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  {w.status === "pending" && (
+                    <button onClick={() => cancelWithdrawal(w.id)} className="depth-press px-3 py-1.5 rounded-full bg-secondary/60 text-xs font-medium text-foreground">Cancel</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="liquid-glass rounded-2xl relative z-10">
           <div className="flex items-center gap-2 px-4 pt-4 pb-2">
             <History className="w-4 h-4 text-muted-foreground" />
@@ -229,7 +312,7 @@ const WalletPage = () => {
                 <motion.div key={tx.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-10 h-10 rounded-xl liquid-glass-subtle flex items-center justify-center">{txIcon(tx.type)}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground capitalize">{tx.type === "topup" ? "M-Pesa Top Up" : tx.type}</p>
+                    <p className="text-sm font-medium text-foreground">{txLabel(tx)}</p>
                     <p className="text-xs text-muted-foreground">
                       {tx.counterparty ? `${tx.type === "send" ? "To" : "From"}: ${tx.counterparty} · ` : ""}
                       {new Date(tx.created_at).toLocaleString()}
@@ -302,8 +385,8 @@ const WalletPage = () => {
                   )}
                   {modal === "withdraw" && (
                     <div className="relative z-10 space-y-3">
-                      <div className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.06] p-3 text-xs text-muted-foreground">
-                        M-Pesa withdrawals are not enabled yet. B2C payout credentials must be configured before money can leave the wallet.
+                      <div className="rounded-2xl border border-primary/20 bg-primary/[0.06] p-3 text-xs text-muted-foreground">
+                        The amount is taken from your balance right away and sent to your M-Pesa number once our team approves it (usually within 24 hours). You can cancel a pending request for a full refund. Minimum KES 50. Available: {kes(balance)}.
                       </div>
                       <label className="text-caption text-muted-foreground block">M-Pesa phone number</label>
                       <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="0712 345 678" inputMode="tel" className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" />
@@ -328,7 +411,7 @@ const WalletPage = () => {
                     className="depth-press w-full py-3.5 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold relative z-10 flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {modal === "topup" ? "Pay with M-Pesa" : modal === "send" ? "Send Money" : modal === "withdraw" ? "Check withdrawal setup" : "Confirm"}
+                    {modal === "topup" ? "Pay with M-Pesa" : modal === "send" ? "Send Money" : modal === "withdraw" ? "Request withdrawal" : "Confirm"}
                   </button>
                   {modal === "topup" && (
                     <p className="text-xs text-muted-foreground text-center relative z-10">You'll get an STK push — enter your M-Pesa PIN to confirm.</p>

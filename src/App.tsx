@@ -15,6 +15,7 @@ import PublicLandingPage from "./pages/PublicLandingPage";
 const MessagesPage = lazy(() => import("./pages/MessagesPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
+const LegalPage = lazy(() => import("./pages/LegalPage"));
 const WalletPage = lazy(() => import("./pages/WalletPage"));
 const ReelsPage = lazy(() => import("./pages/ReelsPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
@@ -87,6 +88,9 @@ const App = () => (
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
             <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
+            <Route path="/terms" element={<LegalPage kind="terms" />} />
+            <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+            <Route path="/help" element={<LegalPage kind="help" />} />
             <Route path="/reels" element={<ProtectedRoute><ReelsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<ProtectedRoute><PublicProfilePage /></ProtectedRoute>} />

@@ -12,8 +12,9 @@ import { Switch } from "@/components/ui/switch";
 import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
 import AndroidDownloadCard from "@/components/AndroidDownloadCard";
 import AccountManagement from "@/components/AccountManagement";
+import { PrivacyPanel, BlockedPanel, SecurityExtras, HelpPanel, WalletShortcut } from "@/components/SettingsExtras";
 
-type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions";
+type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions" | "blocked";
 
 type CreatorSubscription = {
   id: string;
@@ -51,7 +52,6 @@ const SettingsPage = () => {
     updates: true,
     ...readPreference("notifications", {}),
   }));
-  const [privToggles, setPrivToggles] = useState({ private: false, activity: true, tags: true, dms: true });
   const [reduceAnimations, setReduceAnimations] = useState(() => readPreference("reduce-motion", false));
   const [theme, setThemeState] = useState<Theme>(() => readPreference("theme", "dark"));
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => readPreference("color-theme", "obsidian"));
@@ -243,6 +243,7 @@ const SettingsPage = () => {
     { icon: User, label: "Edit Profile", desc: "Update your info", panel: "profile" as Panel, onOpen: loadProfile },
     { icon: Bell, label: "Notifications", desc: "Messages & browser alerts", panel: "notifications" as Panel },
     { icon: Lock, label: "Privacy", desc: "Account privacy settings", panel: "privacy" as Panel },
+    { icon: Shield, label: "Blocked Accounts", desc: "People you blocked", panel: "blocked" as Panel },
     { icon: Shield, label: "Security", desc: "Password & 2FA", panel: "security" as Panel },
     { icon: Palette, label: "Appearance", desc: "Theme & display", panel: "appearance" as Panel },
     { icon: Moon, label: "Dark Mode", desc: darkMode ? "On" : "Off", panel: "darkmode" as Panel },
@@ -294,21 +295,9 @@ const SettingsPage = () => {
           </div>
         );
       case "privacy":
-        return (
-          <div className="space-y-3">
-            {[
-              { key: "private", label: "Private Account" },
-              { key: "activity", label: "Show Activity Status" },
-              { key: "tags", label: "Allow Tags from Everyone" },
-              { key: "dms", label: "Allow Messages from Everyone" },
-            ].map(item => (
-              <div key={item.key} className="liquid-glass rounded-2xl p-4 flex items-center justify-between relative z-10">
-                <span className="text-sm text-foreground">{item.label}</span>
-                <Toggle on={privToggles[item.key as keyof typeof privToggles]} onToggle={() => setPrivToggles(prev => ({ ...prev, [item.key]: !prev[item.key as keyof typeof prev] }))} />
-              </div>
-            ))}
-          </div>
-        );
+        return <PrivacyPanel />;
+      case "blocked":
+        return <BlockedPanel />;
       case "security":
         return (
           <div className="space-y-3">
@@ -324,14 +313,7 @@ const SettingsPage = () => {
                 </button>
               </div>
             )}
-            <div className="liquid-glass rounded-2xl p-4 relative z-10">
-              <p className="text-sm font-semibold text-foreground mb-1">Two-Factor Authentication</p>
-              <p className="text-caption text-muted-foreground">Coming soon</p>
-            </div>
-            <div className="liquid-glass rounded-2xl p-4 relative z-10">
-              <p className="text-sm font-semibold text-foreground mb-1">Login Activity</p>
-              <p className="text-caption text-muted-foreground">Current session active</p>
-            </div>
+            <SecurityExtras />
           </div>
         );
       case "appearance":
@@ -395,23 +377,7 @@ const SettingsPage = () => {
           </div>
         );
       case "help":
-        return (
-          <div className="space-y-3">
-            {[
-              { label: "FAQ", action: () => toast.info("FAQ: Visit our help center for common questions") },
-              { label: "Contact Support", action: () => toast.info("Email: support@primegram.app") },
-              { label: "Report a Problem", action: () => toast.info("Please describe the issue and we'll look into it") },
-              { label: "Terms of Service", action: () => toast.info("Terms of Service - Primegram 2026") },
-              { label: "Privacy Policy", action: () => toast.info("Your data is secure with Primegram") },
-              { label: "About Primegram", action: () => toast.info("Primegram v1.0 - Created by Java Prime, Sponsored by JP7 ULTRA") },
-            ].map(item => (
-              <button key={item.label} onClick={item.action} className="depth-press liquid-glass rounded-2xl p-4 flex items-center justify-between w-full text-left relative z-10">
-                <span className="text-sm text-foreground">{item.label}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-            ))}
-          </div>
-        );
+        return <HelpPanel />;
       case "accounts":
         return (
           <div className="space-y-4">
@@ -648,6 +614,7 @@ const SettingsPage = () => {
               <ChevronRight className="h-4 w-4 text-red-300" />
             </button>
 
+            <WalletShortcut />
             <div className="grid gap-2 sm:grid-cols-2">
               <button onClick={() => { setActivePanel("creator"); void loadCreatorData(); }} className="depth-press flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-3 text-left">
                 <Users className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Creator Dashboard</span><span className="block text-[10px] text-muted-foreground">{creatorActive ? "Manage plan and subscribers" : "Register as a creator"}</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />

@@ -14,7 +14,7 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import LiquidBackground from "@/components/LiquidBackground";
 import {
   Shield, Users, FileText, Video, MessageCircle, Flag, Trash2, ArrowLeft,
-  BadgeCheck, Search, ScrollText, Loader2,
+  BadgeCheck, Search, ScrollText, Loader2, Banknote,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -80,6 +80,20 @@ const AdminPage = () => {
         .limit(200);
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: withdrawals } = useQuery({
+    queryKey: ["admin", "withdrawals"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("withdrawal_requests" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
   });
 
@@ -157,6 +171,32 @@ const AdminPage = () => {
     qc.invalidateQueries({ queryKey: ["admin", "reports"] });
   };
 
+  const processWithdrawal = async (w: any, action: "paid" | "reject") => {
+    let receipt: string | null = null;
+    let note: string | null = null;
+    if (action === "paid") {
+      receipt = window.prompt(`Send KES ${Number(w.amount).toLocaleString()} to ${w.phone} on M-Pesa first, then enter the M-Pesa receipt code:`);
+      if (!receipt || !receipt.trim()) return;
+    } else {
+      note = window.prompt("Reason for rejecting (the user sees this). Their money will be refunded:", "");
+      if (note === null) return;
+    }
+    const { error } = await supabase.rpc("admin_process_withdrawal" as any, {
+      _id: w.id,
+      _action: action,
+      _receipt: receipt,
+      _note: note,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(action === "paid" ? "Marked as paid" : "Rejected and refunded");
+    qc.invalidateQueries({ queryKey: ["admin", "withdrawals"] });
+  };
+
+  const usernameFor = (userId: string) => {
+    const p = (profiles ?? []).find((x: any) => x.user_id === userId) as any;
+    return p?.username ? `@${p.username}` : userId.slice(0, 8);
+  };
+
   const filtered = (profiles ?? []).filter((p: any) =>
     q
       ? `${p.username ?? ""} ${p.display_name ?? ""}`.toLowerCase().includes(q.toLowerCase())
@@ -168,6 +208,7 @@ const AdminPage = () => {
     { label: "Posts", value: posts?.length ?? 0, icon: FileText },
     { label: "Reels", value: reels?.length ?? 0, icon: Video },
     { label: "Open reports", value: (reports ?? []).filter((r: any) => r.status === "open").length, icon: Flag },
+    { label: "Pending withdrawals", value: (withdrawals ?? []).filter((w: any) => w.status === "pending").length, icon: Banknote },
   ];
 
   const glass = "border-white/10 bg-white/5 backdrop-blur-2xl";
@@ -188,7 +229,7 @@ const AdminPage = () => {
         </header>
 
         <main className="max-w-5xl mx-auto p-4 space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {stats.map((s) => (
               <Card key={s.label} className={glass}>
                 <CardContent className="p-4 flex items-center gap-3">
@@ -209,6 +250,7 @@ const AdminPage = () => {
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="content">Content</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
               <TabsTrigger value="audit">Audit log</TabsTrigger>
             </TabsList>
 
@@ -307,6 +349,39 @@ const AdminPage = () => {
                         Dismiss
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="withdrawals" className="mt-4 space-y-3">
+              {(withdrawals ?? []).length === 0 && (
+                <p className="text-sm text-muted-foreground">No withdrawal requests yet.</p>
+              )}
+              {(withdrawals ?? []).map((w: any) => (
+                <Card key={w.id} className={glass}>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Banknote className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">KES {Number(w.amount).toLocaleString()}</span>
+                      <span className="text-sm text-muted-foreground">{usernameFor(w.user_id)} · {w.phone}</span>
+                      <Badge variant="secondary" className="capitalize">{w.status}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Requested {new Date(w.created_at).toLocaleString()}
+                      {w.mpesa_receipt ? ` · Receipt ${w.mpesa_receipt}` : ""}
+                      {w.admin_note ? ` · ${w.admin_note}` : ""}
+                    </p>
+                    {w.status === "pending" && (
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => processWithdrawal(w, "paid")}>
+                          Mark paid
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => processWithdrawal(w, "reject")}>
+                          Reject &amp; refund
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
