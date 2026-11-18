@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Music, Search, Play, Pause, SkipForward, SkipBack, Youtube, Download, Heart, Volume2, Wifi, WifiOff, TrendingUp, Globe, DownloadCloud } from "lucide-react";
 import YouTubePlayer from "./YouTubePlayer";
+import SpotifySearch from "./SpotifySearch";
 import { youtubeService, YouTubeSearchResult, DownloadProgress } from "../services/YouTubeService";
 
 interface Track {
@@ -439,7 +440,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   const [trendingMusic, setTrendingMusic] = useState<YouTubeSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [downloads, setDownloads] = useState<Map<string, DownloadProgress>>(new Map());
-  const [activeTab, setActiveTab] = useState<'library' | 'youtube' | 'trending'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'youtube' | 'trending' | 'spotify'>('library');
   const playerRef = useRef<HTMLIFrameElement>(null);
 
   // IndexedDB setup
@@ -775,21 +776,23 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
             </div>
           </div>
 
-          <div className="px-5 py-3">
-            <div className="liquid-glass rounded-2xl flex items-center gap-3 px-4 py-2.5 relative z-10">
-              <Search className="w-4 h-4 text-muted-foreground" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search songs or artists..."
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-              />
+          {activeTab === 'library' && (
+            <div className="px-5 py-3">
+              <div className="liquid-glass rounded-2xl flex items-center gap-3 px-4 py-2.5 relative z-10">
+                <Search className="w-4 h-4 text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search songs or artists..."
+                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Tab Navigation */}
           <div className="flex gap-2 px-5 pb-2 overflow-x-auto scrollbar-none">
-            {(['library', 'youtube', 'trending'] as const).map(tab => (
+            {(['library', 'youtube', 'trending', 'spotify'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -798,9 +801,11 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                 {tab === 'library' && <Music className="w-3 h-3" />}
                 {tab === 'youtube' && <Globe className="w-3 h-3" />}
                 {tab === 'trending' && <TrendingUp className="w-3 h-3" />}
+                {tab === 'spotify' && <Music className="w-3 h-3" />}
                 {tab === 'library' && 'Library'}
                 {tab === 'youtube' && 'YouTube'}
                 {tab === 'trending' && 'Trending'}
+                {tab === 'spotify' && 'Spotify'}
               </button>
             ))}
           </div>
@@ -961,6 +966,8 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
           </AnimatePresence>
 
           <div className="flex-1 overflow-y-auto px-5 py-2 space-y-1.5">
+            {activeTab === 'spotify' && <SpotifySearch />}
+
             {/* Library Tab */}
             {activeTab === 'library' && filtered.map((track, i) => (
               <motion.button
