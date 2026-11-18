@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Music2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { searchGlobalMusic } from "@/services/GlobalMusicService";
+import SpotifyEmbed, { spotifyIdOf } from "./SpotifyEmbed";
 
 export interface PostMusic {
   title: string;
@@ -42,7 +43,26 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
     if (sharedAudio && currentUrl && activeKey.current === currentUrl) sharedAudio.pause();
   }, []);
 
+  const [found, setFound] = useState<string | null>(null);
+  const spId = spotifyIdOf(music.youtube_id) ?? found;
+  const [spOpen, setSpOpen] = useState(false);
+
   const toggle = async () => {
+    if (!spId && !music.stream_url) {
+      setLoading(true);
+      try {
+        const clean = (v: string) => v.replace(/\(.*?\)|\[.*?\]/g, "").trim();
+        const hits = await searchGlobalMusic(`${clean(music.title)} ${clean(music.artist ?? "")}`.trim(), 5);
+        const sp = hits.find(h => h.id.startsWith("sp_"));
+        if (sp) { setFound(sp.id.slice(3)); if (sharedAudio) sharedAudio.pause(); setSpOpen(true); setLoading(false); return; }
+      } catch { /* fall back to stream */ }
+      setLoading(false);
+    }
+    if (spId) {
+      if (sharedAudio) sharedAudio.pause();
+      setSpOpen(o => !o);
+      return;
+    }
     if (playing && sharedAudio && activeKey.current === currentUrl) {
       sharedAudio.pause();
       setPlaying(false);
@@ -70,14 +90,16 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
   };
 
   return (
-    <div className="mx-4 mb-3 rounded-2xl border border-primary/30 bg-card/70 backdrop-blur-xl px-3 py-2.5 flex items-center gap-3 relative z-10">
+    <div className="mx-4 mb-3 relative z-10">
+    {spId && spOpen && <div className="mb-2"><SpotifyEmbed trackId={spId} onFail={() => setSpOpen(false)} /></div>}
+    <div className="rounded-2xl border border-primary/30 bg-card/70 backdrop-blur-xl px-3 py-2.5 flex items-center gap-3">
       <button
         onClick={() => void toggle()}
         disabled={loading}
         aria-label={playing ? "Pause track" : "Play track"}
         className="depth-press w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0"
       >
-        {playing ? <Pause className="w-4 h-4 text-primary-foreground" /> : <Play className="w-4 h-4 text-primary-foreground" />}
+        {(spId ? spOpen : playing) ? <Pause className="w-4 h-4 text-primary-foreground" /> : <Play className="w-4 h-4 text-primary-foreground" />}
       </button>
       {music.art_url ? (
         <img src={music.art_url} alt="" className="w-10 h-10 rounded-xl object-cover bg-secondary shrink-0" />
@@ -105,6 +127,7 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
           />
         ))}
       </div>
+    </div>
     </div>
   );
 };

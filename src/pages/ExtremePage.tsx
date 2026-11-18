@@ -272,6 +272,7 @@ const SoundsTab = () => {
       return;
     }
     audio.pause();
+    if (!track.streamUrl) { toast.error("No audio preview for this track — add it to a post to play it with Spotify."); return; }
     audio.src = track.streamUrl;
     audio.load();
     try {

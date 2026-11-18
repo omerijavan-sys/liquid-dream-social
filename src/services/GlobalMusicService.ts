@@ -65,16 +65,16 @@ async function audiusTrending(limit = 30): Promise<GlobalMusicTrack[]> {
 
 // ---- Spotify catalogue (metadata + artwork) with playable audio resolved per track ----
 interface SpotifyTrack { id: string; title: string; artist: string; artwork: string | null; duration: number | null; previewUrl: string | null }
-let spotifyDown = false;
+let spotifyDownUntil = 0;
 
 async function spotifyTracks(q: string | null, limit: number): Promise<SpotifyTrack[]> {
-  if (spotifyDown) return [];
+  if (Date.now() < spotifyDownUntil) return [];
   try {
     const { supabase } = await import("@/integrations/supabase/client");
     const { data, error } = await supabase.functions.invoke("spotify-search", { body: { q, limit } });
-    if (error || !data?.tracks) { spotifyDown = true; return []; }
+    if (error || !data?.tracks) { spotifyDownUntil = Date.now() + 60_000; return []; }
     return data.tracks as SpotifyTrack[];
-  } catch { spotifyDown = true; return []; }
+  } catch { spotifyDownUntil = Date.now() + 60_000; return []; }
 }
 
 const clean = (v: string) => v.replace(/\(.*?\)|\[.*?\]|feat\.?.*/gi, "").trim();
@@ -84,8 +84,8 @@ async function withSpotify(q: string | null, limit: number, fallback: () => Prom
   if (!sp.length) return fallback();
   const host = await getAudiusHost().catch(() => null);
   const resolved = await Promise.all(sp.slice(0, Math.min(sp.length, 20)).map(async (t): Promise<GlobalMusicTrack | null> => {
-    let stream = t.previewUrl;
-    if (host) {
+    let stream = t.previewUrl ?? "";
+    if (host && !stream) {
       try {
         const u = new URL(`${host}/v1/tracks/search`);
         u.searchParams.set("query", `${clean(t.title)} ${clean(t.artist.split(",")[0])}`);
@@ -96,7 +96,7 @@ async function withSpotify(q: string | null, limit: number, fallback: () => Prom
         if (hit) stream = toTrack(hit, host).streamUrl;
       } catch { /* keep preview */ }
     }
-    return stream ? { id: `sp_${t.id}`, title: t.title, artist: t.artist, artwork: t.artwork, streamUrl: stream, duration: t.duration } : null;
+    return { id: `sp_${t.id}`, title: t.title, artist: t.artist, artwork: t.artwork, streamUrl: stream, duration: t.duration };
   }));
   const out = resolved.filter((x): x is GlobalMusicTrack => !!x);
   if (out.length < 5) {

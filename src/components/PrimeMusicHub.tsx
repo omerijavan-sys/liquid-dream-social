@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Music, Search, Play, Pause, SkipForward, SkipBack, Youtube, Download, Heart, Volume2, Wifi, WifiOff, TrendingUp, Globe, DownloadCloud } from "lucide-react";
 import { searchGlobalMusic } from "../services/GlobalMusicService";
+import SpotifyEmbed, { spotifyIdOf } from "./SpotifyEmbed";
 import { youtubeService, YouTubeSearchResult, DownloadProgress } from "../services/YouTubeService";
 
 interface Track {
@@ -758,6 +759,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   useEffect(() => {
     const audio = audioRef.current;
     if (!playing || !audio) return;
+    if (spotifyIdOf(playing.youtubeId)) { audio.pause(); setAudioStatus('playing'); return; }
     let cancelled = false;
     setAudioStatus('loading');
     setAudioTime({ current: 0, total: 0 });
@@ -768,6 +770,8 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
         if (!url) {
           const clean = (v: string) => v.replace(/\(.*?\)|\[.*?\]|ft\.?.*|feat\.?.*/gi, '').trim();
           const hits = await searchGlobalMusic(`${clean(playing.title)} ${clean(playing.artist)}`, 5);
+          const sp = hits.find(h => h.id.startsWith('sp_'));
+          if (sp && !cancelled) { setPlaying(p => (p ? { ...p, youtubeId: sp.id } : p)); return; }
           url = hits[0]?.streamUrl || (await searchGlobalMusic(clean(playing.title), 5))[0]?.streamUrl;
           if (url) streamCache.current.set(key, url);
         }
@@ -914,7 +918,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                 initial={{ y: 100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 100, opacity: 0 }}
-                className="fixed bottom-24 left-4 right-4 z-[55] w-80"
+                className="fixed bottom-24 left-4 right-4 z-[55] max-w-sm"
               >
                 <div className="liquid-glass-elevated rounded-2xl p-3">
                   <div className="flex items-center gap-3 mb-2">
@@ -933,7 +937,15 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                     </button>
                   </div>
                   
-                  {/* Audio-only controls */}
+                  {spotifyIdOf(playing.youtubeId) ? (
+                    <div className="px-1 pb-1">
+                      <SpotifyEmbed trackId={spotifyIdOf(playing.youtubeId)!} onEnded={() => nextTrackRef.current()} />
+                      <div className="mt-2 flex items-center justify-center gap-4">
+                        <button onClick={prevTrack} aria-label="Previous" className="depth-press w-9 h-9 rounded-full liquid-glass-subtle flex items-center justify-center"><SkipBack className="w-4 h-4 text-foreground" /></button>
+                        <button onClick={nextTrack} aria-label="Next" className="depth-press w-9 h-9 rounded-full liquid-glass-subtle flex items-center justify-center"><SkipForward className="w-4 h-4 text-foreground" /></button>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="px-1 pb-1">
                     {audioStatus === 'error' && (
                       <p className="mb-2 text-xs text-destructive">Couldn't find playable audio for this track. Try another or use Discover search.</p>
@@ -961,6 +973,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                       <button onClick={toggleRepeat} className={`depth-press text-[10px] ${repeatMode !== 'off' ? 'text-primary' : 'text-muted-foreground'}`}>Repeat{repeatMode === 'one' ? ' 1' : repeatMode === 'all' ? ' all' : ''}</button>
                     </div>
                   </div>
+                  )}
                 </div>
               </motion.div>
             )}

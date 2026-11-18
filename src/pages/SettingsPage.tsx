@@ -279,7 +279,36 @@ const SettingsPage = () => {
       case "notifications":
         return (
           <div className="space-y-3">
-            <p className="px-1 text-xs text-muted-foreground">Browser alerts appear when Primegram is open in the background. Allow notifications in your browser to enable them.</p>
+            <div className="liquid-glass rounded-2xl p-4 relative z-10 space-y-2">
+              <p className="text-sm font-semibold text-foreground">Push notifications</p>
+              <p className="text-xs text-muted-foreground">
+                Get messages, calls, tips and payments as phone alerts even when Primegram is closed.
+                Status: <span className="text-foreground">{typeof Notification === "undefined" ? "not supported here" : Notification.permission === "granted" ? "allowed" : Notification.permission === "denied" ? "blocked in browser settings" : "not enabled"}</span>
+              </p>
+              <div className="flex gap-2">
+                <button
+                  className="depth-press rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+                  onClick={async () => {
+                    try {
+                      await enablePush(user!.id);
+                      const next = { ...notifToggles, push: true };
+                      setNotifToggles(next); savePreference("notifications", next);
+                      toast.success("Push notifications enabled on this device");
+                    } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't enable push"); }
+                  }}
+                >Enable on this device</button>
+                <button
+                  className="depth-press rounded-xl liquid-glass-subtle px-4 py-2 text-xs font-semibold text-foreground"
+                  onClick={async () => {
+                    try {
+                      if (typeof Notification === "undefined" || Notification.permission !== "granted") throw new Error("Enable notifications first.");
+                      const reg = await navigator.serviceWorker.ready;
+                      await reg.showNotification("Primegram", { body: "Push notifications are working 🎉", icon: "/favicon.ico" });
+                    } catch (e) { toast.error(e instanceof Error ? e.message : "Test failed"); }
+                  }}
+                >Send test</button>
+              </div>
+            </div>
             {Object.entries(notifToggles).map(([key, val]) => (
               <div key={key} className="liquid-glass rounded-2xl p-4 flex items-center justify-between relative z-10">
                 <span className="text-sm text-foreground capitalize">{key.replace(/([A-Z])/g, " $1")} Notifications</span>
