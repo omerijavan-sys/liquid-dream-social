@@ -91,7 +91,7 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
 
   return (
     <div className="mx-4 mb-3 relative z-10">
-    {spId && spOpen && <div className="mb-2"><SpotifyEmbed trackId={spId} onFail={() => setSpOpen(false)} /></div>}
+    {spId && spOpen && <div className="mb-2"><SpotifyEmbed trackId={spId} onFail={() => setSpOpen(false)} /><p className="mt-1 text-center text-[10px] text-muted-foreground">No sound? Tap play in the bar, or <a className="underline" target="_blank" rel="noreferrer" href={`https://open.spotify.com/track/${spId}`}>open in Spotify</a>.</p></div>}
     <div className="rounded-2xl border border-primary/30 bg-card/70 backdrop-blur-xl px-3 py-2.5 flex items-center gap-3">
       <button
         onClick={() => void toggle()}

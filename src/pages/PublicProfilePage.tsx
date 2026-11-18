@@ -13,6 +13,7 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import TipAndSubscribeModal from "@/components/TipAndSubscribeModal";
 
 type Profile = {
   user_id: string;
@@ -101,6 +102,8 @@ const PublicProfilePage = () => {
     });
     return () => { cancelled = true; };
   }, [user]);
+
+  const [subModalOpen, setSubModalOpen] = useState(false);
 
   const subscribe = async () => {
     if (!user || !userId) return;
@@ -274,8 +277,7 @@ const PublicProfilePage = () => {
                       id="creator-sub-btn"
                       onClick={() => {
                         if (!user) navigate("/auth");
-                        else if (walletBalance !== null && walletBalance < creatorPrice) navigate("/wallet");
-                        else void subscribe();
+                        else setSubModalOpen(true);
                       }}
                       disabled={subscribing || !!subscribedUntil}
                       className="depth-press flex-1 rounded-xl bg-primary py-2 text-sm font-semibold text-primary-foreground disabled:opacity-70"
@@ -376,6 +378,10 @@ const PublicProfilePage = () => {
         </DialogContent>
       </Dialog>
       <GlassTabBar />
+      {creatorPrice !== null && userId && (
+        <TipAndSubscribeModal open={subModalOpen} onOpenChange={setSubModalOpen} mode="subscription" creatorId={userId} creatorName={profile?.display_name || profile?.username || "creator"} price={creatorPrice}
+          onSuccess={() => { setSubscribedUntil(new Date(Date.now() + 30 * 86400000).toISOString()); }} />
+      )}
     </div>
   );
 };

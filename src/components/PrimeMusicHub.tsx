@@ -940,6 +940,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                   {spotifyIdOf(playing.youtubeId) ? (
                     <div className="px-1 pb-1">
                       <SpotifyEmbed trackId={spotifyIdOf(playing.youtubeId)!} onEnded={() => nextTrackRef.current()} />
+                      <p className="mt-1 text-center text-[10px] text-muted-foreground">No sound? Tap play in the Spotify bar, or <a className="underline" target="_blank" rel="noreferrer" href={`https://open.spotify.com/track/${spotifyIdOf(playing.youtubeId)}`}>open in Spotify</a>.</p>
                       <div className="mt-2 flex items-center justify-center gap-4">
                         <button onClick={prevTrack} aria-label="Previous" className="depth-press w-9 h-9 rounded-full liquid-glass-subtle flex items-center justify-center"><SkipBack className="w-4 h-4 text-foreground" /></button>
                         <button onClick={nextTrack} aria-label="Next" className="depth-press w-9 h-9 rounded-full liquid-glass-subtle flex items-center justify-center"><SkipForward className="w-4 h-4 text-foreground" /></button>

@@ -1,7 +1,8 @@
 import { authHeader } from "@/utils/authFetch";
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Sparkles, Mic, MicOff, Volume2 } from "lucide-react";
+import { X, Send, Sparkles, Mic, MicOff, Volume2, Paperclip, Share2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -12,7 +13,33 @@ const FloatingOrb = lazy(() => import("./FloatingOrb"));
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prime-ai-chat`;
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Attachment = { kind: "image" | "video" | "audio" | "file"; url: string; name: string; dataUrl?: string };
+type Msg = { role: "user" | "assistant"; content: string; attachments?: Attachment[] };
+
+const toDataUrl = (file: File, max = 1280) => new Promise<string>((resolve, reject) => {
+  const img = new Image();
+  const src = URL.createObjectURL(file);
+  img.onload = () => {
+    const k = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(src);
+    resolve(c.toDataURL("image/jpeg", 0.8));
+  };
+  img.onerror = () => reject(new Error("Couldn't read that image"));
+  img.src = src;
+});
+
+/** What the model receives: images as vision parts, other media as named references. */
+const apiMessage = (m: Msg) => {
+  if (!m.attachments?.length) return { role: m.role, content: m.content };
+  const parts: Array<Record<string, unknown>> = [];
+  const notes = m.attachments.filter(a => !a.dataUrl).map(a => `[Attached ${a.kind}: ${a.name} — ${a.url}]`).join(" ");
+  parts.push({ type: "text", text: `${m.content} ${notes}`.trim() || "What is this?" });
+  for (const a of m.attachments) if (a.dataUrl) parts.push({ type: "image_url", image_url: { url: a.dataUrl } });
+  return { role: m.role, content: parts };
+};
 
 const COMMAND_REGISTRY: Record<string, string> = {
   music: "/",
@@ -31,6 +58,9 @@ const COMMAND_REGISTRY: Record<string, string> = {
 const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => void; onOpen?: () => void }) => {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
+  const [pending, setPending] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -156,8 +186,38 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     startAudioAnalysis();
   };
 
+  const attach = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      const next: Attachment[] = [];
+      for (const f of Array.from(files).slice(0, 4)) {
+        if (f.size > 50 * 1024 * 1024) { toast.error(`${f.name} is over 50 MB`); continue; }
+        const kind: Attachment["kind"] = f.type.startsWith("image/") ? "image" : f.type.startsWith("video/") ? "video" : f.type.startsWith("audio/") ? "audio" : "file";
+        let url = URL.createObjectURL(f);
+        if (uid) {
+          const path = `${uid}/ai/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+          const { error } = await supabase.storage.from("media").upload(path, f, { contentType: f.type || undefined });
+          if (!error) url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+        }
+        next.push({ kind, url, name: f.name, dataUrl: kind === "image" ? await toDataUrl(f) : undefined });
+      }
+      setPending(p => [...p, ...next].slice(0, 4));
+    } catch (e: any) { toast.error(e.message || "Couldn't attach file"); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
+  const shareReply = async (text: string) => {
+    try {
+      if (navigator.share) await navigator.share({ text });
+      else { await navigator.clipboard.writeText(text); toast.success("Copied to clipboard"); }
+    } catch { /* cancelled */ }
+  };
+
   const send = async () => {
-    if (!input.trim() || loading) return;
+    if ((!input.trim() && !pending.length) || loading) return;
     const lower = input.toLowerCase();
     
     // Check for Heiji commands
@@ -178,8 +238,9 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
       return;
     }
 
-    const userMsg: Msg = { role: "user", content: input.trim() };
+    const userMsg: Msg = { role: "user", content: input.trim(), attachments: pending.length ? pending : undefined };
     setInput("");
+    setPending([]);
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     let assistantSoFar = "";
@@ -188,7 +249,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: await authHeader() },
-        body: JSON.stringify({ messages: [...messages, userMsg] }),
+        body: JSON.stringify({ messages: [...messages, userMsg].slice(-20).map(apiMessage) }),
       });
       if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.error || `Error ${resp.status}`); }
       const reader = resp.body?.getReader();
@@ -277,6 +338,17 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm prose-invert max-w-none"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
                   ) : msg.content}
+                  {msg.attachments?.map((a, k) => (
+                    <div key={k} className="mt-2">
+                      {a.kind === "image" ? <img src={a.url} alt={a.name} className="max-h-48 rounded-xl" />
+                        : a.kind === "video" ? <video src={a.url} controls className="max-h-48 rounded-xl" />
+                        : a.kind === "audio" ? <audio src={a.url} controls className="max-w-full" />
+                        : <a href={a.url} target="_blank" rel="noreferrer" className="underline text-xs">{a.name}</a>}
+                    </div>
+                  ))}
+                  {msg.role === "assistant" && msg.content && (
+                    <button onClick={() => void shareReply(msg.content)} aria-label="Share reply" className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><Share2 className="h-3 w-3" />Share</button>
+                  )}
                 </div>
               </div>
             ))}
@@ -291,12 +363,26 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
           </div>
 
           <div className="px-4 py-3 relative z-10">
+            {pending.length > 0 && (
+              <div className="mb-2 flex gap-2 overflow-x-auto">
+                {pending.map((a, k) => (
+                  <div key={k} className="relative shrink-0 rounded-xl liquid-glass-subtle px-2 py-1 text-[10px] text-foreground">
+                    {a.kind === "image" ? <img src={a.url} alt="" className="h-12 w-12 rounded-lg object-cover" /> : `${a.kind}: ${a.name.slice(0, 14)}`}
+                    <button onClick={() => setPending(p => p.filter((_, i) => i !== k))} aria-label="Remove attachment" className="absolute -right-1 -top-1 rounded-full bg-black/70 p-0.5"><X className="h-3 w-3" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input ref={fileRef} type="file" multiple accept="image/*,video/*,audio/*,application/pdf,text/*" hidden onChange={e => void attach(e.target.files)} />
             <div className="flex gap-2">
+              <button onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Attach media" className="depth-press w-11 h-11 rounded-2xl liquid-glass-subtle flex items-center justify-center disabled:opacity-40">
+                <Paperclip className="w-4 h-4 text-foreground" />
+              </button>
               <button onClick={toggleVoiceInput} className={`depth-press w-11 h-11 rounded-2xl flex items-center justify-center ${listening ? "bg-green-500" : "liquid-glass-subtle"}`}>
                 {listening ? <MicOff className="w-4 h-4 text-primary-foreground" /> : <Mic className="w-4 h-4 text-foreground" />}
               </button>
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={listening ? "Listening..." : "Ask Heiji anything..."} className="flex-1 px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" />
-              <button onClick={send} disabled={loading || !input.trim()} className="depth-press w-11 h-11 rounded-2xl bg-primary flex items-center justify-center disabled:opacity-40">
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={listening ? "Listening..." : "Ask Heiji or attach media..."} className="flex-1 px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" />
+              <button onClick={send} disabled={loading || (!input.trim() && !pending.length)} className="depth-press w-11 h-11 rounded-2xl bg-primary flex items-center justify-center disabled:opacity-40">
                 <Send className="w-4 h-4 text-primary-foreground" />
               </button>
             </div>

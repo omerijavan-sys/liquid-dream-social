@@ -107,12 +107,27 @@ async function withSpotify(q: string | null, limit: number, fallback: () => Prom
   return out.slice(0, limit);
 }
 
+/** Tracks uploaded by Primegram users (plain audio files — the most reliable to play). */
+async function communityTracks(q: string | null, limit: number): Promise<GlobalMusicTrack[]> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    let query = supabase.from("music_tracks" as never).select("id,title,artist,audio_url,cover_url,duration").order("created_at", { ascending: false }).limit(limit);
+    if (q) query = query.or(`title.ilike.%${q}%,artist.ilike.%${q}%`);
+    const { data } = await query;
+    return ((data ?? []) as Array<{ id: string; title: string; artist: string | null; audio_url: string; cover_url: string | null; duration: number | null }>).map(r => ({
+      id: `up_${r.id}`, title: r.title, artist: r.artist || "Primegram creator", artwork: r.cover_url, streamUrl: r.audio_url, duration: r.duration,
+    }));
+  } catch { return []; }
+}
+
 export async function searchGlobalMusic(query: string, limit = 30): Promise<GlobalMusicTrack[]> {
   const term = query.trim();
   if (term.length < 2) return [];
-  return withSpotify(term, limit, () => audiusSearch(term, limit));
+  const [mine, rest] = await Promise.all([communityTracks(term.replace(/[%,]/g, " "), 10), withSpotify(term, limit, () => audiusSearch(term, limit)).catch(() => [])]);
+  return [...mine, ...rest].slice(0, limit);
 }
 
 export async function getGlobalTrendingMusic(limit = 30): Promise<GlobalMusicTrack[]> {
-  return withSpotify(null, limit, () => audiusTrending(limit));
+  const [mine, rest] = await Promise.all([communityTracks(null, 10), withSpotify(null, limit, () => audiusTrending(limit)).catch(() => [])]);
+  return [...mine, ...rest].slice(0, limit);
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, ShieldAlert, Bot, Globe, Loader2, Search, X, Play, Pause } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, ShieldAlert, Bot, Globe, Loader2, Search, X, Play, Pause, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TIERS, TIP_AMOUNTS } from "@/lib/extreme";
 import AdultTab from "@/components/AdultTab";
+import CreatorTipButton from "@/components/CreatorTipButton";
 import MatchTab from "@/components/MatchTab";
 import { getGlobalTrendingMusic, searchGlobalMusic, type GlobalMusicTrack } from "@/services/GlobalMusicService";
 
@@ -213,121 +214,145 @@ const BountyTab = ({ refresh }: { refresh: () => void }) => {
   );
 };
 
+interface UploadedTrack { id: string; user_id: string; title: string; artist: string | null; audio_url: string; cover_url: string | null; duration: number | null; plays: number; created_at: string }
+
 const SoundsTab = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
-  const [tracks, setTracks] = useState<GlobalMusicTrack[]>([]);
+  const [tracks, setTracks] = useState<UploadedTrack[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [title, setTitle] = useState("");
+  const [artist, setArtist] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const found = query.trim().length >= 2
-          ? await searchGlobalMusic(query, 30)
-          : await getGlobalTrendingMusic(30);
-        if (!cancelled) setTracks(found);
-      } catch (reason) {
-        if (!cancelled) {
-          setTracks([]);
-          setError(reason instanceof Error ? reason.message : "Global music is unavailable right now.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, query.trim().length >= 2 ? 300 : 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [query]);
+  const load = async () => {
+    setLoading(true);
+    let q = supabase.from("music_tracks" as never).select("*").order("created_at", { ascending: false }).limit(60);
+    if (query.trim().length >= 2) q = q.or(`title.ilike.%${query.trim()}%,artist.ilike.%${query.trim()}%`);
+    const { data } = await q;
+    const rows = (data ?? []) as UploadedTrack[];
+    setTracks(rows);
+    const ids = [...new Set(rows.map(r => r.user_id))];
+    if (ids.length) {
+      const { data: profs } = await supabase.from("profiles").select("user_id, username, display_name").in("user_id", ids);
+      setNames(Object.fromEntries((profs ?? []).map(p => [p.user_id, p.display_name || p.username || "Creator"])));
+    }
+    setLoading(false);
+  };
+  useEffect(() => { const t = setTimeout(() => { void load(); }, query ? 300 : 0); return () => clearTimeout(t); }, [query]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const attachTrackToPost = (track: GlobalMusicTrack) => {
-    audioRef.current?.pause();
-    setPreviewingId(null);
-    navigate("/create", {
-      state: {
-        track: {
-          title: track.title,
-          artist: track.artist,
-          artUrl: track.artwork,
-          streamUrl: track.streamUrl,
-        },
-      },
-    });
+  const readDuration = (f: File) => new Promise<number | null>((resolve) => {
+    const a = new Audio(); a.preload = "metadata"; a.src = URL.createObjectURL(f);
+    a.onloadedmetadata = () => { resolve(Number.isFinite(a.duration) ? Math.round(a.duration) : null); URL.revokeObjectURL(a.src); };
+    a.onerror = () => resolve(null);
+  });
+
+  const upload = async () => {
+    if (!user) { toast.error("Sign in to upload music"); return; }
+    if (!file || !title.trim()) { toast.error("Add a title and choose an audio file"); return; }
+    if (!file.type.startsWith("audio/")) { toast.error("Choose an audio file (mp3, m4a, wav…)"); return; }
+    if (file.size > 25 * 1024 * 1024) { toast.error("Audio must be under 25 MB"); return; }
+    setUploading(true);
+    try {
+      const base = `${user.id}/music/${Date.now()}`;
+      const ext = (file.name.split(".").pop() || "mp3").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const { error: upErr } = await supabase.storage.from("media").upload(`${base}.${ext}`, file, { contentType: file.type, upsert: false });
+      if (upErr) throw upErr;
+      const audio_url = supabase.storage.from("media").getPublicUrl(`${base}.${ext}`).data.publicUrl;
+      let cover_url: string | null = null;
+      if (cover) {
+        const cext = (cover.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const { error: cErr } = await supabase.storage.from("media").upload(`${base}_cover.${cext}`, cover, { contentType: cover.type });
+        if (!cErr) cover_url = supabase.storage.from("media").getPublicUrl(`${base}_cover.${cext}`).data.publicUrl;
+      }
+      const duration = await readDuration(file);
+      const { error } = await supabase.from("music_tracks" as never).insert({ user_id: user.id, title: title.trim(), artist: artist.trim() || null, audio_url, cover_url, duration } as never);
+      if (error) throw error;
+      toast.success("Your track is live 🎶");
+      setTitle(""); setArtist(""); setFile(null); setCover(null); setShowUpload(false);
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally { setUploading(false); }
   };
 
-  const previewTrack = async (track: GlobalMusicTrack) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (previewingId === track.id) {
-      audio.pause();
-      audio.currentTime = 0;
-      setPreviewingId(null);
-      return;
-    }
-    audio.pause();
-    if (!track.streamUrl) { toast.error("No audio preview for this track — add it to a post to play it with Spotify."); return; }
-    audio.src = track.streamUrl;
-    audio.load();
-    try {
-      await audio.play();
-      setPreviewingId(track.id);
-    } catch (reason) {
-      setPreviewingId(null);
-      toast.error(reason instanceof Error ? reason.message : "This track could not be played.");
-    }
+  const remove = async (t: UploadedTrack) => {
+    if (!window.confirm(`Delete "${t.title}"?`)) return;
+    const { error } = await supabase.from("music_tracks" as never).delete().eq("id", t.id);
+    if (error) { toast.error(error.message); return; }
+    setTracks(prev => prev.filter(x => x.id !== t.id));
+  };
+
+  const preview = async (t: UploadedTrack) => {
+    const audio = audioRef.current; if (!audio) return;
+    if (previewingId === t.id) { audio.pause(); setPreviewingId(null); return; }
+    audio.pause(); audio.src = t.audio_url; audio.load();
+    try { await audio.play(); setPreviewingId(t.id); void supabase.rpc("music_play" as never, { _id: t.id } as never); }
+    catch (e) { setPreviewingId(null); toast.error(e instanceof Error ? e.message : "This track could not be played."); }
+  };
+
+  const useSound = (t: UploadedTrack) => {
+    audioRef.current?.pause(); setPreviewingId(null);
+    navigate("/create", { state: { track: { title: t.title, artist: t.artist || names[t.user_id] || "", artUrl: t.cover_url, streamUrl: t.audio_url } } });
   };
 
   return (
     <div className="space-y-3">
-      <audio ref={audioRef} hidden onEnded={() => setPreviewingId(null)} onError={() => {
-        setPreviewingId(null);
-        toast.error("This track preview is currently unavailable.");
-      }} />
+      <audio ref={audioRef} hidden onEnded={() => setPreviewingId(null)} onError={() => { setPreviewingId(null); toast.error("This track could not be played."); }} />
       <div className={`${card} space-y-3`}>
         <div className="flex items-center gap-2">
-          <Globe className="h-5 w-5 shrink-0 text-primary" />
+          <Music2 className="h-5 w-5 shrink-0 text-primary" />
           <div className="min-w-0 flex-1">
-            <p className="font-bold">Worldwide Sounds</p>
-            <p className="text-xs text-muted-foreground">Search Audius’s global independent-music catalogue. Availability and rights are managed by the source.</p>
+            <p className="font-bold">Community Sounds</p>
+            <p className="text-xs text-muted-foreground">Music uploaded by Primegram creators. Upload your own, and fans can tip you. Only upload music you own or have the rights to.</p>
           </div>
+          <Button size="sm" onClick={() => setShowUpload(v => !v)}><Upload className="mr-1 h-4 w-4" />Upload</Button>
         </div>
+        {showUpload && (
+          <div className="space-y-2 rounded-2xl border border-border bg-secondary/30 p-3">
+            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Track title" maxLength={120} />
+            <Input value={artist} onChange={e => setArtist(e.target.value)} placeholder="Artist name (optional)" maxLength={80} />
+            <label className="block text-xs text-muted-foreground">Audio file (mp3, m4a, wav — max 25 MB)
+              <input type="file" accept="audio/*" onChange={e => setFile(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-xs" />
+            </label>
+            <label className="block text-xs text-muted-foreground">Cover image (optional)
+              <input type="file" accept="image/*" onChange={e => setCover(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-xs" />
+            </label>
+            <Button className="w-full" disabled={uploading} onClick={() => void upload()}>{uploading ? "Uploading…" : "Publish track"}</Button>
+          </div>
+        )}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
-          <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search any track, artist, or genre worldwide" className="pl-9 pr-10" />
-          {query && <button onClick={() => setQuery("")} aria-label="Clear music search" className="absolute right-3 top-1/2 -translate-y-1/2"><X className="h-4 w-4 text-muted-foreground" /></button>}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {["Afrobeats", "Amapiano", "Latin", "K-pop", "Arabic", "Reggae", "South Asian", "Electronic"].map(genre => (
-            <button key={genre} onClick={() => setQuery(genre)} className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${query.toLowerCase() === genre.toLowerCase() ? "border-primary/60 bg-primary/15 text-primary" : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground"}`}>{genre}</button>
-          ))}
+          <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search community tracks or artists" className="pl-9 pr-10" />
+          {query && <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><X className="h-4 w-4 text-muted-foreground" /></button>}
         </div>
       </div>
       {loading ? (
-        <div className={`${card} flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground`}><Loader2 className="h-4 w-4 animate-spin" />Loading worldwide sounds…</div>
-      ) : error ? (
-        <div role="alert" className={`${card} text-sm text-destructive`}>{error}</div>
+        <div className={`${card} flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground`}><Loader2 className="h-4 w-4 animate-spin" />Loading sounds…</div>
       ) : tracks.length === 0 ? (
-        <div className={`${card} text-center text-sm text-muted-foreground`}>No tracks found. Try another artist or style.</div>
-      ) : tracks.map((track, index) => (
-        <div key={track.id} className={`${card} flex items-center gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_0_24px_-12px_hsl(var(--primary)/.8)]`}>
-          {track.artwork
-            ? <img src={track.artwork} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" loading="lazy" />
+        <div className={`${card} text-center text-sm text-muted-foreground`}>No tracks yet. Be the first to upload one!</div>
+      ) : tracks.map((t) => (
+        <div key={t.id} className={`${card} flex items-center gap-3`}>
+          {t.cover_url
+            ? <img src={t.cover_url} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" loading="lazy" />
             : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10"><Music2 className="h-5 w-5 text-primary" /></span>}
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold">{index + 1}. {track.title}</p>
-            <p className="truncate text-xs text-muted-foreground">{track.artist}{track.duration ? ` · ${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, "0")}` : ""}</p>
+            <p className="truncate font-semibold">{t.title}</p>
+            <p className="truncate text-xs text-muted-foreground">{t.artist || names[t.user_id] || "Creator"} · by {names[t.user_id] || "Creator"} · {t.plays} plays</p>
           </div>
-          <Button size="icon" variant="secondary" aria-label={`${previewingId === track.id ? "Stop" : "Preview"} ${track.title}`} onClick={() => void previewTrack(track)}>
-            {previewingId === track.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          <Button size="icon" variant="secondary" aria-label={`${previewingId === t.id ? "Stop" : "Play"} ${t.title}`} onClick={() => void preview(t)}>
+            {previewingId === t.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Button>
-          <Button size="sm" onClick={() => attachTrackToPost(track)}>Use sound</Button>
+          {user?.id !== t.user_id && <CreatorTipButton creatorId={t.user_id} creatorName={names[t.user_id] || "creator"} trackId={t.id} compact />}
+          <Button size="sm" onClick={() => useSound(t)}>Use</Button>
+          {user?.id === t.user_id && <Button size="icon" variant="ghost" aria-label="Delete track" onClick={() => void remove(t)}><Trash2 className="h-4 w-4" /></Button>}
         </div>
       ))}
     </div>

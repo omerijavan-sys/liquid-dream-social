@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import TipAndSubscribeModal from "@/components/TipAndSubscribeModal";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 interface Transaction {
@@ -39,7 +40,7 @@ const txLabel = (tx: Pick<Transaction, "type" | "note">) => {
   if (note.startsWith("Withdrawal cancelled")) return "Withdrawal refund";
   if (note.startsWith("Withdrawal rejected")) return "Withdrawal refund";
   if (note.startsWith("Withdrawal")) return "Withdrawal";
-  if (tx.type === "topup") return "M-Pesa Top Up";
+  if (tx.type === "topup") return tx.counterparty === "Paystack" ? "Top Up (Paystack)" : "M-Pesa Top Up";
   if (note) return note.replace(/\s*\(5% fee\)$/, "");
   return tx.type === "send" ? "Sent" : tx.type === "receive" ? "Received" : tx.type;
 };
@@ -66,6 +67,7 @@ const WalletPage = () => {
 
   const balance = transactions.reduce((b, t) => b + (t.type === "send" ? -Number(t.amount) : Number(t.amount)), 0);
 
+  const [psTopup, setPsTopup] = useState(false);
   const load = async () => {
     if (!user) return;
     setLoading(true);
@@ -111,6 +113,7 @@ const WalletPage = () => {
   };
 
   useEffect(() => { load(); }, [user]);
+  useEffect(() => { const h = () => { load(); }; window.addEventListener("wallet:refresh", h); return () => window.removeEventListener("wallet:refresh", h); }, [user]);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current !== null) {
@@ -267,7 +270,7 @@ const WalletPage = () => {
           </div>
           <div className="flex justify-center gap-5">
               {[
-              { icon: Plus, label: "Top Up", action: () => setModal("topup") },
+              { icon: Plus, label: "Top Up", action: () => setPsTopup(true) },
               { icon: ArrowUpRight, label: "Send", action: () => setModal("send") },
               { icon: ArrowDownLeft, label: "Receive", action: () => setModal("receive") },
                 { icon: Banknote, label: "Withdraw", action: () => setModal("withdraw") },
@@ -456,6 +459,7 @@ const WalletPage = () => {
         )}
       </AnimatePresence>
       <GlassTabBar />
+      <TipAndSubscribeModal open={psTopup} onOpenChange={setPsTopup} mode="topup" onSuccess={() => { void load(); }} />
     </div>
   );
 };

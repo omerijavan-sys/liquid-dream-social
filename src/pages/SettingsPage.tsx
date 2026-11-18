@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
 import AndroidDownloadCard from "@/components/AndroidDownloadCard";
 import AccountManagement from "@/components/AccountManagement";
+import PayoutSetup from "@/components/PayoutSetup";
 import { enablePush, disablePush } from "@/utils/pushSubscribe";
 import { PrivacyPanel, BlockedPanel, SecurityExtras, HelpPanel, WalletShortcut, ContentPanel, PrimeMembershipCard } from "@/components/SettingsExtras";
 
@@ -448,7 +449,7 @@ const SettingsPage = () => {
       case "creator":
         return (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Set a monthly subscription price between 50 and 5,000 KES. Each purchase covers one prepaid month and does not auto-renew. Creators receive 95% of each payment.</p>
+            <p className="text-sm text-muted-foreground">Set a monthly subscription price between 50 and 5,000 KES. Each purchase covers one prepaid month and does not auto-renew. Wallet payments pay creators 95%; card/M-Pesa payments via Paystack pay 85% (set up your payout account below).</p>
             <label className="block text-sm text-foreground">
               Monthly price (KES)
               <input type="number" min="50" max="5000" step="1" value={creatorPrice} onChange={event => setCreatorPrice(event.target.value)} className="mt-2 w-full rounded-2xl bg-secondary/50 px-4 py-3 outline-none" />
@@ -456,6 +457,7 @@ const SettingsPage = () => {
             <Button className="w-full" disabled={monetizationSaving} onClick={() => void saveCreatorProfile()}>
               {monetizationSaving ? "Saving..." : creatorActive ? "Save Creator Plan" : "Register as a Creator"}
             </Button>
+            <PayoutSetup />
             {monetizationLoading ? <p className="text-sm text-muted-foreground">Loading dashboard...</p> : creatorActive && (
               <section className="liquid-glass rounded-2xl p-4 relative z-10">
                 <h3 className="font-semibold text-foreground">Subscribers ({creatorSubscribers.filter(item => item.status === "active" && new Date(item.expires_at) > new Date()).length})</h3>
