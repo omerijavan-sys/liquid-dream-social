@@ -37,7 +37,7 @@ const toTrack = (track: AudiusTrackResponse, host: string): GlobalMusicTrack => 
   duration: typeof track.duration === "number" ? track.duration : null,
 });
 
-export async function searchGlobalMusic(query: string, limit = 30): Promise<GlobalMusicTrack[]> {
+async function audiusSearch(query: string, limit = 30): Promise<GlobalMusicTrack[]> {
   const term = query.trim();
   if (term.length < 2) return [];
   const host = await getAudiusHost();
@@ -51,7 +51,7 @@ export async function searchGlobalMusic(query: string, limit = 30): Promise<Glob
   return (payload.data ?? []).map(track => toTrack(track, host));
 }
 
-export async function getGlobalTrendingMusic(limit = 30): Promise<GlobalMusicTrack[]> {
+async function audiusTrending(limit = 30): Promise<GlobalMusicTrack[]> {
   const host = await getAudiusHost();
   const url = new URL(`${host}/v1/tracks/trending`);
   url.searchParams.set("app_name", "Primegram");
@@ -61,4 +61,58 @@ export async function getGlobalTrendingMusic(limit = 30): Promise<GlobalMusicTra
   if (!response.ok) throw new Error(`Global trending music failed (${response.status}).`);
   const payload: { data?: AudiusTrackResponse[] } = await response.json();
   return (payload.data ?? []).map(track => toTrack(track, host));
+}
+
+// ---- Spotify catalogue (metadata + artwork) with playable audio resolved per track ----
+interface SpotifyTrack { id: string; title: string; artist: string; artwork: string | null; duration: number | null; previewUrl: string | null }
+let spotifyDown = false;
+
+async function spotifyTracks(q: string | null, limit: number): Promise<SpotifyTrack[]> {
+  if (spotifyDown) return [];
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data, error } = await supabase.functions.invoke("spotify-search", { body: { q, limit } });
+    if (error || !data?.tracks) { spotifyDown = true; return []; }
+    return data.tracks as SpotifyTrack[];
+  } catch { spotifyDown = true; return []; }
+}
+
+const clean = (v: string) => v.replace(/\(.*?\)|\[.*?\]|feat\.?.*/gi, "").trim();
+
+async function withSpotify(q: string | null, limit: number, fallback: () => Promise<GlobalMusicTrack[]>): Promise<GlobalMusicTrack[]> {
+  const sp = await spotifyTracks(q, limit);
+  if (!sp.length) return fallback();
+  const host = await getAudiusHost().catch(() => null);
+  const resolved = await Promise.all(sp.slice(0, Math.min(sp.length, 20)).map(async (t): Promise<GlobalMusicTrack | null> => {
+    let stream = t.previewUrl;
+    if (host) {
+      try {
+        const u = new URL(`${host}/v1/tracks/search`);
+        u.searchParams.set("query", `${clean(t.title)} ${clean(t.artist.split(",")[0])}`);
+        u.searchParams.set("app_name", "Primegram");
+        u.searchParams.set("limit", "1");
+        const r = await fetch(u);
+        const hit = ((await r.json()).data ?? [])[0] as AudiusTrackResponse | undefined;
+        if (hit) stream = toTrack(hit, host).streamUrl;
+      } catch { /* keep preview */ }
+    }
+    return stream ? { id: `sp_${t.id}`, title: t.title, artist: t.artist, artwork: t.artwork, streamUrl: stream, duration: t.duration } : null;
+  }));
+  const out = resolved.filter((x): x is GlobalMusicTrack => !!x);
+  if (out.length < 5) {
+    const extra = await fallback().catch(() => []);
+    const seen = new Set(out.map(t => t.title.toLowerCase()));
+    out.push(...extra.filter(t => !seen.has(t.title.toLowerCase())));
+  }
+  return out.slice(0, limit);
+}
+
+export async function searchGlobalMusic(query: string, limit = 30): Promise<GlobalMusicTrack[]> {
+  const term = query.trim();
+  if (term.length < 2) return [];
+  return withSpotify(term, limit, () => audiusSearch(term, limit));
+}
+
+export async function getGlobalTrendingMusic(limit = 30): Promise<GlobalMusicTrack[]> {
+  return withSpotify(null, limit, () => audiusTrending(limit));
 }

@@ -111,7 +111,7 @@ const StoriesBar = () => {
           id: s.id,
           user_id: s.user_id,
           image_url: s.media_url || "",
-          cover_url: (s as any).thumbnail_url || (isVideoMedia(s.media_url || "") ? null : s.media_url),
+          cover_url: profileMap.get(s.user_id)?.avatar_url || (s as any).thumbnail_url || (isVideoMedia(s.media_url || "") ? null : s.media_url),
           display_name: profileMap.get(s.user_id)?.display_name || "User",
           created_at: s.created_at,
         })));
