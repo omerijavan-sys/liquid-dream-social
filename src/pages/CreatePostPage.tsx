@@ -19,6 +19,10 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { suggestCaptions } from "@/utils/aiCaption";
+import { readContentPrefs } from "@/components/SettingsExtras";
+import { runInBackground } from "@/utils/backgroundUpload";
+import { uploadVideoCover } from "@/utils/videoThumb";
 import { toast } from "sonner";
 import { CAMERA_CONSTRAINTS, VIDEO_BITRATE } from "@/utils/media";
 import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
@@ -64,6 +68,9 @@ const CreatePostPage = () => {
   const [mode, setMode] = useState<Mode>("upload");
   const [textOnly, setTextOnly] = useState(false);
   const [caption, setCaption] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const aiCaptionsOn = readContentPrefs().aiCaptions;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
@@ -416,42 +423,50 @@ const CreatePostPage = () => {
     );
   };
 
-  const handlePost = async () => {
+  const handlePost = () => {
     if (!user || (!file && !caption.trim())) {
       toast.error("Add a photo, video, or some text first");
       return;
     }
+    // Snapshot everything, then upload in the background so the person can keep using the app.
+    const snap = { file, caption, track, isAdult, mediaType, uid: user.id };
+    const hadMedia = Boolean(file);
     setUploading(true);
-    try {
+    runInBackground(snap.mediaType === "video" ? "Uploading your video" : "Sharing your post", async (progress) => {
       let publicUrl: string | null = null;
-      if (file) {
-        const finalFile = await bakeImage(file);
+      let thumbnailUrl: string | null = null;
+      if (snap.file) {
+        const finalFile = await bakeImage(snap.file);
         const ext = finalFile.name.split(".").pop();
-        const path = `${user.id}/${Date.now()}.${ext}`;
+        const path = `${snap.uid}/${Date.now()}.${ext}`;
+        if (snap.mediaType === "video") {
+          progress("Preparing cover…");
+          thumbnailUrl = await uploadVideoCover(snap.uid, finalFile);
+          progress("Uploading video…");
+        }
         const { error: uploadErr } = await supabase.storage.from("media").upload(path, finalFile);
         if (uploadErr) throw uploadErr;
         publicUrl = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
       }
       const { error } = await supabase.from("posts").insert({
-        user_id: user.id,
-        caption: caption || null,
+        user_id: snap.uid,
+        caption: snap.caption || null,
         media_url: publicUrl,
-        media_type: file ? mediaType : "text",
-        music_title: track?.title ?? null,
-        music_artist: track?.artist ?? null,
-        music_art_url: track?.artUrl ?? null,
-        music_url: track?.streamUrl ?? null,
-        music_youtube_id: track?.youtubeId ?? null,
-        is_adult: isAdult,
-      });
+        media_type: snap.file ? snap.mediaType : "text",
+        music_title: snap.track?.title ?? null,
+        music_artist: snap.track?.artist ?? null,
+        music_art_url: snap.track?.artUrl ?? null,
+        music_url: snap.track?.streamUrl ?? null,
+        music_youtube_id: snap.track?.youtubeId ?? null,
+        is_adult: snap.isAdult,
+        thumbnail_url: thumbnailUrl,
+      } as any);
       if (error) throw error;
-      toast.success("Post shared!");
-      navigate("/");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create post");
-    } finally {
-      setUploading(false);
-    }
+      window.dispatchEvent(new Event("prime:posted"));
+    });
+    setUploading(false);
+    if (hadMedia) toast.info("Uploading in the background — you can keep browsing");
+    navigate("/");
   };
 
   const resetMedia = () => {
@@ -640,6 +655,22 @@ const CreatePostPage = () => {
                 placeholder={textOnly ? "Write something to share..." : "Write a caption..."}
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none h-24"
               />
+              {aiCaptionsOn && (
+                <div className="mt-2 border-t border-white/10 pt-2">
+                  <button type="button" disabled={suggesting} onClick={async () => {
+                    setSuggesting(true);
+                    const r = await suggestCaptions({ mediaType: file ? mediaType : "text", music: track?.title, hint: caption });
+                    setSuggestions(r.captions);
+                    if (!r.ai) toast.info("Showing built-in ideas — the AI service isn't connected yet");
+                    setSuggesting(false);
+                  }} className="depth-press rounded-full bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-60">
+                    {suggesting ? "Thinking…" : "✨ Suggest caption"}
+                  </button>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {suggestions.map(c => <button key={c} type="button" onClick={() => { setCaption(c); setSuggestions([]); }} className="rounded-xl bg-secondary/50 px-3 py-2 text-left text-xs text-foreground">{c}</button>)}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Background track + 18+ flag */}

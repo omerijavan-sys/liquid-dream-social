@@ -309,3 +309,75 @@ export const WalletShortcut = () => {
     </button>
   );
 };
+
+// ---------- Content, captions & search ----------
+export type ContentPrefs = { aiCaptions: boolean; safeSearch: boolean; saveSearchHistory: boolean; searchScope: "all" | "people" | "posts"; reelAutoplay: boolean; reelDefaultComments: boolean; reelDefaultDownload: boolean; shakeToReport: boolean; doubleTapLike: boolean };
+export const CONTENT_DEFAULTS: ContentPrefs = { aiCaptions: false, safeSearch: true, saveSearchHistory: true, searchScope: "all", reelAutoplay: true, reelDefaultComments: true, reelDefaultDownload: true, shakeToReport: true, doubleTapLike: true };
+export const readContentPrefs = (): ContentPrefs => {
+  try { return { ...CONTENT_DEFAULTS, ...JSON.parse(localStorage.getItem("primegram-content-prefs") || "{}") }; } catch { return CONTENT_DEFAULTS; }
+};
+
+export const ContentPanel = () => {
+  const { user } = useAuth();
+  const [prefs, setPrefs] = useState<ContentPrefs>(readContentPrefs);
+  const update = (patch: Partial<ContentPrefs>) => {
+    const next = { ...prefs, ...patch };
+    setPrefs(next);
+    localStorage.setItem("primegram-content-prefs", JSON.stringify(next));
+    window.dispatchEvent(new Event("primegram:content-prefs"));
+    if (user) void supabase.from("user_settings").upsert({ user_id: user.id, prefs: next } as any).then(() => {});
+  };
+  const Row = ({ title, desc, k }: { title: string; desc: string; k: keyof ContentPrefs }) => (
+    <div className={`${card} flex items-center gap-3`}>
+      <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">{title}</p><p className="text-caption text-muted-foreground">{desc}</p></div>
+      <Switch checked={Boolean(prefs[k])} onCheckedChange={v => update({ [k]: v } as Partial<ContentPrefs>)} aria-label={title} />
+    </div>
+  );
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Posting</p>
+      <Row k="aiCaptions" title="AI caption suggestions" desc="Show a ✨ Suggest caption button when you create a post" />
+      <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Search</p>
+      <Row k="safeSearch" title="Safe search" desc="Hide adult-marked posts from search results" />
+      <Row k="saveSearchHistory" title="Save search history" desc="Remember what you searched on this device" />
+      <div className={card}>
+        <p className="text-sm font-semibold text-foreground">Search results show</p>
+        <div className="mt-2 flex gap-2">{(["all", "people", "posts"] as const).map(s => <Button key={s} size="sm" variant={prefs.searchScope === s ? "default" : "secondary"} className="flex-1 capitalize" onClick={() => update({ searchScope: s })}>{s}</Button>)}</div>
+        <Button size="sm" variant="ghost" className="mt-2" onClick={() => { localStorage.removeItem("primegram-search-history"); toast.success("Search history cleared"); }}>Clear search history</Button>
+      </div>
+      <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reels</p>
+      <Row k="reelAutoplay" title="Autoplay reels" desc="Play reels automatically as you scroll" />
+      <Row k="doubleTapLike" title="Double-tap to like" desc="Double-tap a reel to like it" />
+      <Row k="shakeToReport" title="Shake to report" desc="Shake your phone while watching a reel to report it" />
+      <Row k="reelDefaultComments" title="Allow comments by default" desc="Pre-selected when you post a reel" />
+      <Row k="reelDefaultDownload" title="Allow downloads by default" desc="Pre-selected when you post a reel" />
+    </div>
+  );
+};
+
+// ---------- Prime membership (cancel) ----------
+export const PrimeMembershipCard = () => {
+  const { user } = useAuth();
+  const [sub, setSub] = useState<{ tier: string; expires_at: string } | null>(null);
+  const load = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase.from("prime_subscriptions").select("tier, expires_at").eq("user_id", user.id).gt("expires_at", new Date().toISOString()).order("expires_at", { ascending: false }).limit(1).maybeSingle();
+    setSub(data ?? null);
+  }, [user]);
+  useEffect(() => { void load(); }, [load]);
+  if (!sub) return null;
+  const forever = new Date(sub.expires_at).getFullYear() > new Date().getFullYear() + 50;
+  return (
+    <div className={`${card} flex items-center gap-3`}>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold capitalize text-foreground">Prime {sub.tier.replace("_", " ")}</p>
+        <p className="text-caption text-muted-foreground">{forever ? "Included with your admin account" : `Active until ${new Date(sub.expires_at).toLocaleDateString()}`}</p>
+      </div>
+      {!forever && <Button variant="destructive" onClick={async () => {
+        if (!window.confirm("Cancel Prime? Access ends immediately and there is no refund.")) return;
+        const { error } = await supabase.rpc("prime_cancel" as any);
+        if (error) toast.error(error.message); else { toast.success("Prime cancelled"); setSub(null); }
+      }}>Cancel</Button>}
+    </div>
+  );
+};

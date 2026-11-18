@@ -1,7 +1,7 @@
 import { logSecurityEvent } from "@/utils/audit";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { PhoneOff, Mic, MicOff, Video, VideoOff, RefreshCw } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Video, VideoOff, RefreshCw, SkipForward, Send, Flag } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +22,11 @@ const CallPage = () => {
   const isCallee = params.get("incoming") === "1";
   const audioOnly = params.get("audio") === "1";
   const callId = params.get("call");
+  const randomMode = params.get("random") === "1";
+  const meetMode = params.get("mode") === "adult" ? "adult" : "general";
+  const exitPath = randomMode ? `/meet?mode=${meetMode}${audioOnly ? "&audio=1" : ""}` : "/";
+  const [chatLog, setChatLog] = useState<{ me: boolean; text: string }[]>([]);
+  const [chatText, setChatText] = useState("");
   const { user } = useAuth();
 
   const [muted, setMuted] = useState(false);
@@ -76,8 +81,8 @@ const CallPage = () => {
     if (callId) void supabase.from("call_invitations").update({ status: "ended" }).eq("id", callId);
     setStatus("ended");
     cleanup();
-    setTimeout(() => navigate("/", { replace: true }), 600);
-  }, [cleanup, navigate, send, callId]);
+    setTimeout(() => navigate(exitPath, { replace: true }), 600);
+  }, [cleanup, navigate, send, callId, exitPath]);
 
   useEffect(() => {
     if (!userId || !user) return;
@@ -199,12 +204,16 @@ const CallPage = () => {
             pendingIce.current.push(payload.candidate);
           }
         })
+        .on("broadcast", { event: "chat" }, ({ payload }: any) => {
+          if (payload.from !== userId) return;
+          setChatLog(l => [...l.slice(-30), { me: false, text: String(payload.text || "").slice(0, 500) }]);
+        })
         .on("broadcast", { event: "hangup" }, () => {
           if (endedRef.current) return;
           endedRef.current = true;
           setStatus("ended");
           cleanup();
-          setTimeout(() => navigate("/messages"), 600);
+          setTimeout(() => navigate(randomMode ? exitPath : "/messages"), 600);
         })
         .subscribe(async (state) => {
           if (state !== "SUBSCRIBED" || cancelled) return;
@@ -351,6 +360,18 @@ const CallPage = () => {
         animate={{ y: 0, opacity: 1 }}
         className="relative z-10 safe-area-bottom pb-8"
       >
+        {randomMode && (
+          <div className="mx-auto mb-3 w-full max-w-sm px-3">
+            <div className="max-h-28 space-y-1 overflow-y-auto">
+              {chatLog.slice(-6).map((m, i) => <p key={i} className={`w-fit max-w-[85%] rounded-2xl px-3 py-1 text-sm text-white ${m.me ? "ml-auto bg-primary/80" : "bg-black/60"}`}>{m.text}</p>)}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input value={chatText} onChange={e => setChatText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && chatText.trim()) { send("chat", { text: chatText.trim() }); setChatLog(l => [...l, { me: true, text: chatText.trim() }]); setChatText(""); } }} placeholder="Type a message…" maxLength={300} className="min-w-0 flex-1 rounded-full bg-black/55 px-4 py-2 text-sm text-white placeholder:text-white/50 outline-none backdrop-blur" />
+              <button aria-label="Send" onClick={() => { if (chatText.trim()) { send("chat", { text: chatText.trim() }); setChatLog(l => [...l, { me: true, text: chatText.trim() }]); setChatText(""); } }} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground"><Send className="h-4 w-4" /></button>
+              <button aria-label="Report this person" onClick={async () => { if (!user || !userId) return; await supabase.from("reports").insert({ reporter_id: user.id, target_type: "user", target_id: userId, reason: "Reported in random video chat" } as any); toast.success("Reported — moving to the next person"); hangUp(); }} className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/70 text-white"><Flag className="h-4 w-4" /></button>
+            </div>
+          </div>
+        )}
         <div className="mx-auto max-w-sm rounded-full bg-black/55 py-3 px-4 backdrop-blur-sm">
           <div className="flex justify-center gap-3 relative z-10">
             <Button variant="ghost" size="icon"
@@ -374,6 +395,11 @@ const CallPage = () => {
             >
               <RefreshCw className="w-6 h-6 text-white" />
             </Button>
+            {randomMode && (
+              <Button variant="ghost" size="icon" onClick={hangUp} aria-label="Next person" title="Next person" className="depth-press w-14 h-14 rounded-full bg-emerald-500/60 flex items-center justify-center">
+                <SkipForward className="w-6 h-6 text-white" />
+              </Button>
+            )}
             <Button variant="destructive" size="icon"
               onClick={hangUp}
               aria-label="End call"

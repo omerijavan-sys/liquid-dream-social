@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Sparkles, Eye, Heart, MessageCircle, Users, Film } from "lucide-react";
+import VideoThumb from "@/components/VideoThumb";
+import { toast } from "sonner";
+import { BadgeDollarSign, BarChart3, Sparkles, Eye, Heart, MessageCircle, Users, Film } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -79,7 +81,7 @@ export const AuraDialog = ({ userId, open, onOpenChange }: { userId: string; ope
                   <span className="w-6 text-center text-sm font-bold text-primary">#{i + 1}</span>
                   <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-secondary">
                     {p.media_url && p.media_type !== "video" && <img src={p.media_url} alt="" className="h-full w-full object-cover" />}
-                    {p.media_url && p.media_type === "video" && <video src={p.media_url} className="h-full w-full object-cover" muted />}
+                    {p.media_url && p.media_type === "video" && <VideoThumb src={p.media_url} poster={(p as any).thumbnail_url} />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-foreground">{p.caption || "Untitled post"}</p>
@@ -154,6 +156,49 @@ export const AnalyticsDialog = ({ userId, isOwner, open, onOpenChange }: { userI
             {!isOwner && <p className="text-[11px] text-muted-foreground">Earnings and payouts are only visible to the account owner.</p>}
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/** Owner sets their monthly fan-subscription price; others see it on the public profile. */
+export const CreatorPlanDialog = ({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) => {
+  const [price, setPrice] = useState("");
+  const [current, setCurrent] = useState<number | null>(null);
+  const [subs, setSubs] = useState(0);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) return;
+      const { data } = await supabase.from("creator_profiles").select("monthly_price").eq("user_id", uid).maybeSingle();
+      setCurrent(data?.monthly_price ?? null);
+      setPrice(data?.monthly_price ? String(data.monthly_price) : "");
+      const { count } = await supabase.from("creator_subscriptions").select("id", { count: "exact", head: true }).eq("creator_id", uid).eq("status", "active").gt("expires_at", new Date().toISOString());
+      setSubs(count ?? 0);
+    })();
+  }, [open]);
+  const save = async (value: number) => {
+    setBusy(true);
+    const { error } = await supabase.rpc("creator_set_price" as any, { _price: value } as any);
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    setCurrent(value > 0 ? value : null);
+    toast.success(value > 0 ? `Fans can now subscribe for KES ${value.toLocaleString()}/month` : "Subscriptions turned off");
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogTitle className="flex items-center gap-2"><BadgeDollarSign className="h-5 w-5 text-primary" /> Fan subscription</DialogTitle>
+        <p className="text-sm text-muted-foreground">Set what fans pay each month (KES 10 – 50,000). You keep 95% and it lands in your wallet.</p>
+        <input type="number" inputMode="numeric" min={10} max={50000} value={price} onChange={e => setPrice(e.target.value)} placeholder="e.g. 300" className="w-full rounded-2xl bg-secondary/60 px-4 py-3 outline-none" />
+        <p className="text-xs text-muted-foreground">{current ? `Current price: KES ${current.toLocaleString()} · ${subs} active subscriber${subs === 1 ? "" : "s"}` : "Subscriptions are currently off."}</p>
+        <div className="flex gap-2">
+          <button disabled={busy || !Number(price)} onClick={() => void save(Math.round(Number(price)))} className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{current ? "Update price" : "Turn on"}</button>
+          {current && <button disabled={busy} onClick={() => void save(0)} className="rounded-xl bg-secondary px-4 py-2.5 text-sm font-semibold">Turn off</button>}
+        </div>
       </DialogContent>
     </Dialog>
   );

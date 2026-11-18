@@ -179,22 +179,40 @@
 
 @layer base {
   :root.light {
-    --background: 0 0% 97%;
-    --foreground: 220 15% 12%;
+    /* Light mode: crisp white surfaces with a red / blue / green tri-colour accent set */
+    --background: 210 40% 98%;
+    --foreground: 222 30% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 12%;
+    --card-foreground: 222 30% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 12%;
-    --secondary: 220 12% 90%;
-    --secondary-foreground: 220 15% 15%;
-    --muted: 220 12% 92%;
-    --muted-foreground: 220 10% 40%;
-    --border: 220 12% 82%;
-    --input: 220 12% 82%;
+    --popover-foreground: 222 30% 12%;
+    --primary: 217 91% 52%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 145 63% 38%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 82% 52%;
+    --ring: 217 91% 52%;
+    --brand-blue: 217 91% 52%;
+    --brand-green: 145 63% 38%;
+    --brand-red: 0 82% 52%;
+    --secondary: 214 32% 92%;
+    --secondary-foreground: 222 30% 15%;
+    --muted: 214 32% 94%;
+    --muted-foreground: 220 12% 38%;
+    --border: 214 24% 84%;
+    --input: 214 24% 84%;
     --glass-bg: 0 0% 100%;
-    --glass-border: 220 15% 30%;
-    --glass-opacity: 0.7;
+    --glass-border: 217 40% 40%;
+    --glass-opacity: 0.78;
   }
+  :root.light body {
+    background-image:
+      radial-gradient(ellipse at 8% 0%, hsla(0, 82%, 55%, 0.10), transparent 42%),
+      radial-gradient(ellipse at 100% 8%, hsla(217, 91%, 55%, 0.13), transparent 46%),
+      radial-gradient(ellipse at 50% 108%, hsla(145, 63%, 42%, 0.12), transparent 48%);
+    background-attachment: fixed;
+  }
+  :root.light[data-color-theme] { --brand-blue: 217 91% 52%; --brand-green: 145 63% 38%; --brand-red: 0 82% 52%; }
   :root[data-reduce-motion="true"] *, :root[data-reduce-motion="true"] *::before, :root[data-reduce-motion="true"] *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

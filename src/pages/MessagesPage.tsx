@@ -74,6 +74,16 @@ const MessagesPage = () => {
 
   useEffect(() => () => speechRecognitionRef.current?.stop(), []);
 
+  // Deep link: /messages?to=<userId> opens that person's direct chat.
+  useEffect(() => {
+    const to = new URLSearchParams(window.location.search).get("to");
+    if (!to || !user || to === user.id) return;
+    let cancelled = false;
+    supabase.from("profiles").select("user_id, display_name, username, avatar_url").eq("user_id", to).maybeSingle()
+      .then(({ data }) => { if (data && !cancelled) setActiveChat(data as ChatUser); });
+    return () => { cancelled = true; };
+  }, [user]);
+
   const toggleVoiceSearch = () => {
     if (voiceSearch) {
       speechRecognitionRef.current?.stop();

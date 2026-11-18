@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import VideoThumb from "@/components/VideoThumb";
 import { motion } from "framer-motion";
 import { Check, Eye, Loader2, Play, ShieldAlert, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -234,7 +235,7 @@ const AdultTab = () => {
               {p.media_url ? (
                 p.media_type === "video" ? (
                   <>
-                    <video src={p.media_url} className="w-full h-full object-cover" muted preload="metadata" />
+                    <VideoThumb src={p.media_url} poster={p.thumbnail_url} />
                     <Play className="absolute top-2 right-2 w-4 h-4 text-foreground" />
                   </>
                 ) : (

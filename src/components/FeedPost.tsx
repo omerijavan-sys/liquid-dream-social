@@ -18,6 +18,7 @@ import CreatorTipButton from "@/components/CreatorTipButton";
 
 interface FeedPostProps {
   image: string;
+  poster?: string | null;
   mediaType?: string;
   username: string;
   avatar: string;
@@ -49,7 +50,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
     <div className={`${size} rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold`}>{avatar}</div>
   );
 
-const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, music, views = 0 }: FeedPostProps) => {
+const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, music, views = 0 }: FeedPostProps) => {
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
   const [me, setMe] = useState<string | null>(null);
@@ -60,7 +61,7 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
   const [showHeart, setShowHeart] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [videoLoading, setVideoLoading] = useState(true);
+  const [videoLoading, setVideoLoading] = useState(false);
   const lastTap = useRef(0);
   const tapTimer = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -264,7 +265,8 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
             <div className="relative w-full">
               <video
                 ref={videoRef}
-                src={image}
+                src={poster ? image : `${image}#t=0.1`}
+                poster={poster || undefined}
                 className="w-full h-auto max-h-[75vh] object-contain bg-background"
                 playsInline
                 muted={muted}

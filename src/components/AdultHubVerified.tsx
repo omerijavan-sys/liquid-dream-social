@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import VideoThumb from "@/components/VideoThumb";
 import { motion } from "framer-motion";
 import { Check, Eye, EyeOff, Heart, Lock, Play, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import CreatorTipButton from "@/components/CreatorTipButton";
 import { Button } from "@/components/ui/button";
+import { AdultMeetTab, AdultMessagesTab, AdultMeTab } from "@/components/AdultExtras";
+import { MessageCircle } from "lucide-react";
 
 type AdultPost = {
   id: string;
@@ -14,6 +17,7 @@ type AdultPost = {
   media_url: string | null;
   media_type: string | null;
   views_count: number;
+  thumbnail_url?: string | null;
 };
 
 type Creator = { user_id: string; username: string | null; display_name: string | null; monthly_price: number };
@@ -28,6 +32,8 @@ const AdultHubVerified = () => {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [blurSensitive, setBlurSensitive] = useState(true);
   const [filter, setFilter] = useState<"all" | "photo" | "video">("all");
+  const [tab, setTab] = useState<"feed" | "meet" | "messages" | "me">("feed");
+  const [chatWith, setChatWith] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { setVerified(false); return; }
@@ -45,7 +51,7 @@ const AdultHubVerified = () => {
     let cancelled = false;
     const load = async () => {
       const [{ data: postData, error: postError }, { data: creatorData, error: creatorError }] = await Promise.all([
-        supabase.from("posts").select("id,user_id,caption,media_url,media_type,views_count").eq("is_adult", true).order("created_at", { ascending: false }).limit(60),
+        supabase.from("posts").select("id,user_id,caption,media_url,media_type,views_count,thumbnail_url").eq("is_adult", true).order("created_at", { ascending: false }).limit(60),
         supabase.from("creator_profiles").select("user_id,monthly_price").limit(60),
       ]);
       if (cancelled) return;
@@ -101,15 +107,19 @@ const AdultHubVerified = () => {
     </div>
   );
 
+  const tabBar = <div className="grid grid-cols-4 gap-1 rounded-2xl border border-white/10 bg-black/50 p-1">{([["feed","Feed"],["meet","Meet"],["messages","Messages"],["me","Me"]] as const).map(([k,l]) => <button key={k} onClick={() => setTab(k)} className={`rounded-xl py-2 text-xs font-semibold ${tab === k ? "bg-rose-600 text-white" : "text-white/60"}`}>{l}</button>)}</div>;
+  if (tab !== "feed") return <div className="space-y-4">{tabBar}{tab === "meet" ? <AdultMeetTab /> : tab === "messages" ? <AdultMessagesTab openWith={chatWith} onClearOpen={() => setChatWith(null)} /> : <AdultMeTab />}</div>;
+
   return <div className="space-y-4">
+    {tabBar}
     <section className="rounded-3xl border border-rose-400/25 bg-black/70 p-4 shadow-[0_0_35px_rgba(255,0,51,.12)] backdrop-blur-2xl">
       <div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/15"><Sparkles className="h-5 w-5 text-rose-300" /></div><div className="min-w-0 flex-1"><p className="font-bold text-white">Verified Creator Hub</p><p className="text-xs text-white/55">Wallet-powered tips and creator memberships.</p></div><button onClick={() => setBlurSensitive(value => !value)} className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/75" aria-label={blurSensitive ? "Show sensitive previews" : "Blur sensitive previews"}>{blurSensitive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
       <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] text-white/55"><div className="rounded-2xl bg-white/5 p-3"><Heart className="mx-auto mb-1 h-4 w-4 text-rose-300" />Tips from wallet</div><div className="rounded-2xl bg-white/5 p-3"><Users className="mx-auto mb-1 h-4 w-4 text-rose-300" />Fan clubs</div><div className="rounded-2xl bg-white/5 p-3"><Lock className="mx-auto mb-1 h-4 w-4 text-rose-300" />Private access</div></div>
     </section>
     <div className="flex gap-2">{(["all", "photo", "video"] as const).map(value => <Button key={value} size="sm" variant={filter === value ? "default" : "secondary"} onClick={() => setFilter(value)}>{value === "all" ? "All" : value === "photo" ? "Photos" : "Videos"}</Button>)}</div>
     {visiblePosts.length === 0 ? <div className="rounded-2xl border border-white/10 bg-black/30 p-8 text-center text-sm text-white/50">No verified creator posts yet.</div> : <div className="grid grid-cols-2 gap-2">{visiblePosts.map((post, index) => <motion.article key={post.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .03 }} className="overflow-hidden rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl">
-      <div className="relative aspect-square bg-black/50">{post.media_url && (post.media_type === "video" ? <video src={post.media_url} muted preload="metadata" className={`h-full w-full object-cover ${blurSensitive ? "blur-lg" : ""}`} /> : <img src={post.media_url} alt="Verified creator content" loading="lazy" className={`h-full w-full object-cover ${blurSensitive ? "blur-lg" : ""}`} />)}<div className="absolute inset-0 flex items-center justify-center bg-black/10">{post.media_type === "video" && <Play className="h-8 w-8 text-white" />}</div></div>
-      <div className="space-y-2 p-2"><p className="line-clamp-2 text-xs text-white/70">{post.caption || "Exclusive verified content"}</p><CreatorTipButton creatorId={post.user_id} /><CreatorSubscriptionButton creatorId={post.user_id} creator={creators.find(item => item.user_id === post.user_id)} /></div>
+      <div className="relative aspect-square bg-black/50">{post.media_url && (post.media_type === "video" ? <VideoThumb src={post.media_url} poster={post.thumbnail_url} className={`h-full w-full object-cover ${blurSensitive ? "blur-lg" : ""}`} /> : <img src={post.media_url} alt="Verified creator content" loading="lazy" className={`h-full w-full object-cover ${blurSensitive ? "blur-lg" : ""}`} />)}<div className="absolute inset-0 flex items-center justify-center bg-black/10">{post.media_type === "video" && <Play className="h-8 w-8 text-white" />}</div></div>
+      <div className="space-y-2 p-2"><p className="line-clamp-2 text-xs text-white/70">{post.caption || "Exclusive verified content"}</p><div className="flex items-center gap-1"><div className="min-w-0 flex-1"><CreatorTipButton creatorId={post.user_id} /></div>{post.user_id !== user?.id && <button aria-label="Message privately" title="Message privately" onClick={() => { setChatWith(post.user_id); setTab("messages"); }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-300/25 bg-rose-500/10 text-rose-200"><MessageCircle className="h-4 w-4" /></button>}</div><CreatorSubscriptionButton creatorId={post.user_id} creator={creators.find(item => item.user_id === post.user_id)} /></div>
     </motion.article>)}</div>}
     <p className="flex items-center justify-center gap-1 text-center text-[11px] text-white/40"><Check className="h-3 w-3 text-emerald-300" /> All purchases use the authenticated Prime Wallet ledger.</p>
   </div>;

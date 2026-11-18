@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, Plus, Search, Sparkles, Layers, Music, Trophy, Gamepad2, Film, X, Video, Eye, EyeOff } from "lucide-react";
-import OnlineCalls from "./OnlineCalls";
+import { MessageCircle, Plus, Search, Sparkles, Layers, Music, Trophy, Gamepad2, Film, X, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PrimeMusicHub from "./PrimeMusicHub";
 
@@ -69,7 +68,6 @@ const PrimeHubPanel = ({ open, onClose }: { open: boolean; onClose: () => void }
 };
 
 const FloatingActions = () => {
-  const [callsOpen, setCallsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -98,7 +96,6 @@ const FloatingActions = () => {
     "Open chat": "linear-gradient(135deg,#38bdf8,#6366f1)",
     "Quick search": "linear-gradient(135deg,#34d399,#06b6d4)",
     "AI assistant": "linear-gradient(135deg,#a78bfa,#ec4899)",
-    "Online calls": "linear-gradient(135deg,#4ade80,#16a34a)",
     "Prime Hub": "linear-gradient(135deg,#fbbf24,#f97316)",
     "Hide floating actions": "linear-gradient(135deg,#64748b,#334155)",
   };
@@ -107,7 +104,6 @@ const FloatingActions = () => {
     { label: "Open chat", icon: MessageCircle, run: () => navigate("/messages"), position: [0.28, 0.76] },
     { label: "Quick search", icon: Search, run: () => navigate("/search"), position: [0.14, 0.5] },
     { label: "AI assistant", icon: Sparkles, run: () => { void openAI(); }, position: [0.32, 0.25] },
-    { label: "Online calls", icon: Video, run: () => setCallsOpen(true), position: [0.7, 0.25] },
     { label: "Prime Hub", icon: Layers, run: () => setHubOpen(true), position: [0.88, 0.48] },
     { label: "Hide floating actions", icon: EyeOff, run: () => {
       localStorage.setItem("primegram:floatingActionsHidden", "true");
@@ -201,7 +197,6 @@ const FloatingActions = () => {
       )}
 
       <PrimeHubPanel open={hubOpen} onClose={() => setHubOpen(false)} />
-      <OnlineCalls open={callsOpen} onClose={() => setCallsOpen(false)} />
       {PrimeAI && <PrimeAI open={aiOpen} onClose={() => setAiOpen(false)} />}
     </>
   );

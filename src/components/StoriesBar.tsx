@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, ChevronRight, Play } from "lucide-react";
+import { Plus, X, ChevronRight, Play, MessageCircle, Send } from "lucide-react";
+import { runInBackground } from "@/utils/backgroundUpload";
+import { uploadVideoCover } from "@/utils/videoThumb";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -51,6 +53,7 @@ interface StoryView {
   id: string;
   user_id: string;
   image_url: string;
+  cover_url?: string | null;
   display_name: string;
   created_at: string;
   progress?: number;
@@ -91,7 +94,7 @@ const StoriesBar = () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from("posts")
-        .select("id, media_url, user_id, created_at")
+        .select("id, media_url, user_id, created_at, thumbnail_url")
         .eq("media_type", "story")
         .gte("created_at", twentyFourHoursAgo)
         .order("created_at", { ascending: false })
@@ -108,6 +111,7 @@ const StoriesBar = () => {
           id: s.id,
           user_id: s.user_id,
           image_url: s.media_url || "",
+          cover_url: (s as any).thumbnail_url || (isVideoMedia(s.media_url || "") ? null : s.media_url),
           display_name: profileMap.get(s.user_id)?.display_name || "User",
           created_at: s.created_at,
         })));
@@ -171,26 +175,62 @@ const StoriesBar = () => {
     toast.success("Story reaction sent");
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (fileRef.current) fileRef.current.value = "";
     if (!file || !user) return;
+    const uid = user.id;
+    const name = user.user_metadata?.full_name || "You";
+    const isVideo = file.type.startsWith("video/");
     setUploading(true);
-    try {
+    runInBackground("Posting your story", async (progress) => {
+      let thumbnail_url: string | null = null;
+      if (isVideo) { progress("Making cover…"); thumbnail_url = await uploadVideoCover(uid, file); }
+      progress("Uploading story…");
       const ext = file.name.split(".").pop();
-      const path = `${user.id}/story_${Date.now()}.${ext}`;
+      const path = `${uid}/story_${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from("media").upload(path, file);
       if (uploadErr) throw uploadErr;
       const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
-      const { data: post, error } = await supabase.from("posts").insert({ user_id: user.id, media_url: publicUrl, media_type: "story", caption: "Story" }).select("id").single();
+      const { data: post, error } = await supabase.from("posts").insert({ user_id: uid, media_url: publicUrl, media_type: "story", caption: "Story", thumbnail_url } as any).select("id").single();
       if (error) throw error;
-      toast.success("Story posted!");
-      setStories(prev => [{ id: post.id, user_id: user.id, image_url: publicUrl, display_name: user.user_metadata?.full_name || "You", created_at: new Date().toISOString() }, ...prev]);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to post story");
-    } finally {
+      return { id: post.id, publicUrl, thumbnail_url };
+    }, (r) => {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      setStories(prev => [{ id: r.id, user_id: uid, image_url: r.publicUrl, cover_url: r.thumbnail_url || (isVideo ? null : r.publicUrl), display_name: name, created_at: new Date().toISOString() }, ...prev]);
+    });
+    setTimeout(() => setUploading(false), 1500);
+  };
+
+  // ---- Story comments ----
+  const [commentText, setCommentText] = useState("");
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [storyComments, setStoryComments] = useState<{ id: string; content: string; user_id: string; name: string }[]>([]);
+  const loadStoryComments = useCallback(async (storyId: string) => {
+    const { data } = await supabase.from("story_comments" as any).select("id, content, user_id").eq("story_id", storyId).order("created_at", { ascending: true }).limit(100);
+    const rows = (data ?? []) as any[];
+    const ids = [...new Set(rows.map(r => r.user_id))];
+    const { data: profs } = ids.length ? await supabase.from("profiles").select("user_id, username, display_name").in("user_id", ids) : { data: [] as any[] };
+    const pm = new Map((profs ?? []).map(p => [p.user_id, p]));
+    setStoryComments(rows.map(r => ({ ...r, name: pm.get(r.user_id)?.username || pm.get(r.user_id)?.display_name || "user" })));
+  }, []);
+  useEffect(() => {
+    setCommentsOpen(false); setCommentText("");
+    if (!viewingStory) { setStoryComments([]); return; }
+    void loadStoryComments(viewingStory.id);
+    const ch = supabase.channel(`story-comments-${viewingStory.id}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "story_comments", filter: `story_id=eq.${viewingStory.id}` }, () => { void loadStoryComments(viewingStory.id); }).subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [viewingStory?.id, loadStoryComments]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sendStoryComment = async () => {
+    if (!viewingStory || !user || !commentText.trim()) return;
+    const text = commentText.trim();
+    const { error } = await supabase.from("story_comments" as any).insert({ story_id: viewingStory.id, user_id: user.id, content: text } as any);
+    if (error) { toast.error("Couldn't post your comment"); return; }
+    setCommentText("");
+    if (viewingStory.user_id !== user.id) {
+      void supabase.from("messages").insert({ sender_id: user.id, receiver_id: viewingStory.user_id, content: `Commented on your story: ${text}` });
     }
+    void loadStoryComments(viewingStory.id);
   };
 
   return (
@@ -200,7 +240,7 @@ const StoriesBar = () => {
         <div className="flex gap-3">
           <StoryBubble name={uploading ? "Posting..." : "Your Story"} initial="+" gradient="linear-gradient(135deg, hsl(210, 100%, 60%), hsl(260, 80%, 60%))" hasNew={false} index={0} onClick={handleAddStory} isAdd />
           {stories.map((story, i) => (
-            <StoryBubble key={story.id} name={story.display_name} imageUrl={story.image_url} initial={story.display_name[0]} gradient="linear-gradient(135deg, hsl(350, 80%, 58%), hsl(280, 70%, 55%))" hasNew index={i + 1} onClick={() => openStory(story)} />
+            <StoryBubble key={story.id} name={story.display_name} imageUrl={story.cover_url} initial={story.display_name[0]} gradient="linear-gradient(135deg, hsl(350, 80%, 58%), hsl(280, 70%, 55%))" hasNew index={i + 1} onClick={() => openStory(story)} />
           ))}
         </div>
       </div>
@@ -236,7 +276,7 @@ const StoriesBar = () => {
             <div className="absolute inset-0 flex items-center justify-center">
               {isVideoMedia(viewingStory.image_url) ? (
                 <button type="button" aria-label={paused ? "Resume story" : "Pause story"} onClick={() => setPaused(value => !value)} className="relative h-full w-full">
-                  <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} autoPlay playsInline className="h-full w-full object-contain" onEnded={advance} onTimeUpdate={event => {
+                  <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} poster={viewingStory.cover_url || undefined} autoPlay playsInline className="h-full w-full object-contain" onEnded={advance} onTimeUpdate={event => {
                     const video = event.currentTarget;
                     if (Number.isFinite(video.duration)) {
                       const progress = video.currentTime / video.duration;
@@ -253,13 +293,30 @@ const StoriesBar = () => {
                 </button>
               )}
             </div>
-            <div className="absolute bottom-5 left-4 right-16 z-20 flex items-center gap-2">
-              {["❤️", "😂", "😮", "🔥", "👏"].map((emoji) => (
-                <button key={emoji} type="button" aria-label={`React ${emoji}`} disabled={viewingStory.user_id === user?.id} onClick={() => void handleReaction(emoji)} className="rounded-full bg-background/70 px-2.5 py-1.5 text-lg backdrop-blur-md disabled:opacity-50">
-                  {emoji}
-                </button>
-              ))}
+            <div className="absolute bottom-4 left-4 right-16 z-20 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                {["❤️", "😂", "😮", "🔥", "👏"].map((emoji) => (
+                  <button key={emoji} type="button" aria-label={`React ${emoji}`} disabled={viewingStory.user_id === user?.id} onClick={() => void handleReaction(emoji)} className="rounded-full bg-background/70 px-2.5 py-1.5 text-lg backdrop-blur-md disabled:opacity-50">
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input value={commentText} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)} onChange={e => setCommentText(e.target.value)} onKeyDown={e => e.key === "Enter" && void sendStoryComment()} placeholder="Add a comment…" maxLength={500} className="min-w-0 flex-1 rounded-full bg-background/80 px-4 py-2 text-sm text-foreground outline-none backdrop-blur-md" />
+                <button type="button" aria-label="Send comment" onClick={() => void sendStoryComment()} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground"><Send className="h-4 w-4" /></button>
+                <button type="button" aria-label="View comments" onClick={() => { setCommentsOpen(o => !o); setPaused(true); }} className="relative flex h-9 w-9 items-center justify-center rounded-full bg-background/80 text-foreground"><MessageCircle className="h-4 w-4" />{storyComments.length > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 text-[10px] text-primary-foreground">{storyComments.length}</span>}</button>
+              </div>
             </div>
+            {commentsOpen && (
+              <div className="absolute inset-x-0 bottom-0 z-30 max-h-[55%] overflow-y-auto rounded-t-3xl bg-background/95 p-4 backdrop-blur-xl">
+                <div className="mb-2 flex items-center justify-between"><span className="font-semibold text-foreground">Comments</span><button onClick={() => { setCommentsOpen(false); setPaused(false); }} aria-label="Close comments"><X className="h-5 w-5 text-foreground" /></button></div>
+                {storyComments.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">No comments yet</p> : storyComments.map(c => (
+                  <div key={c.id} className="flex items-start gap-2 py-1.5 text-sm"><span className="font-semibold text-foreground">{c.name}</span><span className="flex-1 text-foreground/90">{c.content}</span>
+                    {(c.user_id === user?.id || viewingStory.user_id === user?.id) && <button aria-label="Delete comment" onClick={async () => { await supabase.from("story_comments" as any).delete().eq("id", c.id); void loadStoryComments(viewingStory.id); }} className="text-xs text-muted-foreground">✕</button>}
+                  </div>
+                ))}
+              </div>
+            )}
             <Button variant="secondary" size="icon" aria-label="Next story" onClick={advance} className="absolute right-4 bottom-5 z-20"><ChevronRight /></Button>
           </motion.div>
         )}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Moon, Lock, Bell, HelpCircle, LogOut, ChevronRight, User, Shield, Palette, Sun, Users, WalletCards, Heart, Music2, Fingerprint, Disc3, UserRound } from "lucide-react";
+import { ArrowLeft, Moon, Lock, Bell, HelpCircle, LogOut, ChevronRight, User, Shield, Palette, Sun, Users, WalletCards, Heart, Music2, Fingerprint, Disc3, UserRound, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,9 +13,9 @@ import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
 import AndroidDownloadCard from "@/components/AndroidDownloadCard";
 import AccountManagement from "@/components/AccountManagement";
 import { enablePush, disablePush } from "@/utils/pushSubscribe";
-import { PrivacyPanel, BlockedPanel, SecurityExtras, HelpPanel, WalletShortcut } from "@/components/SettingsExtras";
+import { PrivacyPanel, BlockedPanel, SecurityExtras, HelpPanel, WalletShortcut, ContentPanel, PrimeMembershipCard } from "@/components/SettingsExtras";
 
-type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions" | "blocked";
+type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions" | "blocked" | "content";
 
 type CreatorSubscription = {
   id: string;
@@ -403,7 +403,7 @@ const SettingsPage = () => {
                 </div>
               ))}
             </div>
-            <Button className="w-full" disabled={savedAccounts.length >= 2} onClick={async () => {
+            <Button className="w-full" disabled={savedAccounts.length >= 10} onClick={async () => {
               try {
                 await saveCurrentAccount();
                 navigate("/auth?addAccount=1&next=%2Fsettings");
@@ -411,7 +411,7 @@ const SettingsPage = () => {
                 toast.error(error instanceof Error ? error.message : "Couldn't prepare another account");
               }
             }}>
-              {savedAccounts.length >= 2 ? "Remove an account before adding another" : "Add another account"}
+              {savedAccounts.length >= 10 ? "Remove an account before adding another" : "Add another account"}
             </Button>
             <p className="text-xs text-muted-foreground">Account sessions are stored locally in this browser. Removing an account forgets its saved session on this device.</p>
           </div>
@@ -442,9 +442,12 @@ const SettingsPage = () => {
             )}
           </div>
         );
+      case "content":
+        return <ContentPanel />;
       case "subscriptions":
         return (
           <div className="space-y-3">
+            <PrimeMembershipCard />
             <p className="text-sm text-muted-foreground">Purchases are prepaid for one month and do not auto-renew. Cancellation is immediate and does not issue a refund.</p>
             {monetizationLoading ? <p className="text-sm text-muted-foreground">Loading subscriptions...</p> : mySubscriptions.length === 0 ? (
               <p className="liquid-glass rounded-2xl p-4 text-sm text-muted-foreground relative z-10">You have no creator subscriptions.</p>
@@ -620,6 +623,9 @@ const SettingsPage = () => {
             <div className="grid gap-2 sm:grid-cols-2">
               <button onClick={() => { setActivePanel("creator"); void loadCreatorData(); }} className="depth-press flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-3 text-left">
                 <Users className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Creator Dashboard</span><span className="block text-[10px] text-muted-foreground">{creatorActive ? "Manage plan and subscribers" : "Register as a creator"}</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <button onClick={() => setActivePanel("content")} className="depth-press flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-3 text-left">
+                <Sparkles className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Captions, Search & Reels</span><span className="block text-[10px] text-muted-foreground">AI captions, search and reel options</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
               <button onClick={() => { setActivePanel("subscriptions"); void loadMySubscriptions(); }} className="depth-press flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-3 text-left">
                 <WalletCards className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Subscriptions</span><span className="block text-[10px] text-muted-foreground">Your creator memberships</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />

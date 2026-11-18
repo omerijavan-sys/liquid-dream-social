@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import VideoThumb from "@/components/VideoThumb";
 import { motion } from "framer-motion";
-import { ArrowLeft, Settings, Sparkles, BarChart3, Grid3X3, Bookmark, Heart, Camera, Film, X } from "lucide-react";
+import { ArrowLeft, Settings, Sparkles, BarChart3, BadgeDollarSign, Grid3X3, Bookmark, Heart, Camera, Film, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +10,7 @@ import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import FollowListDialog, { FollowButton } from "@/components/FollowListDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { AuraDialog, AnalyticsDialog } from "@/components/ProfileDashboards";
+import { AuraDialog, AnalyticsDialog, CreatorPlanDialog } from "@/components/ProfileDashboards";
 
 interface Profile {
   display_name: string | null;
@@ -38,6 +39,7 @@ const ProfilePage = () => {
   const [tabPosts, setTabPosts] = useState<any[]>([]);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [auraOpen, setAuraOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
 
@@ -45,7 +47,7 @@ const ProfilePage = () => {
     if (!user || tab === "posts") return;
     const load = async () => {
       if (tab === "reels") {
-        const { data } = await supabase.from("reels").select("id, video_url, caption").eq("user_id", user.id).order("created_at", { ascending: false });
+        const { data } = await supabase.from("reels").select("id, video_url, caption, thumbnail_url").eq("user_id", user.id).order("created_at", { ascending: false });
         setTabPosts((data || []).map((reel) => ({ ...reel, media_url: reel.video_url, media_type: "video" })));
         return;
       }
@@ -135,6 +137,7 @@ const ProfilePage = () => {
           <button onClick={() => navigate(-1)} aria-label="Back" className="depth-press text-amber-100"><ArrowLeft className="h-4 w-4" /></button>
           <span className="flex flex-1 items-center gap-1 text-sm font-bold text-white">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} /></span>
           <button onClick={() => setAuraOpen(true)} aria-label="Aura dashboard" className="depth-press text-amber-200"><Sparkles className="h-5 w-5" /></button>
+          <button onClick={() => setPlanOpen(true)} aria-label="Fan subscription price" className="depth-press text-amber-200"><BadgeDollarSign className="h-5 w-5" /></button>
           <button onClick={() => setAnalyticsOpen(true)} aria-label="Analytics dashboard" className="depth-press text-amber-200"><BarChart3 className="h-5 w-5" /></button>
           <button onClick={() => navigate("/settings")} aria-label="Settings" className="depth-press text-amber-200"><Settings className="h-5 w-5" /></button>
         </div>
@@ -196,6 +199,7 @@ const ProfilePage = () => {
           </div>
         )}
       </div>
+      <CreatorPlanDialog open={planOpen} onOpenChange={setPlanOpen} />
       <AuraDialog userId={user.id} open={auraOpen} onOpenChange={setAuraOpen} />
       <AnalyticsDialog userId={user.id} isOwner open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
       {listMode && <FollowListDialog open onOpenChange={o => !o && setListMode(null)} mode={listMode} userId={user.id} myFollowing={myFollowing} setMyFollowing={setMyFollowing} />}
@@ -239,7 +243,7 @@ const ProfilePage = () => {
           {shown.map((post, i) => (
             <motion.button type="button" key={post.id} onClick={() => setSelectedMedia(post)} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
               {post.media_type === "video" ? (
-                <video src={post.media_url} className="w-full h-full object-cover" muted preload="metadata" />
+                <VideoThumb src={post.media_url} poster={post.thumbnail_url} />
               ) : (
                 <img src={post.media_url} alt="" className="w-full h-full object-cover" loading="lazy" />
               )}

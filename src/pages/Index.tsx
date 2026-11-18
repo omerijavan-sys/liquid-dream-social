@@ -1,3 +1,4 @@
+import HomeReelCard from "@/components/HomeReelCard";
 import { useState, useEffect, useRef, useCallback } from "react";
 import TopNavBar from "@/components/TopNavBar";
 import GlassTabBar from "@/components/GlassTabBar";
@@ -96,11 +97,16 @@ const Index = () => {
 
   useEffect(() => {
     void fetchPosts(true);
+    // Only refetch when posts are added or removed (not on every like), and coalesce bursts.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => { clearTimeout(timer); timer = setTimeout(() => void fetchPosts(true), 1500); };
     const channel = supabase.channel("home-posts")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => void fetchPosts(true))
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reels" }, () => void fetchPosts(true))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, refresh)
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "posts" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reels" }, refresh)
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    window.addEventListener("prime:posted", refresh);
+    return () => { clearTimeout(timer); window.removeEventListener("prime:posted", refresh); void supabase.removeChannel(channel); };
   }, [fetchPosts]);
 
   useEffect(() => {
@@ -158,34 +164,12 @@ const Index = () => {
             </div>
           ) : (
             posts.map((post, i) => post._reel ? (
-              <button
-                key={`reel-${post.id}`}
-                onClick={() => navigate(`/reels?r=${post.id}`)}
-                className="liquid-glass mb-6 block w-full overflow-hidden rounded-[1.5rem] text-left"
-              >
-                <div className="relative z-10 flex items-center gap-2 p-4">
-                  <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-secondary text-sm font-semibold">
-                    {post.profile?.avatar_url ? <img src={post.profile.avatar_url} alt="" className="h-full w-full object-cover" /> : (post.profile?.display_name || "U")[0].toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">{post.profile?.display_name || "User"}</p>
-                    <p className="text-[11px] text-muted-foreground">{timeAgo(post.created_at)}</p>
-                  </div>
-                  <span className="flex items-center gap-1 rounded-full bg-fuchsia-400/15 px-2 py-1 text-[10px] font-semibold text-fuchsia-300"><Film className="h-3 w-3" />Reel</span>
-                </div>
-                <div className="relative aspect-[4/5] w-full bg-black">
-                  <video src={post.video_url} className="h-full w-full object-cover" autoPlay muted loop playsInline preload="metadata" />
-                  <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 backdrop-blur"><Play className="h-4 w-4 text-white" /></span>
-                </div>
-                <div className="relative z-10 flex items-center gap-3 p-4">
-                  <span className="flex items-center gap-1 text-sm text-foreground"><Heart className="h-4 w-4" />{post.likes_count ?? 0}</span>
-                  {post.caption && <p className="truncate text-sm text-foreground/80">{post.caption}</p>}
-                </div>
-              </button>
+              <HomeReelCard key={`reel-${post.id}`} reel={post} timeAgo={timeAgo(post.created_at)} />
             ) : (
               <FeedPost
                 key={post.id}
                 image={post.media_url || ""}
+                poster={post.thumbnail_url}
                 mediaType={post.media_type || "image"}
                 username={post.profile?.display_name || "User"}
                 avatar={post.profile?.avatar_url || (post.profile?.display_name || "U")[0].toUpperCase()}
