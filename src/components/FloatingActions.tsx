@@ -13,6 +13,7 @@ const hubItems = [
 
 const PrimeHubPanel = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const [musicOpen, setMusicOpen] = useState(false);
+  useEffect(() => { const f = () => setMusicOpen(true); window.addEventListener("prime:openMusic", f); return () => window.removeEventListener("prime:openMusic", f); }, []);
   const navigate = useNavigate();
 
   const handleClick = (id: string) => {

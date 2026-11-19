@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import PaystackReturn from "@/components/PaystackReturn";
+import SpotifyCallback from "@/components/SpotifyCallback";
 import InAppBrowser from "@/components/InAppBrowser";
 import NativeAuthBridge from "@/components/NativeAuthBridge";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -79,6 +80,7 @@ const App = () => (
       <BrowserRouter>
         <NativeAuthBridge />
         <PaystackReturn />
+        <SpotifyCallback />
         <InAppBrowser />
         <AuthProvider>
           <MuteProvider>

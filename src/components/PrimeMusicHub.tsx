@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Music2, ExternalLink, Loader2 } from "lucide-react";
+import { X, Search, Music2, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward } from "lucide-react";
+import { findFullStream } from "@/services/FullTrack";
+import { isSpotifyConnected, startSpotifyLogin, disconnectSpotify, initSpotifyPlayer, playOnSpotify, spotifyToggle, spotifySeek, spotifyNext, spotifyPrev, spotifyStop, type SpState } from "@/services/SpotifyConnect";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SpotifyEmbed from "./SpotifyEmbed";
 import { openLink } from "@/utils/openLink";
@@ -20,6 +23,81 @@ const TABS: Array<{ id: Kind; label: string }> = [
 
 const glass = "border border-white/15 bg-white/[0.07] backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.18)]";
 
+
+const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/** Plays the selected item: full Spotify (Premium, connected) → full free stream → Spotify preview embed. */
+const NowPlaying = ({ item, onClose }: { item: Item; onClose: () => void }) => {
+  const [engine, setEngine] = useState<"loading" | "spotify" | "audio" | "embed">("loading");
+  const [note, setNote] = useState("");
+  const [st, setSt] = useState<SpState>({ paused: false, position: 0, duration: 0 });
+  const [src, setSrc] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    let dead = false;
+    setEngine("loading"); setNote(""); setSrc(null); setSt({ paused: false, position: 0, duration: 0 });
+    (async () => {
+      if (isSpotifyConnected()) {
+        try {
+          await initSpotifyPlayer((s) => { if (!dead) setSt(s); });
+          await playOnSpotify(item.kind, item.id);
+          if (!dead) setEngine("spotify");
+          return;
+        } catch (e) {
+          const m = e instanceof Error ? e.message : "";
+          if (!dead) setNote(m === "account_error" ? "Spotify Premium is needed for full songs here." : "");
+        }
+      }
+      if (item.kind === "track") {
+        const url = await findFullStream(item.title, item.artist);
+        if (dead) return;
+        if (url) { setSrc(url); setEngine("audio"); return; }
+      }
+      if (!dead) { setEngine("embed"); setNote(n => n || (item.kind === "track" ? "No full version found — playing Spotify's preview." : "Connect Spotify (Premium) to play full playlists and albums.")); }
+    })();
+    return () => { dead = true; spotifyStop(); audioRef.current?.pause(); };
+  }, [item.id, item.kind]);
+
+  const a = audioRef.current;
+  const toggle = () => { if (engine === "spotify") void spotifyToggle(); else if (a) { a.paused ? void a.play() : a.pause(); } };
+  const paused = engine === "spotify" ? st.paused : st.paused;
+  const seek = (v: number) => { if (engine === "spotify") spotifySeek(v * 1000); else if (a) a.currentTime = v; };
+  const pos = engine === "spotify" ? st.position / 1000 : st.position;
+  const dur = engine === "spotify" ? st.duration / 1000 : st.duration;
+
+  return (
+    <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
+      className={`absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 rounded-3xl p-3 ${glass}`}>
+      <div className="mb-2 flex items-center gap-3">
+        {item.artwork && <img src={item.artwork} alt="" className="h-12 w-12 rounded-xl object-cover" />}
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="truncate text-xs text-white/60">{item.artist}</p></div>
+        <button onClick={() => openLink(`https://open.spotify.com/${item.kind}/${item.id}`)} aria-label="Open in Spotify" className="rounded-full p-1.5 hover:bg-white/10"><ExternalLink className="h-4 w-4" /></button>
+        <button onClick={onClose} aria-label="Close player" className="rounded-full p-1.5 hover:bg-white/10"><X className="h-4 w-4" /></button>
+      </div>
+      {engine === "loading" && <div className="flex items-center justify-center gap-2 py-4 text-xs text-white/60"><Loader2 className="h-4 w-4 animate-spin" />Finding the full song…</div>}
+      {engine === "embed" && <SpotifyEmbed key={`${item.kind}-${item.id}`} trackId={item.id} kind={item.kind} />}
+      {(engine === "spotify" || engine === "audio") && (
+        <>
+          {src && <audio ref={audioRef} src={src} autoPlay
+            onPlay={() => setSt(s => ({ ...s, paused: false }))} onPause={() => setSt(s => ({ ...s, paused: true }))}
+            onTimeUpdate={e => setSt(s => ({ ...s, position: e.currentTarget.currentTime, duration: e.currentTarget.duration || 0 }))}
+            onError={() => { setSrc(null); setEngine("embed"); setNote("Couldn't stream the full song — playing Spotify's preview."); }} />}
+          <input type="range" min={0} max={Math.max(1, dur)} step={1} value={Math.min(pos, dur || 0)} onChange={e => seek(Number(e.target.value))} className="w-full accent-emerald-400" aria-label="Seek" />
+          <div className="flex items-center justify-between text-[10px] text-white/50"><span>{fmt(pos)}</span><span>{fmt(dur)}</span></div>
+          <div className="mt-1 flex items-center justify-center gap-5">
+            {engine === "spotify" && <button onClick={() => void spotifyPrev()} aria-label="Previous"><SkipBack className="h-5 w-5" /></button>}
+            <button onClick={toggle} aria-label={paused ? "Play" : "Pause"} className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400 text-black active:scale-95">{paused ? <Play className="h-5 w-5 fill-current" /> : <Pause className="h-5 w-5 fill-current" />}</button>
+            {engine === "spotify" && <button onClick={() => void spotifyNext()} aria-label="Next"><SkipForward className="h-5 w-5" /></button>}
+          </div>
+        </>
+      )}
+      {note && <p className="mt-1 text-center text-[10px] text-white/55">{note}</p>}
+      {engine !== "loading" && <p className="mt-0.5 text-center text-[10px] text-emerald-300/70">{engine === "spotify" ? "Full song · Spotify Premium" : engine === "audio" ? "Full song · free stream" : "Preview"}</p>}
+    </motion.div>
+  );
+};
+
 const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const [kind, setKind] = useState<Kind>("track");
   const [query, setQuery] = useState("");
@@ -29,6 +107,8 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState<Item | null>(null);
   const reqId = useRef(0);
+  const [connected, setConnected] = useState(isSpotifyConnected());
+  useEffect(() => { if (open) setConnected(isSpotifyConnected()); }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -70,6 +150,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
               <h2 className="text-lg font-bold leading-tight">Prime Music</h2>
               <p className="text-[11px] text-white/60">Powered by Spotify</p>
             </div>
+            <button onClick={() => { if (connected) { disconnectSpotify(); setConnected(false); toast.success("Spotify disconnected"); } else void startSpotifyLogin().catch(() => toast.error("Spotify isn't configured yet.")); }} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${connected ? glass : "bg-emerald-400 text-black"}`}>{connected ? "Spotify ✓" : "Connect Spotify"}</button>
             <button onClick={onClose} aria-label="Close music" className={`flex h-10 w-10 items-center justify-center rounded-full ${glass}`}><X className="h-5 w-5" /></button>
           </div>
 
@@ -115,20 +196,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
             )}
           </div>
 
-          <AnimatePresence>
-            {now && (
-              <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
-                className={`absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 rounded-3xl p-3 ${glass}`}>
-                <div className="mb-2 flex items-center gap-2">
-                  <p className="min-w-0 flex-1 truncate text-xs text-white/70">Now playing · <span className="font-semibold text-white">{now.title}</span></p>
-                  <button onClick={() => openLink(`https://open.spotify.com/${now.kind}/${now.id}`)} aria-label="Open in Spotify" className="rounded-full p-1.5 hover:bg-white/10"><ExternalLink className="h-4 w-4" /></button>
-                  <button onClick={() => setNow(null)} aria-label="Close player" className="rounded-full p-1.5 hover:bg-white/10"><X className="h-4 w-4" /></button>
-                </div>
-                <SpotifyEmbed key={`${now.kind}-${now.id}`} trackId={now.id} kind={now.kind} />
-                <p className="mt-1 text-center text-[10px] text-white/50">Tap play in the Spotify player. Sign in to Spotify there for full songs; otherwise you hear a preview.</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <AnimatePresence>{now && <NowPlaying item={now} onClose={() => setNow(null)} />}</AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>
