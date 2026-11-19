@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { startRingtone } from "@/hooks/useRingtone";
-import { getRtcConfig } from "@/utils/iceConfig";
+import { loadRtcConfig } from "@/utils/iceConfig";
 import { rtcChannelName } from "@/utils/calls";
 import { Button } from "@/components/ui/button";
 
@@ -109,7 +109,7 @@ const CallPage = () => {
       invitationChannel = supabase.channel(`call-state-${callId}`).on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "call_invitations", filter: `id=eq.${callId}`,
       }, ({ new: row }) => { if (row.status === "ended" || row.status === "declined") hangUp(); }).subscribe();
-      const pc = new RTCPeerConnection(getRtcConfig());
+      const pc = new RTCPeerConnection(await loadRtcConfig());
       pcRef.current = pc;
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -151,6 +151,9 @@ const CallPage = () => {
             if (pcRef.current === pc && pc.connectionState !== "connected") hangUp();
           }, 6000);
           return;
+        }
+        if (s === "failed") {
+          toast.error("Couldn't connect the call — the network blocked it. Try Wi-Fi or another network.");
         }
         if (s === "failed" || s === "closed") hangUp();
       };

@@ -1,4 +1,6 @@
 import { lazy, Suspense } from "react";
+import PaystackReturn from "@/components/PaystackReturn";
+import InAppBrowser from "@/components/InAppBrowser";
 import NativeAuthBridge from "@/components/NativeAuthBridge";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
@@ -76,6 +78,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <NativeAuthBridge />
+        <PaystackReturn />
+        <InAppBrowser />
         <AuthProvider>
           <MuteProvider>
           <OnlineProvider>

@@ -39,3 +39,22 @@ export const getRtcConfig = (): RTCConfiguration => ({
   ...GOOGLE_RTC_CONFIG,
   iceServers: [{ urls: [...GOOGLE_STUN_URLS] }, ...TURN_SERVERS],
 });
+
+let cached: { at: number; servers: RTCIceServer[] } | null = null;
+
+/** Loads fresh TURN credentials (edge function) and merges them with STUN + fallbacks. */
+export const loadRtcConfig = async (): Promise<RTCConfiguration> => {
+  try {
+    if (!cached || Date.now() - cached.at > 10 * 60 * 1000) {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data } = await Promise.race([
+        supabase.functions.invoke("turn-credentials"),
+        new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), 4000)),
+      ]);
+      const servers = (data as { iceServers?: RTCIceServer[] } | null)?.iceServers;
+      cached = { at: Date.now(), servers: Array.isArray(servers) ? servers : [] };
+    }
+  } catch { cached = { at: Date.now() - 9 * 60 * 1000, servers: [] }; }
+  const extra = cached?.servers ?? [];
+  return { ...getRtcConfig(), iceServers: [...extra, { urls: [...GOOGLE_STUN_URLS] }, ...TURN_SERVERS] };
+};

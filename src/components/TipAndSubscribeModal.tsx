@@ -22,7 +22,7 @@ interface Props {
 
 const TITLES: Record<PayMode, string> = { tip: "Send a tip", subscription: "Subscribe", topup: "Top up wallet" };
 
-async function pollLedger(reference: string, tries = 20): Promise<boolean> {
+export async function pollLedger(reference: string, tries = 20): Promise<boolean> {
   for (let i = 0; i < tries; i++) {
     const { data } = await supabase.from("transactions" as never).select("reference").eq("reference", reference).maybeSingle();
     if (data) return true;
@@ -87,20 +87,11 @@ const TipAndSubscribeModal = ({ open, onOpenChange, mode, creatorId, creatorName
       if (!msg && error) { try { msg = (await (error as { context?: Response }).context?.json())?.error; } catch { /* ignore */ } }
       throw new Error(msg || "Couldn't start the payment");
     }
-    const reference: string = data.reference;
-    const { default: PaystackPop } = await import("@paystack/inline-js");
-    await new Promise<void>((resolve, reject) => {
-      new PaystackPop().resumeTransaction(data.access_code, {
-        onSuccess: () => resolve(),
-        onCancel: () => reject(new Error("Payment cancelled")),
-        onError: (e: { message?: string }) => reject(new Error(e?.message || "Payment failed")),
-      });
-    });
-    toast.loading("Confirming payment…", { id: "ps-confirm" });
-    const ok = await pollLedger(reference);
-    toast.dismiss("ps-confirm");
-    if (!ok) throw new Error("Payment received but not confirmed yet. It will appear shortly.");
-    finish(mode === "topup" ? "Wallet topped up" : mode === "tip" ? "Tip sent 🎉" : "Subscription unlocked 🎉");
+    // Full-page redirect to Paystack's hosted checkout (works in browsers and the Android app,
+    // and can't be blocked like an embedded popup). We verify on return in <PaystackReturn />.
+    try { localStorage.setItem("primegram:payReturn", JSON.stringify({ ref: data.reference, mode, path: window.location.pathname + window.location.search, at: Date.now() })); } catch { /* ignore */ }
+    window.location.assign(data.authorization_url);
+    await new Promise(() => undefined); // navigation in progress
   };
 
   const pay = async () => {
