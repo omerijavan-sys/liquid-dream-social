@@ -303,7 +303,7 @@ const ReelsPage = () => {
                   <video
                     ref={el => { if (el) videoRefs.current.set(i, el); }}
                     src={reel.video_url}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain bg-black"
                     loop
                     playsInline
                     muted={muted}
