@@ -96,9 +96,9 @@ export function initSpotifyPlayer(onState: (s: SpState) => void): Promise<string
 }
 
 export async function playOnSpotify(kind: "track" | "playlist" | "album", id: string) {
+  await player?.activateElement?.();
   const token = await spotifyToken();
   if (!token || !deviceId) throw new Error("not ready");
-  await player?.activateElement?.();
   const body = kind === "track" ? { uris: [`spotify:track:${id}`] } : { context_uri: `spotify:${kind}:${id}` };
   const r = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok && r.status !== 204) throw new Error(`play ${r.status}`);
