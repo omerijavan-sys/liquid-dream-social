@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Plus, Search, Sparkles, Layers, Music, Trophy, Gamepad2, Film, X, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +13,8 @@ const hubItems = [
 
 const PrimeHubPanel = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const [musicOpen, setMusicOpen] = useState(false);
+  const musicRef = useRef(false); musicRef.current = musicOpen;
+  useEffect(() => { const b = (e: Event) => { const d = (e as CustomEvent).detail; if (d && !d.handled && musicRef.current) { d.handled = true; setMusicOpen(false); } }; window.addEventListener("prime:back", b); return () => window.removeEventListener("prime:back", b); }, []);
   useEffect(() => { const f = () => setMusicOpen(true); window.addEventListener("prime:openMusic", f); return () => window.removeEventListener("prime:openMusic", f); }, []);
   const navigate = useNavigate();
 

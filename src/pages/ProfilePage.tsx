@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import VideoThumb from "@/components/VideoThumb";
+import MediaViewer from "@/components/MediaViewer";
 import { motion } from "framer-motion";
 import { ArrowLeft, Settings, Sparkles, BarChart3, BadgeDollarSign, Grid3X3, Bookmark, Heart, Camera, Film, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -241,7 +242,7 @@ const ProfilePage = () => {
       ) : (
         <div className="prime-profile-grid grid grid-cols-3 gap-0.5 p-0.5">
           {shown.map((post, i) => (
-            <motion.button type="button" key={post.id} onClick={() => setSelectedMedia(post)} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
+            <motion.button type="button" key={post.id} onClick={() => (tab === "reels" ? navigate(`/reels?r=${post.id}`) : setSelectedMedia(post))} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
               {post.media_type === "video" ? (
                 <VideoThumb src={post.media_url} poster={post.thumbnail_url} />
               ) : (
@@ -261,24 +262,11 @@ const ProfilePage = () => {
           {profile?.avatar_url ? <img src={profile.avatar_url} alt="Profile picture" className="max-h-full max-w-full object-contain" /> : <p className="text-white">No profile picture</p>}
         </DialogContent>
       </Dialog>
-      <Dialog open={!!selectedMedia} onOpenChange={open => { if (!open) setSelectedMedia(null); }}>
-        <DialogContent className="flex h-dvh w-screen max-w-none flex-col rounded-none border-0 bg-background p-0 [&>button]:hidden">
-          <DialogTitle className="sr-only">{tab === "reels" ? "Reel" : "Post"}</DialogTitle>
-          <div className="flex items-center justify-end p-3">
-            <button onClick={() => setSelectedMedia(null)} aria-label="Close media" className="rounded-full p-2 text-foreground">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center bg-black/20">
-            {selectedMedia?.media_type === "video" ? (
-              <video src={selectedMedia.media_url} controls autoPlay playsInline className="max-h-full max-w-full object-contain" />
-            ) : selectedMedia?.media_url ? (
-              <img src={selectedMedia.media_url} alt="" className="max-h-full max-w-full object-contain" />
-            ) : <p className="p-6 text-center text-foreground">{selectedMedia?.caption}</p>}
-          </div>
-          {selectedMedia?.caption && <p className="p-4 text-sm text-foreground">{selectedMedia.caption}</p>}
-        </DialogContent>
-      </Dialog>
+      <MediaViewer onClose={() => setSelectedMedia(null)} post={selectedMedia ? {
+        id: selectedMedia.id, media_url: selectedMedia.media_url ?? selectedMedia.video_url ?? null, media_type: selectedMedia.media_type ?? (selectedMedia.video_url ? "video" : "image"),
+        caption: selectedMedia.caption, author: profile?.display_name || profile?.username, likes_count: selectedMedia.likes_count ?? 0, views_count: selectedMedia.views_count ?? 0,
+        music: selectedMedia.music_title ? { title: selectedMedia.music_title, artist: selectedMedia.music_artist, art_url: selectedMedia.music_art_url, stream_url: selectedMedia.music_url, youtube_id: selectedMedia.music_youtube_id } : null,
+      } : null} />
       <GlassTabBar goldStyle />
     </div>
   );

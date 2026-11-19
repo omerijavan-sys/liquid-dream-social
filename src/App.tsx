@@ -1,6 +1,9 @@
 import { lazy, Suspense } from "react";
 import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
+import NativePush from "@/components/NativePush";
+import BackButtonHandler from "@/components/BackButtonHandler";
+import MiniPlayer from "@/components/MiniPlayer";
 import InAppBrowser from "@/components/InAppBrowser";
 import NativeAuthBridge from "@/components/NativeAuthBridge";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -79,13 +82,16 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <NativeAuthBridge />
+        <BackButtonHandler />
         <PaystackReturn />
         <SpotifyCallback />
+        <MiniPlayer />
         <InAppBrowser />
         <AuthProvider>
           <MuteProvider>
           <OnlineProvider>
           <GlobalRealtimeListener />
+          <NativePush />
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
           <Routes>
             <Route path="/welcome" element={<AuthRoute><WelcomePage /></AuthRoute>} />

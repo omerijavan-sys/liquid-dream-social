@@ -10,6 +10,8 @@ import CommentsSection from "@/components/CommentsSection";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useVideoPoster } from "@/utils/videoPoster";
+import MediaViewer from "@/components/MediaViewer";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import ShareSheet from "@/components/ShareSheet";
 import type { PostMusic } from "@/components/PostMusicPlayer";
@@ -51,6 +53,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
   );
 
 const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, music, views = 0 }: FeedPostProps) => {
+  const coverImg = useVideoPoster(mediaType === "video" ? image : null, poster);
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
   const [me, setMe] = useState<string | null>(null);
@@ -229,13 +232,15 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
           <button onClick={openProfile} aria-label={`Open ${username}'s profile`} className="depth-press">
             <Avatar avatar={avatar} username={username} />
           </button>
-          <button onClick={openProfile} className="flex-1 min-w-0 text-left">
-            <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1">
-              {username}
-              <VerifiedBadge isVerified={isVerified} isOfficial={isOfficial} />
-            </p>
-            <p className="text-caption text-muted-foreground">{timeAgo}</p>
-          </button>
+          <div className="flex-1 min-w-0 text-left">
+            <button onClick={openProfile} className="block max-w-full text-left">
+              <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1">
+                {username}
+                <VerifiedBadge isVerified={isVerified} isOfficial={isOfficial} />
+              </p>
+            </button>
+            {music?.title ? <PostMusicPlayer music={music} /> : <p className="text-caption text-muted-foreground">{timeAgo}</p>}
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button aria-label="Post options" className="depth-press w-8 h-8 flex items-center justify-center rounded-full liquid-glass-subtle">
@@ -265,8 +270,8 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
             <div className="relative w-full">
               <video
                 ref={videoRef}
-                src={poster ? image : `${image}#t=0.1`}
-                poster={poster || undefined}
+                src={coverImg ? image : `${image}#t=0.1`}
+                poster={coverImg}
                 className="w-full h-auto max-h-[75vh] object-contain bg-background"
                 playsInline
                 muted={muted}
@@ -280,11 +285,6 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               {videoLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/40 pointer-events-none">
                   <Loader2 className="w-10 h-10 text-foreground animate-spin" />
-                </div>
-              )}
-              {!isVisible && !videoLoading && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-16 h-16 rounded-full liquid-glass flex items-center justify-center"><Play className="w-8 h-8 text-foreground" /></div>
                 </div>
               )}
               <button
@@ -337,8 +337,6 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
             </button>
           )}
         </div>
-
-        {music?.title && <PostMusicPlayer music={music} />}
 
         <div className="p-4 relative z-10">
           <div className="flex items-center gap-4 mb-3">
@@ -393,7 +391,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
       </Dialog>
 
       {/* Full-screen post */}
-      <Dialog open={fullPost} onOpenChange={setFullPost}>
+      <Dialog open={fullPost && !(isVideo && !!postId)} onOpenChange={setFullPost}>
         <DialogContent className="max-w-none w-screen h-dvh p-0 border-0 rounded-none bg-background/95 flex flex-col [&>button]:hidden">
           <DialogTitle className="sr-only">Post by {username}</DialogTitle>
           <div className="flex items-center gap-3 p-4">
@@ -411,7 +409,6 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
                 ? <video src={image} controls autoPlay playsInline muted={muted} className="max-w-full max-h-full object-contain" />
                 : <img src={image} alt={`Post by ${username}`} className="max-w-full max-h-full object-contain" />}
           </div>
-          {music?.title && <PostMusicPlayer music={music} />}
           <div className="p-4 space-y-2 max-h-[40vh] overflow-y-auto">
             <div className="flex items-center gap-4">
               <button onClick={() => setLike(!liked)} aria-label="Like"><Heart className={`w-6 h-6 ${liked ? "fill-like text-like" : "text-foreground"}`} /></button>
@@ -426,6 +423,9 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
           </div>
         </DialogContent>
       </Dialog>
+      {isVideo && postId && fullPost && (
+        <MediaViewer onClose={() => setFullPost(false)} post={{ id: postId, media_url: image, media_type: "video", caption, author: username, likes_count: likeCount, views_count: viewCount, music: music ?? null }} />
+      )}
       {postId && <ShareSheet open={shareOpen} onOpenChange={setShareOpen} target={{ kind: "post", id: postId, mediaUrl: image, mediaType, caption, username, link: postLink }} />}
     </motion.div>
   );

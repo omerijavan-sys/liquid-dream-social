@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import VideoThumb from "@/components/VideoThumb";
+import MediaViewer from "@/components/MediaViewer";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2, X } from "lucide-react";
@@ -340,43 +341,11 @@ const PublicProfilePage = () => {
         )}
       </main>
 
-      <Dialog open={!!selectedPost} onOpenChange={closePost}>
-        <DialogContent className="flex h-dvh w-screen max-w-none flex-col rounded-none border-0 bg-background p-0 [&>button]:hidden">
-          <DialogTitle className="sr-only">Post by {profile?.display_name || profile?.username}</DialogTitle>
-          <div className="flex items-center justify-between p-4">
-            <span className="font-semibold text-foreground">{profile?.display_name || profile?.username}</span>
-            <button onClick={() => setSelectedPost(null)} aria-label="Close post" className="depth-press">
-              <X className="h-5 w-5 text-foreground" />
-            </button>
-          </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center bg-black/20">
-            {selectedPost?.media_type === "video" ? (
-              <video src={selectedPost.media_url || undefined} controls autoPlay playsInline className="max-h-full max-w-full object-contain" />
-            ) : selectedPost?.media_url ? (
-              <img src={selectedPost.media_url} alt="" className="max-h-full max-w-full object-contain" />
-            ) : (
-              <p className="p-6 text-center text-foreground">{selectedPost?.caption}</p>
-            )}
-          </div>
-          <div className="max-h-[42vh] space-y-3 overflow-y-auto p-4">
-            {selectedPost?.music_title && (
-              <PostMusicPlayer music={{
-                title: selectedPost.music_title,
-                artist: selectedPost.music_artist,
-                art_url: selectedPost.music_art_url,
-                stream_url: selectedPost.music_url,
-                youtube_id: selectedPost.music_youtube_id,
-              }} />
-            )}
-            {selectedPost?.caption && <p className="text-sm text-foreground">{selectedPost.caption}</p>}
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Eye className="h-3.5 w-3.5" /> {selectedViews.toLocaleString()} views
-              <span className="mx-1">·</span>{(selectedPost?.likes_count ?? 0).toLocaleString()} likes
-            </p>
-            {selectedPost && <CommentsSection postId={selectedPost.id} onCountChange={() => {}} />}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <MediaViewer onClose={() => setSelectedPost(null)} post={selectedPost ? {
+        id: selectedPost.id, media_url: selectedPost.media_url, media_type: selectedPost.media_type, caption: selectedPost.caption,
+        author: profile?.display_name || profile?.username, likes_count: selectedPost.likes_count, views_count: selectedViews,
+        music: selectedPost.music_title ? { title: selectedPost.music_title, artist: selectedPost.music_artist, art_url: selectedPost.music_art_url, stream_url: selectedPost.music_url, youtube_id: selectedPost.music_youtube_id } : null,
+      } : null} />
       <GlassTabBar />
       {creatorPrice !== null && userId && (
         <TipAndSubscribeModal open={subModalOpen} onOpenChange={setSubModalOpen} mode="subscription" creatorId={userId} creatorName={profile?.display_name || profile?.username || "creator"} price={creatorPrice}

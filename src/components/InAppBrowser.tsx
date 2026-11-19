@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, Copy, RefreshCw, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { openLink } from "@/utils/openLink";
@@ -9,6 +9,8 @@ const OWN_HOSTS = [window.location.host];
 const InAppBrowser = () => {
   const [url, setUrl] = useState<string | null>(null);
   const [key, setKey] = useState(0);
+  const urlRef = useRef<string | null>(null);
+  urlRef.current = url;
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -23,9 +25,11 @@ const InAppBrowser = () => {
       e.preventDefault();
       void openLink(u.toString());
     };
+    const onBack = (e: Event) => { const d = (e as CustomEvent).detail; if (d && !d.handled && urlRef.current) { d.handled = true; setUrl(null); } };
+    window.addEventListener("prime:back", onBack);
     window.addEventListener("prime:openLink", onOpen);
     document.addEventListener("click", onClick, true);
-    return () => { window.removeEventListener("prime:openLink", onOpen); document.removeEventListener("click", onClick, true); };
+    return () => { window.removeEventListener("prime:back", onBack); window.removeEventListener("prime:openLink", onOpen); document.removeEventListener("click", onClick, true); };
   }, []);
 
   useEffect(() => {

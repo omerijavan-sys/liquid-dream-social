@@ -15,14 +15,14 @@ const VerifiedBadge = ({ isVerified, isOfficial, className }: VerifiedBadgeProps
         title="Official Primegram account"
         className={cn("inline-flex items-center align-middle", className)}
       >
-        <ShieldCheck className="h-4 w-4 text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.8)]" />
+        <ShieldCheck className="h-4 w-4 text-[#F5B800] drop-shadow-[0_0_6px_rgba(245,184,0,0.8)]" />
       </span>
     );
   }
   if (!isVerified) return null;
   return (
     <span title="Verified" className={cn("inline-flex items-center align-middle", className)}>
-      <BadgeCheck className="h-4 w-4 text-primary" />
+      <BadgeCheck className="h-4 w-4 text-[#1D9BF0]" />
     </span>
   );
 };

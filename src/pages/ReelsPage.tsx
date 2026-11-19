@@ -1,3 +1,4 @@
+import { useMute } from "@/contexts/MuteContext";
 import ShareSheet from "@/components/ShareSheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,7 +38,7 @@ const ReelsPage = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   // Start muted so browsers allow scroll-triggered autoplay. Users can enable
   // sound with the volume button after playback has started.
-  const [muted, setMuted] = useState(true);
+  const { muted, toggleMuted } = useMute();
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -350,7 +351,7 @@ const ReelsPage = () => {
                   </button>
                 )}
                 <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
-                <button onClick={(e) => { e.stopPropagation(); setMuted(!muted); }} className="depth-press">
+                <button onClick={(e) => { e.stopPropagation(); toggleMuted(); }} className="depth-press">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
                     {muted ? <VolumeX className="h-5 w-5 text-amber-100" /> : <Volume2 className="h-5 w-5 text-amber-100" />}
                   </div>
