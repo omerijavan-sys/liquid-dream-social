@@ -30,19 +30,22 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).p
 const NowPlaying = ({ item, onClose }: { item: Item; onClose: () => void }) => {
   const [engine, setEngine] = useState<"loading" | "spotify" | "audio" | "embed">("loading");
   const [note, setNote] = useState("");
-  const [st, setSt] = useState<SpState>({ paused: false, position: 0, duration: 0 });
+  const [st, setSt] = useState<SpState>({ paused: true, position: 0, duration: 0 });
   const [src, setSrc] = useState<string | null>(null);
+  const [spotifyStarted, setSpotifyStarted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     let dead = false;
-    setEngine("loading"); setNote(""); setSrc(null); setSt({ paused: false, position: 0, duration: 0 });
+    setEngine("loading"); setNote(""); setSrc(null); setSpotifyStarted(false); setSt({ paused: true, position: 0, duration: 0 });
     (async () => {
       if (isSpotifyConnected()) {
         try {
           await initSpotifyPlayer((s) => { if (!dead) setSt(s); });
-          await playOnSpotify(item.kind, item.id);
-          if (!dead) setEngine("spotify");
+          if (!dead) {
+            setEngine("spotify");
+            setNote("Ready for full playback. Press play to start on Spotify.");
+          }
           return;
         } catch (e) {
           const m = e instanceof Error ? e.message : "";
@@ -60,7 +63,19 @@ const NowPlaying = ({ item, onClose }: { item: Item; onClose: () => void }) => {
   }, [item.id, item.kind]);
 
   const a = audioRef.current;
-  const toggle = () => { if (engine === "spotify") void spotifyToggle(); else if (a) { a.paused ? void a.play() : a.pause(); } };
+  const toggle = () => {
+    if (engine === "spotify") {
+      if (spotifyStarted) {
+        void spotifyToggle();
+        return;
+      }
+      void playOnSpotify(item.kind, item.id)
+        .then(() => { setSpotifyStarted(true); setSt((state) => ({ ...state, paused: false })); setNote(""); })
+        .catch(() => setNote("Spotify could not start playback. Confirm the connected account is Premium, then try again."));
+      return;
+    }
+    if (a) { a.paused ? void a.play() : a.pause(); }
+  };
   const paused = engine === "spotify" ? st.paused : st.paused;
   const seek = (v: number) => { if (engine === "spotify") spotifySeek(v * 1000); else if (a) a.currentTime = v; };
   const pos = engine === "spotify" ? st.position / 1000 : st.position;
