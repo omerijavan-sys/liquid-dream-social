@@ -3,7 +3,12 @@ import { findFullStream } from "./FullTrack";
 import { spotifyStop } from "./SpotifyConnect";
 
 export interface EngineTrack { key: string; title: string; artist: string; artwork?: string | null; url?: string; yt?: string }
-export interface EngineState { track: EngineTrack | null; paused: boolean; loading: boolean; error: string | null; pos: number; dur: number }
+export interface EngineState { track: EngineTrack | null; paused: boolean; loading: boolean; error: string | null; pos: number; dur: number; hasQueue?: boolean }
+
+let queueH: { next?: () => void; prev?: () => void } | null = null;
+export const setQueueHandlers = (h: { next?: () => void; prev?: () => void } | null) => { queueH = h; set({ hasQueue: !!h }); };
+export const nextTrack = () => queueH?.next?.();
+export const prevTrack = () => queueH?.prev?.();
 
 let state: EngineState = { track: null, paused: true, loading: false, error: null, pos: 0, dur: 0 };
 const subs = new Set<() => void>();
@@ -20,7 +25,7 @@ const el = (): HTMLAudioElement => {
   audio.addEventListener("waiting", () => set({ loading: true }));
   audio.addEventListener("playing", () => set({ loading: false, paused: false }));
   audio.addEventListener("timeupdate", () => set({ pos: audio!.currentTime, dur: audio!.duration || 0 }));
-  audio.addEventListener("ended", () => set({ paused: true, pos: 0 }));
+  audio.addEventListener("ended", () => { set({ paused: true, pos: 0 }); queueH?.next?.(); });
   audio.addEventListener("error", () => set({ loading: false, paused: true, error: "This track couldn't be played." }));
   return audio;
 };
@@ -34,6 +39,7 @@ const media = (t: EngineTrack | null) => {
   ms.setActionHandler("pause", () => { if (mode === "yt") yt?.pauseVideo(); else el().pause(); });
   ms.setActionHandler("seekto", (d) => { if (d.seekTime != null) seekMusic(d.seekTime); });
   ms.setActionHandler("stop", () => stopMusic());
+  try { ms.setActionHandler("nexttrack", () => queueH?.next?.()); ms.setActionHandler("previoustrack", () => queueH?.prev?.()); } catch { /* unsupported */ }
 };
 
 // ---- YouTube embedded player (full-length songs for everyone, audio only) ----
@@ -47,7 +53,7 @@ const loadYT = () => (ytPromise ??= new Promise<any>((resolve, reject) => {
     const inner = document.createElement("div"); host.appendChild(inner); document.body.appendChild(host);
     new w.YT.Player(inner, { height: "200", width: "200", playerVars: { autoplay: 1, playsinline: 1, controls: 0, rel: 0, origin: location.origin }, events: {
       onReady: (e: any) => resolve(e.target),
-      onStateChange: (e: any) => { const c = e.data; if (c === 1) set({ paused: false, loading: false }); else if (c === 2) set({ paused: true }); else if (c === 3) set({ loading: true }); else if (c === 0) set({ paused: true, pos: 0 }); },
+      onStateChange: (e: any) => { const c = e.data; if (c === 1) set({ paused: false, loading: false }); else if (c === 2) set({ paused: true }); else if (c === 3) set({ loading: true }); else if (c === 0) { set({ paused: true, pos: 0 }); queueH?.next?.(); } },
       onError: () => set({ loading: false, paused: true, error: "This track couldn't be played." }),
     } });
   };

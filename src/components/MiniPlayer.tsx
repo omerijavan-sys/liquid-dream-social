@@ -1,5 +1,5 @@
-import { Pause, Play, X, Music2, Loader2 } from "lucide-react";
-import { useMusic, toggleMusic, stopMusic } from "@/services/MusicEngine";
+import { Pause, Play, X, Music2, Loader2, SkipBack, SkipForward } from "lucide-react";
+import { useMusic, toggleMusic, stopMusic, nextTrack, prevTrack } from "@/services/MusicEngine";
 
 /** Floating mini player: keeps music controllable on every screen while it plays in the background. */
 const MiniPlayer = () => {
@@ -12,9 +12,11 @@ const MiniPlayer = () => {
         <p className="truncate text-sm font-semibold">{m.track.title}</p>
         <p className="truncate text-[11px] text-white/60">{m.error ?? m.track.artist}</p>
       </div>
+      {m.hasQueue && <button onClick={prevTrack} aria-label="Previous song" className="text-white/80"><SkipBack className="h-4 w-4" /></button>}
       <button onClick={toggleMusic} aria-label={m.paused ? "Play" : "Pause"} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black active:scale-95">
         {m.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : m.paused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4 fill-current" />}
       </button>
+      {m.hasQueue && <button onClick={nextTrack} aria-label="Next song" className="text-white/80"><SkipForward className="h-4 w-4" /></button>}
       <button onClick={stopMusic} aria-label="Close player" className="text-white/60"><X className="h-4 w-4" /></button>
     </div>
   );
