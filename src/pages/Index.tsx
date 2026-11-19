@@ -189,6 +189,8 @@ const Index = () => {
                   art_url: post.music_art_url,
                   stream_url: post.music_url,
                   youtube_id: post.music_youtube_id,
+                  start: (post as any).music_start,
+                  len: (post as any).music_len,
                 } : null}
               />
             ))

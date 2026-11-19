@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Music2, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import { searchGlobalMusic } from "@/services/GlobalMusicService";
-import { getMusicState, playSong, playUrl, toggleMusic, useMusic } from "@/services/MusicEngine";
+import { getMusicState, playSong, playUrl, seekMusic, toggleMusic, useMusic } from "@/services/MusicEngine";
 
 export interface PostMusic {
   title: string;
@@ -10,6 +10,8 @@ export interface PostMusic {
   art_url?: string | null;
   stream_url?: string | null;
   youtube_id?: string | null;
+  start?: number | null;
+  len?: number | null;
 }
 
 /** Instagram-style music line shown under the profile name, with a small play/pause button. */
@@ -21,6 +23,17 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const userPaused = useRef(false);
   const visible = useRef(false);
+  const start0 = music.start ?? 0;
+  const len0 = music.len ?? 30;
+  const seeked = useRef(false);
+
+  // jump to the poster's chosen section, and loop just that section
+  useEffect(() => {
+    if (!mine || m.paused) { if (!mine) seeked.current = false; return; }
+    if (!seeked.current && start0 > 0) { seekMusic(start0); seeked.current = true; return; }
+    seeked.current = true;
+    if (m.pos >= start0 + len0) seekMusic(start0);
+  }, [mine, m.paused, m.pos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = async () => {
     try {

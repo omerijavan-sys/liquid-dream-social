@@ -344,7 +344,7 @@ const PublicProfilePage = () => {
       <MediaViewer onClose={() => setSelectedPost(null)} post={selectedPost ? {
         id: selectedPost.id, media_url: selectedPost.media_url, media_type: selectedPost.media_type, caption: selectedPost.caption,
         author: profile?.display_name || profile?.username, likes_count: selectedPost.likes_count, views_count: selectedViews,
-        music: selectedPost.music_title ? { title: selectedPost.music_title, artist: selectedPost.music_artist, art_url: selectedPost.music_art_url, stream_url: selectedPost.music_url, youtube_id: selectedPost.music_youtube_id } : null,
+        music: selectedPost.music_title ? { title: selectedPost.music_title, artist: selectedPost.music_artist, art_url: selectedPost.music_art_url, stream_url: selectedPost.music_url, youtube_id: selectedPost.music_youtube_id, start: (selectedPost as any).music_start, len: (selectedPost as any).music_len } : null,
       } : null} />
       <GlassTabBar />
       {creatorPrice !== null && userId && (

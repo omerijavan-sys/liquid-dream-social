@@ -265,7 +265,7 @@ const ProfilePage = () => {
       <MediaViewer onClose={() => setSelectedMedia(null)} post={selectedMedia ? {
         id: selectedMedia.id, media_url: selectedMedia.media_url ?? selectedMedia.video_url ?? null, media_type: selectedMedia.media_type ?? (selectedMedia.video_url ? "video" : "image"),
         caption: selectedMedia.caption, author: profile?.display_name || profile?.username, likes_count: selectedMedia.likes_count ?? 0, views_count: selectedMedia.views_count ?? 0,
-        music: selectedMedia.music_title ? { title: selectedMedia.music_title, artist: selectedMedia.music_artist, art_url: selectedMedia.music_art_url, stream_url: selectedMedia.music_url, youtube_id: selectedMedia.music_youtube_id } : null,
+        music: selectedMedia.music_title ? { title: selectedMedia.music_title, artist: selectedMedia.music_artist, art_url: selectedMedia.music_art_url, stream_url: selectedMedia.music_url, youtube_id: selectedMedia.music_youtube_id, start: selectedMedia.music_start, len: selectedMedia.music_len } : null,
       } : null} />
       <GlassTabBar goldStyle />
     </div>

@@ -4,7 +4,7 @@ import { useMusic, toggleMusic, stopMusic, nextTrack, prevTrack } from "@/servic
 /** Floating mini player: keeps music controllable on every screen while it plays in the background. */
 const MiniPlayer = () => {
   const m = useMusic();
-  if (!m.track || m.track.key.startsWith("post|")) return null; // post music plays silently, no tab
+  if (!m.track || (m.track.key.startsWith("post|") || m.track.key.startsWith("clip|"))) return null; // post music plays silently, no tab
   return (
     <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[60] mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-white/15 bg-black/70 p-2 pr-3 text-white shadow-2xl backdrop-blur-2xl">
       {m.track.artwork ? <img src={m.track.artwork} alt="" className="h-10 w-10 rounded-xl object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><Music2 className="h-5 w-5" /></span>}
