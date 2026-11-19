@@ -33,6 +33,7 @@ jobs:
           VITE_SUPABASE_URL: https://kfvoqwbfgptqrrkyhorj.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_yFGklkV-V-QEFX7i8bWnbw_TvK-v02f
           VITE_SUPABASE_PROJECT_ID: kfvoqwbfgptqrrkyhorj
+          VITE_APP_BUILD: ${{ github.run_number }}
 
       - name: Add Firebase config (enables phone notifications)
         env:

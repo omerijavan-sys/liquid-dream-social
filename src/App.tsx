@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
 import NativePush from "@/components/NativePush";
+import UpdateChecker from "@/components/UpdateChecker";
 import BackButtonHandler from "@/components/BackButtonHandler";
 import MiniPlayer from "@/components/MiniPlayer";
 import InAppBrowser from "@/components/InAppBrowser";
@@ -83,6 +84,7 @@ const App = () => (
       <BrowserRouter>
         <NativeAuthBridge />
         <BackButtonHandler />
+        <UpdateChecker />
         <PaystackReturn />
         <SpotifyCallback />
         <MiniPlayer />
