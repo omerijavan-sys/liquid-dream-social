@@ -1,12 +1,17 @@
+import ShareSheet from "@/components/ShareSheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2, Download, Flag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import CreatorTipButton from "@/components/CreatorTipButton";
+import { runInBackground } from "@/utils/backgroundUpload";
+import { uploadVideoCover } from "@/utils/videoThumb";
+import { suggestCaptions } from "@/utils/aiCaption";
+import { readContentPrefs } from "@/components/SettingsExtras";
 
 const REEL_BATCH_SIZE = 20;
 
@@ -17,6 +22,12 @@ const ReelsPage = () => {
   const [caption, setCaption] = useState("");
   const [musicTitle, setMusicTitle] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [opts, setOpts] = useState(() => { const p = readContentPrefs(); return { allow_comments: p.reelDefaultComments, allow_download: p.reelDefaultDownload, hide_likes: false, visibility: "public" as "public" | "followers" }; });
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [heartBurst, setHeartBurst] = useState<{ id: string; k: number } | null>(null);
+  const lastTap = useRef<{ t: number; id: string }>({ t: 0, id: "" });
+  const prefs = readContentPrefs();
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [reels, setReels] = useState<any[]>([]);
@@ -35,6 +46,24 @@ const ReelsPage = () => {
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const reelIds = reels.map(reel => reel.id);
+  const deepLinkDone = useRef(false);
+
+  // Deep link: /reels?r=<id> scrolls to the shared reel once loaded.
+  useEffect(() => {
+    if (deepLinkDone.current || reels.length === 0) return;
+    const target = new URLSearchParams(window.location.search).get("r");
+    if (!target) { deepLinkDone.current = true; return; }
+    const idx = reels.findIndex(r => r.id === target);
+    if (idx >= 0) {
+      deepLinkDone.current = true;
+      requestAnimationFrame(() => {
+        const el = containerRef.current?.children[idx] as HTMLElement | undefined;
+        el?.scrollIntoView({ block: "start" });
+      });
+    } else if (hasMoreRef.current && !loadingRef.current) {
+      void fetchReels(false);
+    }
+  }, [reels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchReels = useCallback(async (reset = false) => {
     if (loadingRef.current || (!reset && !hasMoreRef.current)) return;
@@ -104,24 +133,63 @@ const ReelsPage = () => {
     }
   };
 
-  const handleCreateReel = async () => {
+  const handleCreateReel = () => {
     if (!user || !videoFile) { toast.error("Select a video"); return; }
-    setUploading(true);
-    try {
-      const ext = videoFile.name.split(".").pop();
-      const path = `${user.id}/reel_${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("media").upload(path, videoFile);
+    const snap = { file: videoFile, caption, musicTitle, opts, uid: user.id };
+    setCreating(false); setCaption(""); setMusicTitle(""); setVideoFile(null); setVideoPreview(null); setSuggestions([]);
+    runInBackground("Uploading your reel", async (progress) => {
+      progress("Preparing cover…");
+      const thumbnail_url = await uploadVideoCover(snap.uid, snap.file);
+      progress("Uploading reel…");
+      const ext = snap.file.name.split(".").pop();
+      const path = `${snap.uid}/reel_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("media").upload(path, snap.file);
       if (uploadErr) throw uploadErr;
       const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
-      const { error } = await supabase.from("reels").insert({ user_id: user.id, caption: caption || null, music_title: musicTitle || null, video_url: publicUrl });
+      const { error } = await supabase.from("reels").insert({ user_id: snap.uid, caption: snap.caption || null, music_title: snap.musicTitle || null, video_url: publicUrl, thumbnail_url, ...snap.opts } as any);
       if (error) throw error;
-      toast.success("Reel posted!");
-      setCreating(false); setCaption(""); setMusicTitle(""); setVideoFile(null); setVideoPreview(null);
-      await fetchReels(true);
-    } catch (err: any) {
-      toast.error(err.message || "Failed");
-    } finally { setUploading(false); }
+    }, () => { void fetchReels(true); });
+    toast.info("Uploading in the background — keep browsing");
   };
+
+  const downloadReel = async (reel: any) => {
+    if (!reel.allow_download && reel.user_id !== user?.id) { toast.error("The creator turned off downloads"); return; }
+    const t = toast.loading("Downloading reel…");
+    try {
+      const blob = await (await fetch(reel.video_url)).blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `primegram-reel-${reel.id.slice(0, 8)}.mp4`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast.success("Saved to your downloads", { id: t });
+    } catch { toast.error("Couldn't download this reel", { id: t }); }
+  };
+
+  const reportReel = async (reel: any) => {
+    if (!user) return;
+    const { error } = await supabase.from("reports").insert({ reporter_id: user.id, target_type: "reel", target_id: reel.id, reason: "Reported from reels" } as any);
+    if (error) toast.error("Couldn't send the report"); else toast.success("Thanks — we'll review this reel");
+  };
+
+  // Shake the phone to report the reel on screen.
+  useEffect(() => {
+    if (!prefs.shakeToReport) return;
+    let last = 0, lastReport = 0;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const a = e.accelerationIncludingGravity; if (!a) return;
+      const force = Math.abs(a.x ?? 0) + Math.abs(a.y ?? 0) + Math.abs(a.z ?? 0);
+      const now = Date.now();
+      if (force > 38 && now - last > 400) {
+        last = now;
+        const reel = reels[currentIndex];
+        if (reel && now - lastReport > 8000 && window.confirm("Report this reel?")) { lastReport = Date.now(); void reportReel(reel); }
+        else lastReport = Date.now();
+      }
+    };
+    window.addEventListener("devicemotion", onMotion);
+    return () => window.removeEventListener("devicemotion", onMotion);
+  }, [reels, currentIndex, prefs.shakeToReport, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [openComments, setOpenComments] = useState<string | null>(null);
@@ -168,14 +236,8 @@ const ReelsPage = () => {
     loadComments(openComments);
   };
 
-  const shareReel = async (reel: any) => {
-    const url = `${window.location.origin}/reels?r=${reel.id}`;
-    try {
-      if (navigator.share) await navigator.share({ title: "Primegram Reel", text: reel.caption || "Watch this reel", url });
-      else { await navigator.clipboard.writeText(url); toast.success("Link copied"); }
-    } catch { /* cancelled */ }
-  };
-
+  const [shareReelTarget, setShareReelTarget] = useState<any | null>(null);
+  const shareReel = (reel: any) => { setShareReelTarget(reel); };
   return (
     <div className="min-h-screen overflow-hidden bg-[#080b14] text-white [background-image:radial-gradient(ellipse_at_24%_16%,rgba(168,85,247,.2),transparent_35%),radial-gradient(ellipse_at_88%_22%,rgba(34,211,238,.18),transparent_33%),radial-gradient(ellipse_at_73%_88%,rgba(212,175,55,.16),transparent_36%)]">
       {/* Header */}
@@ -215,6 +277,15 @@ const ReelsPage = () => {
               <div
                 className="relative h-[min(74vh,720px)] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#100c08] shadow-[0_18px_70px_rgba(0,0,0,.42)] md:ml-9 md:w-[calc(100%_-_6rem)] md:rounded-[2.6rem]"
                 onClick={() => {
+                  const now = Date.now();
+                  if (prefs.doubleTapLike && lastTap.current.id === reel.id && now - lastTap.current.t < 320) {
+                    lastTap.current = { t: 0, id: "" };
+                    if (!liked.has(reel.id)) void toggleLike(reel.id);
+                    setHeartBurst({ id: reel.id, k: now });
+                    setTimeout(() => setHeartBurst(h => (h && h.k === now ? null : h)), 800);
+                    return;
+                  }
+                  lastTap.current = { t: now, id: reel.id };
                   const video = videoRefs.current.get(i);
                   if (!video) return;
                   if (video.paused) video.play().catch(() => {});
@@ -230,8 +301,14 @@ const ReelsPage = () => {
                     playsInline
                     muted={muted}
                     autoPlay={i === 0}
+                    poster={reel.thumbnail_url || undefined}
                     preload={Math.abs(i - currentIndex) <= 1 ? "auto" : "none"}
                   />
+                )}
+                {heartBurst?.id === reel.id && (
+                  <motion.div key={heartBurst.k} initial={{ scale: 0.3, opacity: 1 }} animate={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.8 }} className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <Heart className="h-24 w-24 fill-rose-500 text-rose-500 drop-shadow-[0_0_20px_rgba(244,63,94,.8)]" />
+                  </motion.div>
                 )}
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/15" />
                 {reel.user_id === user?.id && (
@@ -249,9 +326,9 @@ const ReelsPage = () => {
                   <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
                     <Heart className={`h-5 w-5 ${liked.has(reel.id) ? "fill-rose-400 text-rose-400" : "text-amber-100"}`} />
                   </div>
-                  <span className="text-[11px] text-amber-100">{reel.likes_count ?? 0}</span>
+                  <span className="text-[11px] text-amber-100">{reel.hide_likes && reel.user_id !== user?.id ? "" : (reel.likes_count ?? 0)}</span>
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); loadComments(reel.id); }} className="depth-press flex flex-col items-center gap-1" aria-label="Comments">
+                <button onClick={(e) => { e.stopPropagation(); if (reel.allow_comments === false) { toast.info("Comments are turned off for this reel"); return; } loadComments(reel.id); }} className={`depth-press flex flex-col items-center gap-1 ${reel.allow_comments === false ? "opacity-50" : ""}`} aria-label="Comments">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
                     <MessageCircle className="h-5 w-5 text-amber-100" />
                   </div>
@@ -262,6 +339,16 @@ const ReelsPage = () => {
                     <Share2 className="h-5 w-5 text-amber-100" />
                   </div>
                 </button>
+                {(reel.allow_download !== false || reel.user_id === user?.id) && (
+                  <button onClick={(e) => { e.stopPropagation(); void downloadReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Download reel">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11"><Download className="h-5 w-5 text-amber-100" /></div>
+                  </button>
+                )}
+                {reel.user_id !== user?.id && (
+                  <button onClick={(e) => { e.stopPropagation(); if (window.confirm("Report this reel?")) void reportReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Report reel">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11"><Flag className="h-5 w-5 text-amber-100" /></div>
+                  </button>
+                )}
                 <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
                 <button onClick={(e) => { e.stopPropagation(); setMuted(!muted); }} className="depth-press">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
@@ -308,7 +395,7 @@ const ReelsPage = () => {
                 <button onClick={() => { setCreating(false); setVideoFile(null); setVideoPreview(null); }} className="depth-press"><X className="w-5 h-5 text-foreground" /></button>
                 <span className="text-headline text-foreground text-base flex-1">New Reel</span>
                 <button onClick={handleCreateReel} disabled={uploading || !videoFile} className="depth-press px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
-                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Post"}
+                  Post
                 </button>
               </div>
             </div>
@@ -330,6 +417,21 @@ const ReelsPage = () => {
               <div className="liquid-glass rounded-2xl p-4 relative z-10">
                 <label className="text-caption text-muted-foreground block mb-2">Caption</label>
                 <textarea value={caption} onChange={e => setCaption(e.target.value)} placeholder="Write a caption..." className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none h-20" />
+              </div>
+              {prefs.aiCaptions && (
+                <div className="liquid-glass rounded-2xl p-4 relative z-10">
+                  <button type="button" disabled={suggesting} onClick={async () => { setSuggesting(true); const r = await suggestCaptions({ mediaType: "video", music: musicTitle, hint: caption }); setSuggestions(r.captions); if (!r.ai) toast.info("Showing built-in ideas — the AI service isn't connected yet"); setSuggesting(false); }} className="rounded-full bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-60">{suggesting ? "Thinking…" : "✨ Suggest caption"}</button>
+                  <div className="mt-2 flex flex-col gap-1.5">{suggestions.map(c => <button key={c} type="button" onClick={() => { setCaption(c); setSuggestions([]); }} className="rounded-xl bg-secondary/50 px-3 py-2 text-left text-xs text-foreground">{c}</button>)}</div>
+                </div>
+              )}
+              <div className="liquid-glass rounded-2xl p-4 relative z-10 space-y-3">
+                <p className="text-caption text-muted-foreground">Reel settings</p>
+                {([["allow_comments", "Allow comments"], ["allow_download", "Allow downloads"], ["hide_likes", "Hide like count"]] as const).map(([k, label]) => (
+                  <label key={k} className="flex items-center justify-between text-sm text-foreground">{label}<input type="checkbox" checked={Boolean(opts[k])} onChange={e => setOpts(o => ({ ...o, [k]: e.target.checked }))} className="h-5 w-5 accent-[hsl(var(--primary))]" /></label>
+                ))}
+                <label className="flex items-center justify-between text-sm text-foreground">Who can watch
+                  <select value={opts.visibility} onChange={e => setOpts(o => ({ ...o, visibility: e.target.value as "public" | "followers" }))} className="rounded-lg bg-secondary/60 px-2 py-1 text-sm"><option value="public">Everyone</option><option value="followers">Followers</option></select>
+                </label>
               </div>
               <div className="liquid-glass rounded-2xl p-4 relative z-10">
                 <label className="text-caption text-muted-foreground block mb-2">Music (optional)</label>
@@ -369,6 +471,13 @@ const ReelsPage = () => {
         )}
       </AnimatePresence>
       <GlassTabBar />
+      {shareReelTarget && (
+        <ShareSheet
+          open
+          onOpenChange={o => { if (!o) setShareReelTarget(null); }}
+          target={{ kind: "reel", id: shareReelTarget.id, mediaUrl: shareReelTarget.video_url, mediaType: "video", caption: shareReelTarget.caption, username: shareReelTarget.profile?.username, link: `${window.location.origin}/reels?r=${shareReelTarget.id}` }}
+        />
+      )}
     </div>
   );
 };

@@ -54,3 +54,14 @@ self.addEventListener('notificationclick', event => {
   const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
   event.waitUntil(self.clients.openWindow(target));
 });
+
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text() }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'Primegram', {
+    body: data.body || '',
+    icon: '/favicon.png',
+    badge: '/favicon.png',
+    data: { url: data.url || '/' },
+  }));
+});

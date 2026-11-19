@@ -7,6 +7,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,6 +29,10 @@ jobs:
 
       - name: Build web assets
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://kfvoqwbfgptqrrkyhorj.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_yFGklkV-V-QEFX7i8bWnbw_TvK-v02f
+          VITE_SUPABASE_PROJECT_ID: kfvoqwbfgptqrrkyhorj
 
       - name: Sync Capacitor Android project
         run: npx cap sync android
@@ -70,3 +77,16 @@ jobs:
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish APK to the website download
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk public/primegram-extreme.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/primegram-extreme.apk
+          if git diff --cached --quiet; then echo "No APK change"; else
+            git commit -m "Update Android APK download [skip actions]"
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
+          fi

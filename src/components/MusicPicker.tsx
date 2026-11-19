@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Disc3, Globe, Loader2, Music, Search, TrendingUp, X } from "lucide-react";
-import { tracks } from "./PrimeMusicHub";
 import { Input } from "@/components/ui/input";
-import { searchGlobalMusic } from "@/services/GlobalMusicService";
+import { searchGlobalMusic, getGlobalTrendingMusic } from "@/services/GlobalMusicService";
 
 export interface PickedTrack {
   title: string;
@@ -35,15 +34,14 @@ const MusicPicker = ({
     }
     setSearchError(null);
     if (source === "chart") {
-      setResults(
-        tracks.slice(0, 40).map((t) => ({
-          title: t.title,
-          artist: t.artist,
-          youtubeId: t.youtubeId,
-        }))
-      );
-      setLoading(false);
-      return;
+      let dead = false;
+      setLoading(true);
+      void getGlobalTrendingMusic(30).then((list) => {
+        if (dead) return;
+        setResults(list.map((t) => ({ title: t.title, artist: t.artist, youtubeId: t.id })));
+        setLoading(false);
+      }).catch(() => { if (!dead) setLoading(false); });
+      return () => { dead = true; };
     }
     const term = q.trim();
     if (term.length < 2) {

@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
+import VideoThumb from "@/components/VideoThumb";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Eye, Grid3X3, Loader2, X } from "lucide-react";
+import { ArrowLeft, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { FollowButton } from "@/components/FollowListDialog";
 import CommentsSection from "@/components/CommentsSection";
+import { AuraDialog, AnalyticsDialog } from "@/components/ProfileDashboards";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import TipAndSubscribeModal from "@/components/TipAndSubscribeModal";
 
 type Profile = {
   user_id: string;
@@ -43,6 +46,8 @@ const PublicProfilePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [auraOpen, setAuraOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [posts, setPosts] = useState<ProfilePost[]>([]);
   const [followers, setFollowers] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -97,6 +102,8 @@ const PublicProfilePage = () => {
     });
     return () => { cancelled = true; };
   }, [user]);
+
+  const [subModalOpen, setSubModalOpen] = useState(false);
 
   const subscribe = async () => {
     if (!user || !userId) return;
@@ -194,9 +201,22 @@ const PublicProfilePage = () => {
           <h1 className="text-headline text-foreground">
             {profile?.username ? `@${profile.username}` : "Profile"}
           </h1>
+          {userId && (
+            <div className="ml-auto flex items-center gap-3">
+              {creatorPrice !== null && user?.id !== userId && (
+                <button onClick={() => document.getElementById("creator-sub-btn")?.scrollIntoView({ behavior: "smooth", block: "center" })} aria-label={`Subscribe · ${creatorPrice} KES per month`} className="depth-press flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-xs font-semibold text-primary">
+                  <BadgeDollarSign className="h-4 w-4" />{creatorPrice.toLocaleString()}
+                </button>
+              )}
+              <button onClick={() => setAuraOpen(true)} aria-label="Aura dashboard" className="depth-press"><Sparkles className="h-5 w-5 text-primary" /></button>
+              <button onClick={() => setAnalyticsOpen(true)} aria-label="Analytics dashboard" className="depth-press"><BarChart3 className="h-5 w-5 text-primary" /></button>
+            </div>
+          )}
         </div>
       </header>
 
+      {userId && <AuraDialog userId={userId} open={auraOpen} onOpenChange={setAuraOpen} />}
+      {userId && <AnalyticsDialog userId={userId} isOwner={user?.id === userId} open={analyticsOpen} onOpenChange={setAnalyticsOpen} />}
       <main className="mx-auto max-w-3xl">
         {loading ? (
           <div className="flex justify-center py-16 text-muted-foreground">
@@ -237,7 +257,7 @@ const PublicProfilePage = () => {
                     <FollowButton targetId={userId!} following={following} onChange={setFollowing} />
                   </div>
                   <button
-                    onClick={() => navigate("/messages")}
+                    onClick={() => navigate(`/messages?to=${userId}`)}
                     className="depth-press flex-1 rounded-xl liquid-glass py-2 text-sm font-semibold text-foreground"
                   >
                     Message
@@ -254,10 +274,10 @@ const PublicProfilePage = () => {
                   </button>
                   {creatorPrice !== null && (
                     <button
+                      id="creator-sub-btn"
                       onClick={() => {
                         if (!user) navigate("/auth");
-                        else if (walletBalance !== null && walletBalance < creatorPrice) navigate("/wallet");
-                        else void subscribe();
+                        else setSubModalOpen(true);
                       }}
                       disabled={subscribing || !!subscribedUntil}
                       className="depth-press flex-1 rounded-xl bg-primary py-2 text-sm font-semibold text-primary-foreground disabled:opacity-70"
@@ -267,6 +287,18 @@ const PublicProfilePage = () => {
                         : subscribing ? "Starting..." : !user ? `Sign in to subscribe · ${creatorPrice.toLocaleString()} KES/month`
                           : walletBalance !== null && walletBalance < creatorPrice ? "Insufficient balance · top up"
                             : `Wallet · ${creatorPrice.toLocaleString()} KES/month`}
+                    </button>
+                  )}
+                  {subscribedUntil && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm("Unsubscribe? You keep access only until you resubscribe, and there is no refund for the current month.")) return;
+                        const { error } = await supabase.rpc("creator_unsubscribe" as any, { _creator_id: userId } as any);
+                        if (error) toast.error(error.message); else { setSubscribedUntil(null); toast.success("Unsubscribed"); }
+                      }}
+                      className="depth-press rounded-xl liquid-glass px-3 py-2 text-sm font-semibold text-red-300"
+                    >
+                      Unsubscribe
                     </button>
                   )}
                 </div>
@@ -289,7 +321,7 @@ const PublicProfilePage = () => {
                     className="relative aspect-square overflow-hidden bg-secondary"
                   >
                     {post.media_type === "video" ? (
-                      <video src={post.media_url || undefined} muted preload="metadata" className="h-full w-full object-cover" />
+                      <VideoThumb src={post.media_url} poster={(post as any).thumbnail_url} />
                     ) : post.media_url ? (
                       <img src={post.media_url} alt="" loading="lazy" className="h-full w-full object-cover" />
                     ) : (
@@ -346,6 +378,10 @@ const PublicProfilePage = () => {
         </DialogContent>
       </Dialog>
       <GlassTabBar />
+      {creatorPrice !== null && userId && (
+        <TipAndSubscribeModal open={subModalOpen} onOpenChange={setSubModalOpen} mode="subscription" creatorId={userId} creatorName={profile?.display_name || profile?.username || "creator"} price={creatorPrice}
+          onSuccess={() => { setSubscribedUntil(new Date(Date.now() + 30 * 86400000).toISOString()); }} />
+      )}
     </div>
   );
 };

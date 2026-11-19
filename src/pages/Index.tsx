@@ -1,3 +1,4 @@
+import HomeReelCard from "@/components/HomeReelCard";
 import { useState, useEffect, useRef, useCallback } from "react";
 import TopNavBar from "@/components/TopNavBar";
 import GlassTabBar from "@/components/GlassTabBar";
@@ -7,7 +8,7 @@ import FeedPost from "@/components/FeedPost";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { timeAgo } from "@/utils/timeAgo";
-import { Compass, Film, Loader2, MessageCircle, Plus, WalletCards } from "lucide-react";
+import { Compass, Film, Heart, Loader2, MessageCircle, Play, Plus, WalletCards } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -36,7 +37,10 @@ const Index = () => {
     }
     const page = reset ? 0 : pageRef.current;
     try {
-      const [{ data, error }, { data: follows, error: followsError }] = await Promise.all([
+      const reelsPromise = page === 0
+        ? supabase.from("reels").select("*").is("source_post_id", null).order("created_at", { ascending: false }).limit(15)
+        : Promise.resolve({ data: [] as any[] });
+      const [{ data, error }, { data: follows, error: followsError }, { data: reelRows }] = await Promise.all([
         supabase
           .from("posts")
           .select("*")
@@ -47,12 +51,17 @@ const Index = () => {
         currentUserId
           ? supabase.from("follows").select("following_id").eq("follower_id", currentUserId)
           : Promise.resolve({ data: [], error: null }),
+        reelsPromise,
       ]);
 
       if (error) throw error;
       if (followsError) throw followsError;
-      const rows = data ?? [];
-      hasMoreRef.current = rows.length === FEED_PAGE_SIZE;
+      const postRows = data ?? [];
+      const rows = [
+        ...postRows,
+        ...((reelRows ?? []) as any[]).map(r => ({ ...r, _reel: true, media_url: r.video_url, media_type: "video" })),
+      ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+      hasMoreRef.current = postRows.length === FEED_PAGE_SIZE;
       setHasMore(hasMoreRef.current);
       pageRef.current = page + 1;
       if (rows.length) {
@@ -88,10 +97,16 @@ const Index = () => {
 
   useEffect(() => {
     void fetchPosts(true);
+    // Only refetch when posts are added or removed (not on every like), and coalesce bursts.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => { clearTimeout(timer); timer = setTimeout(() => void fetchPosts(true), 1500); };
     const channel = supabase.channel("home-posts")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => void fetchPosts(true))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, refresh)
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "posts" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reels" }, refresh)
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    window.addEventListener("prime:posted", refresh);
+    return () => { clearTimeout(timer); window.removeEventListener("prime:posted", refresh); void supabase.removeChannel(channel); };
   }, [fetchPosts]);
 
   useEffect(() => {
@@ -148,10 +163,13 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">No posts yet. Create your first post to get started.</p>
             </div>
           ) : (
-            posts.map((post, i) => (
+            posts.map((post, i) => post._reel ? (
+              <HomeReelCard key={`reel-${post.id}`} reel={post} timeAgo={timeAgo(post.created_at)} />
+            ) : (
               <FeedPost
                 key={post.id}
                 image={post.media_url || ""}
+                poster={post.thumbnail_url}
                 mediaType={post.media_type || "image"}
                 username={post.profile?.display_name || "User"}
                 avatar={post.profile?.avatar_url || (post.profile?.display_name || "U")[0].toUpperCase()}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import VideoThumb from "@/components/VideoThumb";
 import { motion } from "framer-motion";
 import { Search, UserPlus, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +8,10 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import TopNavBar from "@/components/TopNavBar";
+import { readContentPrefs } from "@/components/SettingsExtras";
+
+const HISTORY_KEY = "primegram-search-history";
+const readHistory = (): string[] => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; } };
 
 const SearchPage = () => {
   const [query, setQuery] = useState("");
@@ -25,20 +30,33 @@ const SearchPage = () => {
       .then(({ data }) => setResults(data || []));
   }, [user]);
 
-  const [mode, setMode] = useState<"people" | "posts">("people");
+  const prefs = readContentPrefs();
+  const [mode, setMode] = useState<"people" | "posts">(prefs.searchScope === "posts" ? "posts" : "people");
+  const [history, setHistory] = useState<string[]>(readHistory);
   const [postResults, setPostResults] = useState<any[]>([]);
 
   useEffect(() => {
-    supabase.from("posts").select("*").neq("media_type", "story").order("created_at", { ascending: false }).limit(60)
+    let qb = supabase.from("posts").select("*").neq("media_type", "story");
+    if (readContentPrefs().safeSearch) qb = qb.eq("is_adult", false);
+    qb.order("created_at", { ascending: false }).limit(60)
       .then(({ data }) => setPostResults(data || []));
   }, []);
 
-  const search = async () => {
-    const q = query.trim().replace(/[%,()]/g, "");
+  const search = async (override?: string) => {
+    const q = (override ?? query).trim().replace(/[%,()]/g, "");
     if (!q) return;
+    if (override) setQuery(override);
+    if (readContentPrefs().saveSearchHistory) {
+      const next = [q, ...readHistory().filter(h => h.toLowerCase() !== q.toLowerCase())].slice(0, 8);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+      setHistory(next);
+    }
     const [{ data }, { data: posts }] = await Promise.all([
       supabase.from("profiles").select("*").or(`username.ilike.%${q}%,display_name.ilike.%${q}%`).limit(20),
-      supabase.from("posts").select("*").neq("media_type", "story").ilike("caption", `%${q}%`).order("created_at", { ascending: false }).limit(60),
+      (readContentPrefs().safeSearch
+        ? supabase.from("posts").select("*").neq("media_type", "story").eq("is_adult", false)
+        : supabase.from("posts").select("*").neq("media_type", "story")
+      ).ilike("caption", `%${q}%`).order("created_at", { ascending: false }).limit(60),
     ]);
     setResults(data || []);
     setPostResults(posts || []);
@@ -64,12 +82,18 @@ const SearchPage = () => {
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && search()}
+            onKeyDown={e => e.key === "Enter" && void search()}
             placeholder="Search users..."
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
         </div>
 
+        {history.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {history.map(h => <button key={h} onClick={() => void search(h)} className="rounded-full liquid-glass-subtle px-3 py-1 text-xs text-foreground">{h}</button>)}
+            <button onClick={() => { localStorage.removeItem(HISTORY_KEY); setHistory([]); }} className="px-2 text-xs text-muted-foreground">Clear</button>
+          </div>
+        )}
         <div className="flex gap-2 mb-4">
           {(["people", "posts"] as const).map(m => (
             <button key={m} onClick={() => setMode(m)} className={`px-4 py-1.5 rounded-full text-xs font-semibold capitalize ${mode === m ? "bg-primary text-primary-foreground" : "liquid-glass-subtle text-foreground"}`}>{m}</button>
@@ -83,7 +107,7 @@ const SearchPage = () => {
             <div className="grid grid-cols-3 gap-0.5">
               {postResults.map(p => (
                 <div key={p.id} className="aspect-square relative bg-muted overflow-hidden" title={p.caption || ""}>
-                  {p.media_url ? (p.media_type === "video" ? <video src={p.media_url} className="w-full h-full object-cover" muted preload="metadata" /> : <img src={p.media_url} alt={p.caption || ""} className="w-full h-full object-cover" loading="lazy" />)
+                  {p.media_url ? (p.media_type === "video" ? <VideoThumb src={p.media_url} poster={p.thumbnail_url} /> : <img src={p.media_url} alt={p.caption || ""} className="w-full h-full object-cover" loading="lazy" />)
                     : <div className="w-full h-full p-2 text-xs text-foreground flex items-center">{p.caption}</div>}
                 </div>
               ))}

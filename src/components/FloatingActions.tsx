@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, Plus, Search, Sparkles, Layers, Music, Trophy, Gamepad2, Film, X, Video, Eye, EyeOff } from "lucide-react";
-import OnlineCalls from "./OnlineCalls";
+import { MessageCircle, Plus, Search, Sparkles, Layers, Music, Trophy, Gamepad2, Film, X, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PrimeMusicHub from "./PrimeMusicHub";
 
@@ -14,6 +13,7 @@ const hubItems = [
 
 const PrimeHubPanel = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const [musicOpen, setMusicOpen] = useState(false);
+  useEffect(() => { const f = () => setMusicOpen(true); window.addEventListener("prime:openMusic", f); return () => window.removeEventListener("prime:openMusic", f); }, []);
   const navigate = useNavigate();
 
   const handleClick = (id: string) => {
@@ -69,21 +69,15 @@ const PrimeHubPanel = ({ open, onClose }: { open: boolean; onClose: () => void }
 };
 
 const FloatingActions = () => {
-  const [callsOpen, setCallsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [hidden, setHidden] = useState(() => localStorage.getItem("primegram:floatingActionsHidden") === "true");
   const [PrimeAI, setPrimeAI] = useState<React.ComponentType<any> | null>(null);
-  const navigate = useNavigate();
-
   const openAI = useCallback(async () => {
     if (!PrimeAI) {
       const mod = await import("./PrimeAIChat");
       setPrimeAI(() => mod.default);
     }
     setAiOpen(true);
-    setMenuOpen(false);
     setHubOpen(false);
   }, [PrimeAI]);
 
@@ -93,101 +87,41 @@ const FloatingActions = () => {
     return () => window.removeEventListener("prime:openOrb", handleOpenAssistant);
   }, [openAI]);
 
-  const actions = [
-    { label: "Create post", icon: Plus, run: () => navigate("/create"), position: [0.76, 0.72] },
-    { label: "Open chat", icon: MessageCircle, run: () => navigate("/messages"), position: [0.28, 0.76] },
-    { label: "Quick search", icon: Search, run: () => navigate("/search"), position: [0.14, 0.5] },
-    { label: "AI assistant", icon: Sparkles, run: () => { void openAI(); }, position: [0.32, 0.25] },
-    { label: "Online calls", icon: Video, run: () => setCallsOpen(true), position: [0.7, 0.25] },
-    { label: "Prime Hub", icon: Layers, run: () => setHubOpen(true), position: [0.88, 0.48] },
-    { label: "Hide floating actions", icon: EyeOff, run: () => {
-      localStorage.setItem("primegram:floatingActionsHidden", "true");
-      setHidden(true);
-      setMenuOpen(false);
-    }, position: [0.52, 0.55] },
-  ];
-  const originX = window.innerWidth - 44;
-  const originY = window.innerHeight - 96;
-
+  const grads: Record<string, string> = {
+    "Create post": "linear-gradient(135deg,#ff6bd6,#7c4dff)",
+    "Open chat": "linear-gradient(135deg,#38bdf8,#6366f1)",
+    "Quick search": "linear-gradient(135deg,#34d399,#06b6d4)",
+    "AI assistant": "linear-gradient(135deg,#a78bfa,#ec4899)",
+    "Prime Hub": "linear-gradient(135deg,#fbbf24,#f97316)",
+    "Hide floating actions": "linear-gradient(135deg,#64748b,#334155)",
+  };
   return (
     <>
-      {hidden ? (
-        <button
-          type="button"
-          aria-label="Show floating actions"
-          title="Show floating actions"
-          onClick={() => {
-            localStorage.setItem("primegram:floatingActionsHidden", "false");
-            setHidden(false);
-          }}
-          className="fixed bottom-24 right-4 z-[55] flex h-11 w-11 items-center justify-center rounded-full liquid-glass-elevated text-foreground shadow-lg"
-        >
-          <Eye className="h-5 w-5" />
-        </button>
-      ) : (
-      <>
-        <AnimatePresence>
-          {menuOpen && (
-            <motion.button
-              type="button"
-              aria-label="Close quick actions"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setMenuOpen(false)}
-              className="fixed inset-0 z-[54] bg-background/20 backdrop-blur-[2px]"
-            />
-          )}
-        </AnimatePresence>
-        <AnimatePresence>
-          {menuOpen && actions.map((action, index) => {
-            const targetX = Math.max(40, Math.min(window.innerWidth - 40, window.innerWidth * action.position[0]));
-            const targetY = Math.max(84, Math.min(window.innerHeight - 110, window.innerHeight * action.position[1]));
-            return (
-              <motion.button
-                key={action.label}
-                type="button"
-                aria-label={action.label}
-                title={action.label}
-                initial={{ opacity: 0, scale: 0.35, x: originX - targetX, y: originY - targetY }}
-                animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-                exit={{ opacity: 0, scale: 0.35, x: originX - targetX, y: originY - targetY }}
-                transition={{ type: "spring", stiffness: 380, damping: 28, delay: index * 0.035 }}
-                onClick={() => { setMenuOpen(false); action.run(); }}
-                style={{ left: targetX, top: targetY, translate: "-50% -50%" }}
-                className="depth-press fixed z-[56] flex h-14 w-14 items-center justify-center rounded-full liquid-glass-elevated text-primary shadow-xl"
-              >
-                <action.icon className="h-5 w-5" />
-                <span className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-background/90 px-2 py-1 text-[10px] font-medium text-foreground shadow">
-                  {action.label}
-                </span>
-              </motion.button>
-            );
-          })}
-        </AnimatePresence>
-      <div className="fixed bottom-24 right-4 z-[60]">
-        <motion.button
-          type="button"
-          aria-label={menuOpen ? "Close quick actions" : "Open quick actions"}
-          aria-expanded={menuOpen}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.92 }}
-          onClick={() => setMenuOpen((open) => !open)}
-          className="depth-press flex h-14 w-14 items-center justify-center rounded-full liquid-glass-elevated text-primary shadow-lg"
-          style={{ boxShadow: "0 4px 24px hsla(280, 80%, 60%, 0.38)" }}
-        >
-          <motion.span animate={{ rotate: menuOpen ? 45 : 0 }} className="flex">
-            {menuOpen
-              ? <X className="h-6 w-6" />
-              : <Plus className="h-6 w-6" />}
-          </motion.span>
-        </motion.button>
+      <div className="fixed bottom-28 right-3 z-[60] flex flex-col items-center gap-3">
+        {[
+          { label: "Prime Hub", icon: Layers, run: () => setHubOpen(true), bg: "linear-gradient(135deg,#fbbf24,#f97316)", glow: "rgba(249,115,22,0.55)" },
+          { label: "AI assistant", icon: Sparkles, run: () => { void openAI(); }, bg: "linear-gradient(135deg,#a78bfa,#ec4899)", glow: "rgba(167,139,250,0.55)" },
+        ].map((a) => (
+          <motion.button
+            key={a.label}
+            type="button"
+            aria-label={a.label}
+            title={a.label}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            animate={{ y: [0, -4, 0] }}
+            transition={{ y: { duration: 3, repeat: Infinity, ease: "easeInOut" } }}
+            onClick={a.run}
+            className="relative flex h-12 w-12 items-center justify-center rounded-full text-white ring-1 ring-white/40"
+            style={{ background: a.bg, boxShadow: `0 8px 22px ${a.glow}, inset 0 1px 1px rgba(255,255,255,0.6)` }}
+          >
+            <span aria-hidden className="pointer-events-none absolute inset-x-2 top-1 h-3 rounded-full bg-white/30 blur-[2px]" />
+            <a.icon className="h-5 w-5 drop-shadow" />
+          </motion.button>
+        ))}
       </div>
-      </>
-      )}
 
       <PrimeHubPanel open={hubOpen} onClose={() => setHubOpen(false)} />
-      <OnlineCalls open={callsOpen} onClose={() => setCallsOpen(false)} />
       {PrimeAI && <PrimeAI open={aiOpen} onClose={() => setAiOpen(false)} />}
     </>
   );

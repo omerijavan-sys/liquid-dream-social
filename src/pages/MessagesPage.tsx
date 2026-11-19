@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2 } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2, Paperclip, Square, Play as PlayIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,9 @@ import { toast } from "sonner";
 import { beginCall } from "@/utils/calls";
 import { useOnline } from "@/contexts/OnlineContext";
 import { Button } from "@/components/ui/button";
+import { SwipeRow, MessageActionSheet, linkify, firstUrl } from "@/components/MessageGestures";
+import { openLink } from "@/utils/openLink";
+import { X, Globe } from "lucide-react";
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
 type SpeechRecognitionLike = {
@@ -42,7 +45,17 @@ interface Message {
   content: string;
   created_at: string;
   read?: boolean;
+  media_url?: string | null;
+  media_type?: "image" | "video" | "audio" | "post" | "reel" | null;
+  shared_ref?: string | null;
+  reply_to?: string | null;
+  edited_at?: string | null;
+  deleted_at?: string | null;
+  reactions?: Record<string, string[]> | null;
+  hidden_by?: string[] | null;
 }
+
+const MSG_COLS = "id, sender_id, receiver_id, content, created_at, read, media_url, media_type, shared_ref, reply_to, edited_at, deleted_at, reactions, hidden_by";
 
 const MessagesPage = () => {
   const navigate = useNavigate();
@@ -55,6 +68,10 @@ const MessagesPage = () => {
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [msg, setMsg] = useState("");
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
+  const [sheetMsg, setSheetMsg] = useState<Message | null>(null);
+  const [starred, setStarred] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem("primegram:starred") || "[]")); } catch { return new Set(); } });
   const [searchUser, setSearchUser] = useState("");
   const [searchResults, setSearchResults] = useState<ChatUser[]>([]);
   const [aiModeChats, setAiModeChats] = useState<Set<string>>(() => {
@@ -70,6 +87,16 @@ const MessagesPage = () => {
   const [voiceSearch, setVoiceSearch] = useState(false);
 
   useEffect(() => () => speechRecognitionRef.current?.stop(), []);
+
+  // Deep link: /messages?to=<userId> opens that person's direct chat.
+  useEffect(() => {
+    const to = new URLSearchParams(window.location.search).get("to");
+    if (!to || !user || to === user.id) return;
+    let cancelled = false;
+    supabase.from("profiles").select("user_id, display_name, username, avatar_url").eq("user_id", to).maybeSingle()
+      .then(({ data }) => { if (data && !cancelled) setActiveChat(data as ChatUser); });
+    return () => { cancelled = true; };
+  }, [user]);
 
   const toggleVoiceSearch = () => {
     if (voiceSearch) {
@@ -209,7 +236,7 @@ const MessagesPage = () => {
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from("messages")
-        .select("id, sender_id, receiver_id, content, created_at, read")
+        .select(MSG_COLS)
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${activeChat.user_id}),and(sender_id.eq.${activeChat.user_id},receiver_id.eq.${user.id})`)
         .order("created_at", { ascending: false })
         .limit(61);
@@ -275,7 +302,7 @@ const MessagesPage = () => {
     setLoadingOlderMessages(true);
     const { data, error } = await supabase
       .from("messages")
-      .select("id, sender_id, receiver_id, content, created_at, read")
+      .select(MSG_COLS)
       .or(`and(sender_id.eq.${user.id},receiver_id.eq.${activeChat.user_id}),and(sender_id.eq.${activeChat.user_id},receiver_id.eq.${user.id})`)
       .lt("created_at", messages[0].created_at)
       .order("created_at", { ascending: false })
@@ -291,17 +318,118 @@ const MessagesPage = () => {
     setLoadingOlderMessages(false);
   };
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadAndSend = async (blob: Blob, ext: string, type: "image" | "video" | "audio") => {
+    if (!activeChat || !user) return;
+    if (blob.size > 50 * 1024 * 1024) { toast.error("File is too large (50 MB max)."); return; }
+    setUploading(true);
+    try {
+      const path = `${user.id}/dm_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const label = type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice message";
+      const { data, error } = await supabase.from("messages").insert({
+        sender_id: user.id, receiver_id: activeChat.user_id, content: label, media_url: publicUrl, media_type: type,
+      } as never).select().single();
+      if (error) throw error;
+      if (data) setMessages(prev => prev.some(m => m.id === (data as Message).id) ? prev : [...prev, data as Message]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't send. Try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const isVideo = file.type.startsWith("video/");
+    if (!isVideo && !file.type.startsWith("image/")) { toast.error("Choose a photo or video."); return; }
+    void uploadAndSend(file, file.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg"), isVideo ? "video" : "image");
+  };
+
+  const toggleVoiceNote = async () => {
+    if (recording) { recorderRef.current?.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = ev => { if (ev.data.size) chunks.push(ev.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        setRecording(false);
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        if (blob.size > 0) void uploadAndSend(blob, blob.type.includes("mp4") ? "m4a" : "webm", "audio");
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+    } catch {
+      toast.error("Microphone permission is needed to record a voice message.");
+    }
+  };
+
+  const rpcCall = (fn: string, args: Record<string, unknown>) =>
+    (supabase.rpc as unknown as (f: string, a: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>)(fn, args);
+
+  const patchMsg = (id: string, patch: Partial<Message>) => setMessages(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m));
+
   const sendMessage = async () => {
     if (!msg.trim() || !activeChat || !user) return;
     const content = msg.trim();
-    setMsg("");
+    if (editing) {
+      const target = editing;
+      setMsg(""); setEditing(null);
+      const { error } = await rpcCall("message_edit", { _id: target.id, _content: content });
+      if (error) { toast.error(error.message); return; }
+      patchMsg(target.id, { content, edited_at: new Date().toISOString() });
+      return;
+    }
+    const reply = replyTo;
+    setMsg(""); setReplyTo(null);
     const { data, error } = await supabase.from("messages").insert({
       sender_id: user.id,
       receiver_id: activeChat.user_id,
       content,
-    }).select().single();
-    if (error) { setMsg(content); toast.error("Message not sent. Try again."); return; }
-    if (data) setMessages(prev => prev.some(m => m.id === data.id) ? prev : [...prev, data]);
+      ...(reply ? { reply_to: reply.id } : {}),
+    } as never).select(MSG_COLS).single();
+    if (error) { setMsg(content); setReplyTo(reply); toast.error("Message not sent. Try again."); return; }
+    if (data) setMessages(prev => prev.some(m => m.id === (data as Message).id) ? prev : [...prev, data as unknown as Message]);
+  };
+
+  const reactTo = async (m: Message, emoji: string) => {
+    setSheetMsg(null);
+    const { data, error } = await rpcCall("message_react", { _id: m.id, _emoji: emoji });
+    if (error) toast.error(error.message); else patchMsg(m.id, { reactions: data as Record<string, string[]> });
+  };
+  const deleteMsg = async (m: Message, everyone: boolean) => {
+    setSheetMsg(null);
+    const { error } = await rpcCall("message_delete", { _id: m.id, _for_everyone: everyone });
+    if (error) { toast.error(error.message); return; }
+    if (everyone) patchMsg(m.id, { deleted_at: new Date().toISOString(), content: "", media_url: null, reactions: {} });
+    else setMessages(prev => prev.filter(x => x.id !== m.id));
+  };
+  const toggleStar = (m: Message) => {
+    setSheetMsg(null);
+    setStarred(prev => {
+      const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id);
+      try { localStorage.setItem("primegram:starred", JSON.stringify([...n])); } catch { /* ignore */ }
+      return n;
+    });
+  };
+  const forwardMsg = async (m: Message) => {
+    setSheetMsg(null);
+    const text = m.content || m.media_url || "";
+    try {
+      if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast.success("Copied — paste it into another chat"); }
+    } catch { /* cancelled */ }
   };
 
   if (activeChat) {
@@ -358,16 +486,60 @@ const MessagesPage = () => {
               {!loadingMessages && messages.length === 0 && (
                 <div className="text-center text-muted-foreground text-sm py-10">No messages yet. Say hello!</div>
               )}
-              {messages.map((m, idx) => {
+              {messages.filter(m => !(m.hidden_by ?? []).includes(user?.id ?? "")).map((m, idx, list) => {
                 const mine = m.sender_id === user?.id;
-                const isLastMine = mine && !messages.slice(idx + 1).some((x) => x.sender_id === user?.id);
+                const isLastMine = mine && !list.slice(idx + 1).some((x) => x.sender_id === user?.id);
+                const deleted = !!m.deleted_at;
+                const parent = m.reply_to ? messages.find(x => x.id === m.reply_to) : null;
+                const link = !deleted && m.content && !m.media_type ? firstUrl(m.content) : null;
+                const reactionEntries = Object.entries(m.reactions ?? {}).filter(([, u]) => u.length > 0);
                 return (
                 <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-                  <div className={`max-w-[75%] break-words whitespace-pre-wrap px-4 py-2.5 rounded-2xl text-sm ${
+                  <SwipeRow className="max-w-[78%]" onReply={() => { if (!deleted) { setReplyTo(m); setEditing(null); } }} onLongPress={() => { if (!deleted) setSheetMsg(m); }}>
+                  <div className={`break-words whitespace-pre-wrap px-4 py-2.5 rounded-2xl text-sm ${
+                    deleted ? "border border-white/10 bg-white/[0.02] italic text-white/40" :
                     mine ? "border border-amber-200/30 bg-gradient-to-br from-amber-300/20 to-amber-700/15 text-amber-50 shadow-[0_4px_18px_rgba(212,175,55,.12)]" : "border border-white/10 bg-white/[0.03] text-white shadow-[0_6px_20px_rgba(0,0,0,.2)] backdrop-blur-xl"
                   }`}>
-                    {m.content}
+                    {deleted ? "🚫 This message was deleted" : (<>
+                    {m.reply_to && (
+                      <div className="mb-1.5 max-w-full overflow-hidden rounded-lg border-l-2 border-amber-300/70 bg-black/25 px-2 py-1 text-[11px] text-white/65">
+                        <div className="font-semibold text-amber-200/80">{parent ? (parent.sender_id === user?.id ? "You" : activeChat.display_name || "Them") : "Message"}</div>
+                        <div className="truncate">{parent ? (parent.deleted_at ? "Deleted message" : parent.content || (parent.media_type ? `📎 ${parent.media_type}` : "")) : "Original message unavailable"}</div>
+                      </div>
+                    )}
+                    {m.media_type === "image" && m.media_url && <button type="button" onClick={() => openLink(m.media_url!)}><img src={m.media_url} alt="Photo" className="mb-1 max-h-64 rounded-xl object-cover" /></button>}
+                    {m.media_type === "video" && m.media_url && <video src={m.media_url} controls playsInline className="mb-1 max-h-64 rounded-xl" />}
+                    {m.media_type === "audio" && m.media_url && <audio src={m.media_url} controls className="h-10 max-w-full" />}
+                    {(m.media_type === "post" || m.media_type === "reel") && (
+                      <button
+                        onClick={() => navigate(m.media_type === "reel" ? `/reels?r=${m.shared_ref}` : `/?post=${m.shared_ref}`)}
+                        className="mb-1 block w-56 overflow-hidden rounded-xl border border-white/10 bg-black/30 text-left"
+                      >
+                        {m.media_url && (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(m.media_url)
+                          ? <video src={m.media_url} className="h-36 w-full object-cover" muted playsInline />
+                          : <img src={m.media_url} alt="" className="h-36 w-full object-cover" />)}
+                        <span className="flex items-center gap-1 px-2 py-1.5 text-[11px] text-white/80"><PlayIcon className="h-3 w-3" />Open {m.media_type}</span>
+                      </button>
+                    )}
+                    {!(m.media_type === "image" || m.media_type === "video" || m.media_type === "audio") && linkify(m.content)}
+                    {link && (
+                      <button type="button" onClick={() => openLink(link)} className="mt-2 flex w-full items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-2.5 py-2 text-left text-[11px] text-sky-200">
+                        <Globe className="h-4 w-4 shrink-0" /><span className="truncate">{link.replace(/^https?:\/\//, "")}</span>
+                      </button>
+                    )}
+                    {m.edited_at && <span className="ml-2 text-[10px] text-white/40">edited</span>}
+                    </>)}
                   </div>
+                  {reactionEntries.length > 0 && !deleted && (
+                    <div className={`-mt-2 flex gap-1 ${mine ? "justify-end pr-2" : "justify-start pl-2"}`}>
+                      {reactionEntries.map(([e, u]) => (
+                        <button key={e} onClick={() => void reactTo(m, e)} className={`rounded-full border px-1.5 py-0.5 text-xs backdrop-blur-xl ${u.includes(user?.id ?? "") ? "border-amber-300/60 bg-amber-300/20" : "border-white/15 bg-black/60"}`}>
+                          {e}{u.length > 1 ? ` ${u.length}` : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  </SwipeRow>
                   {isLastMine && (
                     <span className={`text-[10px] mt-1 ${m.read ? "text-amber-200" : "text-white/40"}`}>
                       {m.read ? "✓✓ Seen" : "✓ Sent"}
@@ -378,8 +550,40 @@ const MessagesPage = () => {
               <div ref={bottomRef} />
             </div>
 
+            {sheetMsg && (
+              <MessageActionSheet
+                mine={sheetMsg.sender_id === user?.id}
+                canEdit={sheetMsg.sender_id === user?.id && !sheetMsg.media_type && !sheetMsg.media_url}
+                starred={starred.has(sheetMsg.id)}
+                onClose={() => setSheetMsg(null)}
+                onReact={(e) => void reactTo(sheetMsg, e)}
+                onReply={() => { setReplyTo(sheetMsg); setEditing(null); setSheetMsg(null); }}
+                onCopy={() => { void navigator.clipboard?.writeText(sheetMsg.content || sheetMsg.media_url || ""); toast.success("Copied"); setSheetMsg(null); }}
+                onEdit={() => { setEditing(sheetMsg); setReplyTo(null); setMsg(sheetMsg.content); setSheetMsg(null); }}
+                onDeleteEveryone={() => void deleteMsg(sheetMsg, true)}
+                onDeleteMe={() => void deleteMsg(sheetMsg, false)}
+                onForward={() => void forwardMsg(sheetMsg)}
+                onStar={() => toggleStar(sheetMsg)}
+              />
+            )}
             <div className="relative z-10 px-4 py-3 safe-area-bottom">
+              {(replyTo || editing) && (
+                <div className="mb-2 flex items-center gap-2 rounded-xl border border-amber-200/20 bg-black/55 px-3 py-2 text-xs text-white/70 backdrop-blur-xl">
+                  <div className="min-w-0 flex-1 border-l-2 border-amber-300/70 pl-2">
+                    <div className="font-semibold text-amber-200/90">{editing ? "Editing message" : `Replying to ${replyTo!.sender_id === user?.id ? "yourself" : activeChat.display_name || "them"}`}</div>
+                    <div className="truncate">{(editing ?? replyTo)!.content || "📎 Media"}</div>
+                  </div>
+                  <button aria-label="Cancel" onClick={() => { setReplyTo(null); setEditing(null); if (editing) setMsg(""); }}><X className="h-4 w-4" /></button>
+                </div>
+              )}
               <div className="flex gap-2 rounded-2xl border border-amber-200/20 bg-black/55 p-1.5 shadow-[0_0_22px_rgba(212,175,55,.1)] backdrop-blur-xl">
+                <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={onPickFile} />
+                <button onClick={() => fileRef.current?.click()} disabled={uploading || recording} aria-label="Attach photo or video" className="depth-press flex h-10 w-10 items-center justify-center rounded-xl text-amber-200 hover:bg-amber-300/10 disabled:opacity-40">
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                </button>
+                <button onClick={() => void toggleVoiceNote()} disabled={uploading} aria-label={recording ? "Stop and send voice message" : "Record voice message"} className={`depth-press flex h-10 w-10 items-center justify-center rounded-xl ${recording ? "bg-red-500 text-white animate-pulse" : "text-amber-200 hover:bg-amber-300/10"}`}>
+                  {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
                 <input
                   value={msg}
                   onChange={(e) => setMsg(e.target.value)}

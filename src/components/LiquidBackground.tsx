@@ -36,15 +36,16 @@ const LiquidBackground = () => {
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Base dark
-      ctx.fillStyle = "hsl(220, 20%, 4%)";
+      const light = document.documentElement.classList.contains("light");
+      // Base
+      ctx.fillStyle = light ? "hsl(210, 40%, 98%)" : "hsl(220, 20%, 4%)";
       ctx.fillRect(0, 0, w, h);
 
       // Liquid blobs
       const blobs = [
-        { cx: 0.3 + Math.sin(time * 0.7) * 0.1 + mouseX * 0.05, cy: 0.25 + Math.cos(time * 0.5) * 0.08 + mouseY * 0.03, r: 0.35, color: "210, 100%, 60%" },
-        { cx: 0.7 + Math.cos(time * 0.6) * 0.12 - mouseX * 0.04, cy: 0.65 + Math.sin(time * 0.8) * 0.1 - mouseY * 0.04, r: 0.3, color: "280, 70%, 55%" },
-        { cx: 0.5 + Math.sin(time * 0.9) * 0.08, cy: 0.5 + Math.cos(time * 0.4) * 0.12 + mouseY * 0.02, r: 0.25, color: "350, 80%, 58%" },
+        { cx: 0.3 + Math.sin(time * 0.7) * 0.1 + mouseX * 0.05, cy: 0.25 + Math.cos(time * 0.5) * 0.08 + mouseY * 0.03, r: 0.35, color: light ? "217, 91%, 55%" : "210, 100%, 60%" },
+        { cx: 0.7 + Math.cos(time * 0.6) * 0.12 - mouseX * 0.04, cy: 0.65 + Math.sin(time * 0.8) * 0.1 - mouseY * 0.04, r: 0.3, color: light ? "0, 82%, 55%" : "280, 70%, 55%" },
+        { cx: 0.5 + Math.sin(time * 0.9) * 0.08, cy: 0.5 + Math.cos(time * 0.4) * 0.12 + mouseY * 0.02, r: 0.25, color: light ? "145, 63%, 42%" : "350, 80%, 58%" },
         { cx: 0.15 + Math.cos(time * 1.1) * 0.06 + mouseX * 0.03, cy: 0.8 + Math.sin(time * 0.7) * 0.06, r: 0.2, color: "170, 60%, 50%" },
       ];
 
@@ -53,8 +54,9 @@ const LiquidBackground = () => {
           blob.cx * w, blob.cy * h, 0,
           blob.cx * w, blob.cy * h, blob.r * Math.max(w, h)
         );
-        grad.addColorStop(0, `hsla(${blob.color}, 0.06)`);
-        grad.addColorStop(0.5, `hsla(${blob.color}, 0.03)`);
+        const k = light ? 2.6 : 1;
+        grad.addColorStop(0, `hsla(${blob.color}, ${0.06 * k})`);
+        grad.addColorStop(0.5, `hsla(${blob.color}, ${0.03 * k})`);
         grad.addColorStop(1, `hsla(${blob.color}, 0)`);
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, w, h);

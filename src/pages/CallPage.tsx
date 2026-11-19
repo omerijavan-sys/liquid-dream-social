@@ -1,13 +1,13 @@
 import { logSecurityEvent } from "@/utils/audit";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { PhoneOff, Mic, MicOff, Video, VideoOff, RefreshCw } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Video, VideoOff, RefreshCw, SkipForward, Send, Flag } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { startRingtone } from "@/hooks/useRingtone";
-import { getRtcConfig } from "@/utils/iceConfig";
+import { loadRtcConfig } from "@/utils/iceConfig";
 import { rtcChannelName } from "@/utils/calls";
 import { Button } from "@/components/ui/button";
 
@@ -22,6 +22,11 @@ const CallPage = () => {
   const isCallee = params.get("incoming") === "1";
   const audioOnly = params.get("audio") === "1";
   const callId = params.get("call");
+  const randomMode = params.get("random") === "1";
+  const meetMode = params.get("mode") === "adult" ? "adult" : "general";
+  const exitPath = randomMode ? `/meet?mode=${meetMode}${audioOnly ? "&audio=1" : ""}` : "/";
+  const [chatLog, setChatLog] = useState<{ me: boolean; text: string }[]>([]);
+  const [chatText, setChatText] = useState("");
   const { user } = useAuth();
 
   const [muted, setMuted] = useState(false);
@@ -76,8 +81,8 @@ const CallPage = () => {
     if (callId) void supabase.from("call_invitations").update({ status: "ended" }).eq("id", callId);
     setStatus("ended");
     cleanup();
-    setTimeout(() => navigate("/", { replace: true }), 600);
-  }, [cleanup, navigate, send, callId]);
+    setTimeout(() => navigate(exitPath, { replace: true }), 600);
+  }, [cleanup, navigate, send, callId, exitPath]);
 
   useEffect(() => {
     if (!userId || !user) return;
@@ -104,7 +109,7 @@ const CallPage = () => {
       invitationChannel = supabase.channel(`call-state-${callId}`).on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "call_invitations", filter: `id=eq.${callId}`,
       }, ({ new: row }) => { if (row.status === "ended" || row.status === "declined") hangUp(); }).subscribe();
-      const pc = new RTCPeerConnection(getRtcConfig());
+      const pc = new RTCPeerConnection(await loadRtcConfig());
       pcRef.current = pc;
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -146,6 +151,9 @@ const CallPage = () => {
             if (pcRef.current === pc && pc.connectionState !== "connected") hangUp();
           }, 6000);
           return;
+        }
+        if (s === "failed") {
+          toast.error("Couldn't connect the call — the network blocked it. Try Wi-Fi or another network.");
         }
         if (s === "failed" || s === "closed") hangUp();
       };
@@ -199,12 +207,16 @@ const CallPage = () => {
             pendingIce.current.push(payload.candidate);
           }
         })
+        .on("broadcast", { event: "chat" }, ({ payload }: any) => {
+          if (payload.from !== userId) return;
+          setChatLog(l => [...l.slice(-30), { me: false, text: String(payload.text || "").slice(0, 500) }]);
+        })
         .on("broadcast", { event: "hangup" }, () => {
           if (endedRef.current) return;
           endedRef.current = true;
           setStatus("ended");
           cleanup();
-          setTimeout(() => navigate("/messages"), 600);
+          setTimeout(() => navigate(randomMode ? exitPath : "/messages"), 600);
         })
         .subscribe(async (state) => {
           if (state !== "SUBSCRIBED" || cancelled) return;
@@ -293,8 +305,8 @@ const CallPage = () => {
 
   return (
     <div className="h-dvh bg-background flex flex-col relative overflow-hidden">
-      {/* Liquid glass blobs — blue · red · green */}
-      <div className="absolute inset-0 -z-10">
+      {/* Liquid glass blobs — only while ringing/connecting so the live call stays clear */}
+      <div className={`absolute inset-0 -z-10 transition-opacity duration-500 ${status === "connected" ? "opacity-0" : "opacity-100"}`}>
         <motion.div
           className="absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full"
           style={{ background: "radial-gradient(circle, hsl(var(--brand-blue) / 0.5), transparent 70%)", filter: "blur(60px)" }}
@@ -317,15 +329,19 @@ const CallPage = () => {
 
       <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
       {status !== "connected" && <div className="absolute inset-0 bg-background/40 backdrop-blur-md" />}
+      {status === "connected" && <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 to-transparent" />}
+      {status === "connected" && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 to-transparent" />}
 
       <div className="relative z-10 safe-area-top p-6">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-auto max-w-sm liquid-glass-elevated rounded-3xl px-6 py-4 text-center"
+          className={status === "connected" ? "flex flex-col items-center text-center" : "mx-auto max-w-sm liquid-glass-elevated rounded-3xl px-6 py-4 text-center"}
         >
-          <p className="text-display text-foreground text-2xl relative z-10">{peerName}</p>
-          <p className="text-sm text-primary mt-1 font-mono relative z-10">{formatTime(callTime)}</p>
+          <p className={`relative z-10 font-semibold text-white drop-shadow ${status === "connected" ? "text-lg" : "text-display text-2xl text-foreground"}`}>{peerName}</p>
+          <p className="relative z-10 mt-1 font-mono text-sm text-white/90 drop-shadow">
+            {status === "ringing" ? (isCallee ? "Incoming call…" : "Ringing…") : status === "connecting" ? "Connecting…" : status === "ended" ? "Call ended" : formatTime(callTime)}
+          </p>
         </motion.div>
       </div>
 
@@ -336,9 +352,9 @@ const CallPage = () => {
           transition={{ delay: 0.3, type: "spring" }}
           drag
           dragConstraints={{ left: -220, right: 0, top: -420, bottom: 0 }}
-          className="w-32 h-44 rounded-3xl overflow-hidden liquid-glass-elevated border border-white/20 shadow-2xl cursor-grab active:cursor-grabbing"
+          className="w-24 h-36 rounded-2xl overflow-hidden border-2 border-white/40 bg-black shadow-2xl cursor-grab active:cursor-grabbing"
         >
-          <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover mirror relative z-10" />
+          <video ref={localVideoRef} autoPlay playsInline muted className={`w-full h-full object-cover relative z-10 ${facing === "user" ? "mirror" : ""}`} />
         </motion.div>
       </div>
 
@@ -347,29 +363,46 @@ const CallPage = () => {
         animate={{ y: 0, opacity: 1 }}
         className="relative z-10 safe-area-bottom pb-8"
       >
-        <div className="mx-auto max-w-sm liquid-glass-elevated rounded-full py-3 px-4">
+        {randomMode && (
+          <div className="mx-auto mb-3 w-full max-w-sm px-3">
+            <div className="max-h-28 space-y-1 overflow-y-auto">
+              {chatLog.slice(-6).map((m, i) => <p key={i} className={`w-fit max-w-[85%] rounded-2xl px-3 py-1 text-sm text-white ${m.me ? "ml-auto bg-primary/80" : "bg-black/60"}`}>{m.text}</p>)}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input value={chatText} onChange={e => setChatText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && chatText.trim()) { send("chat", { text: chatText.trim() }); setChatLog(l => [...l, { me: true, text: chatText.trim() }]); setChatText(""); } }} placeholder="Type a message…" maxLength={300} className="min-w-0 flex-1 rounded-full bg-black/55 px-4 py-2 text-sm text-white placeholder:text-white/50 outline-none backdrop-blur" />
+              <button aria-label="Send" onClick={() => { if (chatText.trim()) { send("chat", { text: chatText.trim() }); setChatLog(l => [...l, { me: true, text: chatText.trim() }]); setChatText(""); } }} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground"><Send className="h-4 w-4" /></button>
+              <button aria-label="Report this person" onClick={async () => { if (!user || !userId) return; await supabase.from("reports").insert({ reporter_id: user.id, target_type: "user", target_id: userId, reason: "Reported in random video chat" } as any); toast.success("Reported — moving to the next person"); hangUp(); }} className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/70 text-white"><Flag className="h-4 w-4" /></button>
+            </div>
+          </div>
+        )}
+        <div className="mx-auto max-w-sm rounded-full bg-black/55 py-3 px-4 backdrop-blur-sm">
           <div className="flex justify-center gap-3 relative z-10">
             <Button variant="ghost" size="icon"
               onClick={toggleMute}
               aria-label="Toggle microphone"
-              className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${muted ? "bg-destructive/30" : "liquid-glass-subtle"}`}
+              className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${muted ? "bg-red-500/40" : "bg-white/15"}`}
             >
-              {muted ? <MicOff className="w-6 h-6 text-destructive" /> : <Mic className="w-6 h-6 text-foreground" />}
+              {muted ? <MicOff className="w-6 h-6 text-destructive" /> : <Mic className="w-6 h-6 text-white" />}
             </Button>
             <Button variant="ghost" size="icon" disabled={audioOnly}
               onClick={toggleVideo}
               aria-label="Toggle camera"
-              className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${!videoOn ? "bg-destructive/30" : "liquid-glass-subtle"}`}
+              className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${!videoOn ? "bg-red-500/40" : "bg-white/15"}`}
             >
-              {videoOn ? <Video className="w-6 h-6 text-foreground" /> : <VideoOff className="w-6 h-6 text-destructive" />}
+              {videoOn ? <Video className="w-6 h-6 text-white" /> : <VideoOff className="w-6 h-6 text-destructive" />}
             </Button>
             <Button variant="ghost" size="icon" disabled={audioOnly}
               onClick={flipCamera}
               aria-label="Switch camera"
-              className="depth-press w-14 h-14 rounded-full liquid-glass-subtle flex items-center justify-center"
+              className="depth-press w-14 h-14 rounded-full bg-white/15 flex items-center justify-center"
             >
-              <RefreshCw className="w-6 h-6 text-foreground" />
+              <RefreshCw className="w-6 h-6 text-white" />
             </Button>
+            {randomMode && (
+              <Button variant="ghost" size="icon" onClick={hangUp} aria-label="Next person" title="Next person" className="depth-press w-14 h-14 rounded-full bg-emerald-500/60 flex items-center justify-center">
+                <SkipForward className="w-6 h-6 text-white" />
+              </Button>
+            )}
             <Button variant="destructive" size="icon"
               onClick={hangUp}
               aria-label="End call"

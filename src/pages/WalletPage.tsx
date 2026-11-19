@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import TipAndSubscribeModal from "@/components/TipAndSubscribeModal";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 interface Transaction {
@@ -39,7 +40,7 @@ const txLabel = (tx: Pick<Transaction, "type" | "note">) => {
   if (note.startsWith("Withdrawal cancelled")) return "Withdrawal refund";
   if (note.startsWith("Withdrawal rejected")) return "Withdrawal refund";
   if (note.startsWith("Withdrawal")) return "Withdrawal";
-  if (tx.type === "topup") return "M-Pesa Top Up";
+  if (tx.type === "topup") return tx.counterparty === "Paystack" ? "Top Up (Paystack)" : "M-Pesa Top Up";
   if (note) return note.replace(/\s*\(5% fee\)$/, "");
   return tx.type === "send" ? "Sent" : tx.type === "receive" ? "Received" : tx.type;
 };
@@ -53,6 +54,7 @@ const WalletPage = () => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [earnings, setEarnings] = useState<null | { tips_all: number; tips_month: number; subs_all: number; subs_month: number; withdrawn_all: number; pending_withdrawals: number; subscribers_active: number }>(null);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<"send" | "receive" | "topup" | "withdraw" | null>(null);
   const [amount, setAmount] = useState("");
@@ -65,6 +67,7 @@ const WalletPage = () => {
 
   const balance = transactions.reduce((b, t) => b + (t.type === "send" ? -Number(t.amount) : Number(t.amount)), 0);
 
+  const [psTopup, setPsTopup] = useState(false);
   const load = async () => {
     if (!user) return;
     setLoading(true);
@@ -84,7 +87,22 @@ const WalletPage = () => {
     if (txRes.error) toast.error("Failed to load wallet");
     else setTransactions((txRes.data as Transaction[]) || []);
     if (!wdRes.error) setWithdrawals((wdRes.data as unknown as Withdrawal[]) || []);
+    const { data: earn } = await supabase.rpc("wallet_earnings_summary" as never);
+    if (earn) setEarnings(earn as never);
     setLoading(false);
+  };
+
+  const downloadStatement = () => {
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const rows = [["Date", "Type", "Description", "Counterparty", "Amount (KES)", "Direction"]];
+    for (const t of transactions) {
+      rows.push([new Date(t.created_at).toISOString(), t.type, txLabel(t), t.counterparty ?? "", Number(t.amount).toFixed(2), t.type === "send" ? "out" : "in"]);
+    }
+    const csv = rows.map(r => r.map(c => esc(String(c))).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `primegram-statement-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const cancelWithdrawal = async (id: string) => {
@@ -95,6 +113,7 @@ const WalletPage = () => {
   };
 
   useEffect(() => { load(); }, [user]);
+  useEffect(() => { const h = () => { load(); }; window.addEventListener("wallet:refresh", h); return () => window.removeEventListener("wallet:refresh", h); }, [user]);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current !== null) {
@@ -251,7 +270,7 @@ const WalletPage = () => {
           </div>
           <div className="flex justify-center gap-5">
               {[
-              { icon: Plus, label: "Top Up", action: () => setModal("topup") },
+              { icon: Plus, label: "Top Up", action: () => setPsTopup(true) },
               { icon: ArrowUpRight, label: "Send", action: () => setModal("send") },
               { icon: ArrowDownLeft, label: "Receive", action: () => setModal("receive") },
                 { icon: Banknote, label: "Withdraw", action: () => setModal("withdraw") },
@@ -265,6 +284,23 @@ const WalletPage = () => {
             ))}
           </div>
         </motion.div>
+
+        {earnings && (earnings.tips_all > 0 || earnings.subs_all > 0 || earnings.withdrawn_all > 0 || earnings.subscribers_active > 0) && (
+          <div className="liquid-glass rounded-2xl relative z-10 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold text-foreground">Creator earnings</span>
+              <button onClick={downloadStatement} className="depth-press text-xs text-primary">Download statement</button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><p className="text-xs text-muted-foreground">Tips this month</p><p className="font-semibold text-foreground">{kes(earnings.tips_month)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Subscriptions this month</p><p className="font-semibold text-foreground">{kes(earnings.subs_month)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Total earned</p><p className="font-semibold text-foreground">{kes(earnings.tips_all + earnings.subs_all)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Withdrawn</p><p className="font-semibold text-foreground">{kes(earnings.withdrawn_all)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Active subscribers</p><p className="font-semibold text-foreground">{earnings.subscribers_active}</p></div>
+              <div><p className="text-xs text-muted-foreground">Pending payouts</p><p className="font-semibold text-foreground">{kes(earnings.pending_withdrawals)}</p></div>
+            </div>
+          </div>
+        )}
 
         {withdrawals.length > 0 && (
           <div className="liquid-glass rounded-2xl relative z-10">
@@ -386,7 +422,7 @@ const WalletPage = () => {
                   {modal === "withdraw" && (
                     <div className="relative z-10 space-y-3">
                       <div className="rounded-2xl border border-primary/20 bg-primary/[0.06] p-3 text-xs text-muted-foreground">
-                        The amount is taken from your balance right away and sent to your M-Pesa number once our team approves it (usually within 24 hours). You can cancel a pending request for a full refund. Minimum KES 50. Available: {kes(balance)}.
+                        The amount is taken from your balance right away and sent to your M-Pesa number once our team approves it (usually within 24 hours). You can cancel a pending request for a full refund. Minimum KES 50, maximum KES 50,000 per day. Available: {kes(balance)}.
                       </div>
                       <label className="text-caption text-muted-foreground block">M-Pesa phone number</label>
                       <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="0712 345 678" inputMode="tel" className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/30" />
@@ -423,6 +459,7 @@ const WalletPage = () => {
         )}
       </AnimatePresence>
       <GlassTabBar />
+      <TipAndSubscribeModal open={psTopup} onOpenChange={setPsTopup} mode="topup" onSuccess={() => { void load(); }} />
     </div>
   );
 };

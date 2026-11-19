@@ -1,4 +1,8 @@
 import { lazy, Suspense } from "react";
+import PaystackReturn from "@/components/PaystackReturn";
+import SpotifyCallback from "@/components/SpotifyCallback";
+import InAppBrowser from "@/components/InAppBrowser";
+import NativeAuthBridge from "@/components/NativeAuthBridge";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -30,6 +34,7 @@ const ExtremePage = lazy(() => import("./pages/ExtremePage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const CrushPage = lazy(() => import("./pages/CrushPage"));
 const AdultPage = lazy(() => import("./pages/AdultPage"));
+const MeetPage = lazy(() => import("./pages/MeetPage"));
 const AIBotsPage = lazy(() => import("./pages/AIBotsPage"));
 const PublicProfilePage = lazy(() => import("./pages/PublicProfilePage"));
 import GlobalRealtimeListener from "./components/GlobalRealtimeListener";
@@ -73,6 +78,10 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <NativeAuthBridge />
+        <PaystackReturn />
+        <SpotifyCallback />
+        <InAppBrowser />
         <AuthProvider>
           <MuteProvider>
           <OnlineProvider>
@@ -100,6 +109,7 @@ const App = () => (
             <Route path="/discover" element={<ProtectedRoute><DiscoverPage /></ProtectedRoute>} />
             <Route path="/extreme" element={<ProtectedRoute><ExtremePage /></ProtectedRoute>} />
             <Route path="/crush" element={<ProtectedRoute><CrushPage /></ProtectedRoute>} />
+            <Route path="/meet" element={<ProtectedRoute><MeetPage /></ProtectedRoute>} />
             <Route path="/adult" element={<ProtectedRoute><AdultPage /></ProtectedRoute>} />
             <Route path="/bots" element={<ProtectedRoute><AIBotsPage /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />

@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       session: current,
     };
     const accounts = readSavedAccounts().filter(saved => saved.userId !== account.userId);
-    const next = [...accounts, account].slice(-2);
+    const next = [...accounts, account].slice(-10);
     localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
     setSavedAccounts(next);
   }, []);

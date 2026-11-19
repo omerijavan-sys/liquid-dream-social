@@ -97,6 +97,27 @@ const AdminPage = () => {
     },
   });
 
+  const { data: tickets } = useQuery({
+    queryKey: ["admin", "tickets"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_tickets" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const resolveTicket = async (id: string) => {
+    const { error } = await supabase.from("support_tickets" as any).update({ status: "resolved" }).eq("id", id);
+    if (error) { toast.error("Couldn't update ticket"); return; }
+    toast.success("Ticket resolved");
+    qc.invalidateQueries({ queryKey: ["admin", "tickets"] });
+  };
+
   const { data: audit } = useQuery({
     queryKey: ["admin", "audit"],
     enabled,
@@ -209,6 +230,9 @@ const AdminPage = () => {
     { label: "Reels", value: reels?.length ?? 0, icon: Video },
     { label: "Open reports", value: (reports ?? []).filter((r: any) => r.status === "open").length, icon: Flag },
     { label: "Pending withdrawals", value: (withdrawals ?? []).filter((w: any) => w.status === "pending").length, icon: Banknote },
+    { label: "Payout queue (KES)", value: (withdrawals ?? []).filter((w: any) => w.status === "pending").reduce((a: number, w: any) => a + Number(w.amount || 0), 0).toLocaleString(), icon: Banknote },
+    { label: "New users (7d)", value: (profiles ?? []).filter((p: any) => p.created_at && Date.now() - new Date(p.created_at).getTime() < 7 * 864e5).length, icon: Users },
+    { label: "Open tickets", value: ((tickets ?? []) as any[]).filter((t: any) => t.status !== "resolved").length, icon: Flag },
   ];
 
   const glass = "border-white/10 bg-white/5 backdrop-blur-2xl";
@@ -251,6 +275,7 @@ const AdminPage = () => {
               <TabsTrigger value="content">Content</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+              <TabsTrigger value="tickets">Support ({(tickets ?? []).filter((t: any) => t.status === "open").length})</TabsTrigger>
               <TabsTrigger value="audit">Audit log</TabsTrigger>
             </TabsList>
 
@@ -366,6 +391,9 @@ const AdminPage = () => {
                       <span className="text-sm font-medium">KES {Number(w.amount).toLocaleString()}</span>
                       <span className="text-sm text-muted-foreground">{usernameFor(w.user_id)} · {w.phone}</span>
                       <Badge variant="secondary" className="capitalize">{w.status}</Badge>
+                      {(w.risk_flags ?? []).map((f: string) => (
+                        <Badge key={f} variant="destructive" className="text-[10px]">{f.replace(/_/g, " ")}</Badge>
+                      ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Requested {new Date(w.created_at).toLocaleString()}
@@ -385,6 +413,28 @@ const AdminPage = () => {
                   </CardContent>
                 </Card>
               ))}
+            </TabsContent>
+
+            <TabsContent value="tickets" className="mt-4 space-y-3">
+              {(tickets ?? []).map((t: any) => (
+                <Card key={t.id} className={glass}>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium">{t.subject}</span>
+                      <Badge variant="secondary" className="capitalize">{t.kind}</Badge>
+                      <Badge variant={t.status === "open" ? "destructive" : "secondary"} className="capitalize">{t.status}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{t.message}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {usernameFor(t.user_id)} · {new Date(t.created_at).toLocaleString()}
+                    </p>
+                    {t.status === "open" && (
+                      <Button size="sm" variant="secondary" onClick={() => resolveTicket(t.id)}>Mark resolved</Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+              {(tickets ?? []).length === 0 && <p className="text-sm text-muted-foreground">No support tickets.</p>}
             </TabsContent>
 
             <TabsContent value="audit" className="mt-4 space-y-2">

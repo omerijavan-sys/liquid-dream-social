@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
+import { nativeGoogleSignIn } from "@/components/NativeAuthBridge";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -28,7 +30,7 @@ const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(countryCodes[0]);
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(countryCodes.find(c => c.code === "KE") ?? countryCodes[0]);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(0);
@@ -418,6 +420,11 @@ const AuthPage = () => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
+      if (Capacitor.isNativePlatform()) {
+        await nativeGoogleSignIn();
+        void logSecurityEvent("auth", "google_oauth_started_native");
+        return;
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         // Let Supabase/browser perform the cross-origin redirect directly.

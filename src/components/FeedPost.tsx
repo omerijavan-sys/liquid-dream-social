@@ -11,12 +11,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
+import ShareSheet from "@/components/ShareSheet";
 import type { PostMusic } from "@/components/PostMusicPlayer";
 import { BOOSTS } from "@/lib/extreme";
 import CreatorTipButton from "@/components/CreatorTipButton";
 
 interface FeedPostProps {
   image: string;
+  poster?: string | null;
   mediaType?: string;
   username: string;
   avatar: string;
@@ -48,7 +50,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
     <div className={`${size} rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold`}>{avatar}</div>
   );
 
-const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, music, views = 0 }: FeedPostProps) => {
+const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, authorId, music, views = 0 }: FeedPostProps) => {
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
   const [me, setMe] = useState<string | null>(null);
@@ -59,7 +61,7 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
   const [showHeart, setShowHeart] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [videoLoading, setVideoLoading] = useState(true);
+  const [videoLoading, setVideoLoading] = useState(false);
   const lastTap = useRef(0);
   const tapTimer = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -145,13 +147,8 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
     toast.success(saved ? "Removed from saved" : "Saved");
   };
 
-  const sharePost = async () => {
-    const text = `${username} on Primegram: ${caption}`;
-    try {
-      if (navigator.share) await navigator.share({ title: "Primegram", text, url: postLink });
-      else { await navigator.clipboard.writeText(postLink); toast.success("Link copied"); }
-    } catch { /* cancelled */ }
-  };
+  const [shareOpen, setShareOpen] = useState(false);
+  const sharePost = () => { if (postId) setShareOpen(true); else void navigator.clipboard.writeText(postLink).then(() => toast.success("Link copied")); };
 
   const copyLink = async () => {
     try { await navigator.clipboard.writeText(postLink); toast.success("Link copied"); } catch { toast.error("Couldn't copy link"); }
@@ -268,7 +265,8 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
             <div className="relative w-full">
               <video
                 ref={videoRef}
-                src={image}
+                src={poster ? image : `${image}#t=0.1`}
+                poster={poster || undefined}
                 className="w-full h-auto max-h-[75vh] object-contain bg-background"
                 playsInline
                 muted={muted}
@@ -428,6 +426,7 @@ const FeedPost = ({ image, mediaType = "image", username, avatar, caption, likes
           </div>
         </DialogContent>
       </Dialog>
+      {postId && <ShareSheet open={shareOpen} onOpenChange={setShareOpen} target={{ kind: "post", id: postId, mediaUrl: image, mediaType, caption, username, link: postLink }} />}
     </motion.div>
   );
 };
