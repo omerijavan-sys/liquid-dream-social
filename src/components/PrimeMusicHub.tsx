@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Music2, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward, ListPlus, Send, Trash2 } from "lucide-react";
+import { X, Search, Music2, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward, ListPlus, Send, Trash2, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { playSong, toggleMusic, seekMusic, stopMusic, useMusic, setQueueHandlers } from "@/services/MusicEngine";
+import { playSong, toggleMusic, seekMusic, stopMusic, useMusic, setQueueHandlers, getMusicState, cycleRepeat, toggleShuffle } from "@/services/MusicEngine";
 import { isSpotifyConnected, startSpotifyLogin, disconnectSpotify, initSpotifyPlayer, playOnSpotify, spotifyToggle, spotifySeek, spotifyNext, spotifyPrev, type SpState } from "@/services/SpotifyConnect";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,10 +101,12 @@ const NowPlaying = ({ item, onClose, onNext, onPrev, onUse }: { item: Item; onCl
         <>
           <input type="range" min={0} max={Math.max(1, dur)} step={1} value={Math.min(pos, dur || 0)} onChange={e => seek(Number(e.target.value))} className="w-full accent-emerald-400" aria-label="Seek" />
           <div className="flex items-center justify-between text-[10px] text-white/50"><span>{fmt(pos)}</span><span>{fmt(dur)}</span></div>
-          <div className="mt-1 flex items-center justify-center gap-5">
+          <div className="mt-1 flex items-center justify-center gap-4">
+            <button onClick={toggleShuffle} aria-label="Shuffle" className={music.shuffle ? "text-emerald-300" : "text-white/45"}><Shuffle className="h-5 w-5" /></button>
             {(onPrev || spot) && <button onClick={() => (onPrev && item.kind === "track" ? onPrev() : void spotifyPrev())} aria-label="Previous song"><SkipBack className="h-5 w-5" /></button>}
             <button onClick={toggle} aria-label={paused ? "Play" : "Pause"} className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400 text-black active:scale-95">{!spot && music.loading ? <Loader2 className="h-5 w-5 animate-spin" /> : paused ? <Play className="h-5 w-5 fill-current" /> : <Pause className="h-5 w-5 fill-current" />}</button>
             {(onNext || spot) && <button onClick={() => (onNext && item.kind === "track" ? onNext() : void spotifyNext())} aria-label="Next song"><SkipForward className="h-5 w-5" /></button>}
+            <button onClick={cycleRepeat} aria-label="Repeat" className={music.repeat === "off" ? "text-white/45" : "text-emerald-300"}>{music.repeat === "one" ? <Repeat1 className="h-5 w-5" /> : <Repeat className="h-5 w-5" />}</button>
           </div>
         </>
       )}
@@ -134,15 +136,22 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   const queue: Item[] = kind === "mine" ? (mineOpen !== null ? (lists[mineOpen]?.items ?? []) as Item[] : []) : items.filter(i => i.kind === "track");
   const qRef = useRef<Item[]>([]); qRef.current = queue;
   const nowRef = useRef<Item | null>(null); nowRef.current = now;
-  const advance = (d: number) => {
+  const advance = (d: number, auto = false) => {
     const list = qRef.current; const cur = nowRef.current;
     if (!list.length) return;
     const i = cur ? list.findIndex(x => x.id === cur.id) : -1;
-    setNow(list[(i + d + list.length) % list.length]);
+    const { shuffle, repeat } = getMusicState();
+    if (shuffle && list.length > 1) {
+      let j = i; while (j === i) j = Math.floor(Math.random() * list.length);
+      setNow(list[j]); return;
+    }
+    const n = i + d;
+    if (auto && repeat === "off" && n >= list.length) return; // end of the list
+    setNow(list[(n + list.length) % list.length]);
   };
   // lets the mini player, lock screen and auto-advance use next/previous
   useEffect(() => {
-    if (now?.kind === "track") setQueueHandlers({ next: () => advance(1), prev: () => advance(-1) });
+    if (now?.kind === "track") setQueueHandlers({ next: (auto) => advance(1, !!auto), prev: () => advance(-1) });
     else setQueueHandlers(null);
   }, [now?.id, now?.kind]); // eslint-disable-line react-hooks/exhaustive-deps
 

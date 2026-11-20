@@ -10,7 +10,7 @@ const NativePush = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
-    if (!Capacitor.isNativePlatform() || !user) return;
+    if (!Capacitor.isNativePlatform() || !user || import.meta.env.VITE_PUSH_ENABLED !== "true") return; // only builds that include a valid google-services.json register for push
     let cleanup: Array<() => void> = [];
     void (async () => {
       try {

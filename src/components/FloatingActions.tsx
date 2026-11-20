@@ -101,7 +101,7 @@ const FloatingActions = () => {
     <>
       <div className="fixed bottom-28 right-3 z-[60] flex flex-col items-center gap-3">
         {[
-          { label: "Prime Hub", icon: Layers, run: () => setHubOpen(true), bg: "linear-gradient(135deg,#fbbf24,#f97316)", glow: "rgba(249,115,22,0.55)" },
+          { label: "Music", icon: Music, run: () => window.dispatchEvent(new Event("prime:openMusic")), bg: "linear-gradient(135deg,#34d399,#059669)", glow: "rgba(16,185,129,0.55)" },
           { label: "AI assistant", icon: Sparkles, run: () => { void openAI(); }, bg: "linear-gradient(135deg,#a78bfa,#ec4899)", glow: "rgba(167,139,250,0.55)" },
         ].map((a) => (
           <motion.button

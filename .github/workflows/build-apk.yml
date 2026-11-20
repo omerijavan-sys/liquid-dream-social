@@ -27,6 +27,18 @@ jobs:
       - name: Install dependencies
         run: npm ci --include=optional
 
+      - name: Add Firebase config (enables phone notifications)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ] && echo "$GOOGLE_SERVICES_JSON" | grep -q '"package_name": *"com.primegram.app"'; then
+            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "VITE_PUSH_ENABLED=true" >> "$GITHUB_ENV"
+            echo "google-services.json added - push enabled"
+          else
+            echo "No valid GOOGLE_SERVICES_JSON (package must be com.primegram.app) - push disabled in this build"
+          fi
+
       - name: Build web assets
         run: npm run build
         env:
@@ -34,12 +46,6 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_yFGklkV-V-QEFX7i8bWnbw_TvK-v02f
           VITE_SUPABASE_PROJECT_ID: kfvoqwbfgptqrrkyhorj
           VITE_APP_BUILD: ${{ github.run_number }}
-
-      - name: Add Firebase config (enables phone notifications)
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json; echo "google-services.json added"; else echo "No GOOGLE_SERVICES_JSON secret - push notifications disabled in this build"; fi
 
       - name: Sync Capacitor Android project
         run: npx cap sync android

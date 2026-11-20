@@ -3,14 +3,14 @@ import { findFullStream } from "./FullTrack";
 import { spotifyStop } from "./SpotifyConnect";
 
 export interface EngineTrack { key: string; title: string; artist: string; artwork?: string | null; url?: string; yt?: string }
-export interface EngineState { track: EngineTrack | null; paused: boolean; loading: boolean; error: string | null; pos: number; dur: number; hasQueue?: boolean }
+export interface EngineState { track: EngineTrack | null; paused: boolean; loading: boolean; error: string | null; pos: number; dur: number; hasQueue?: boolean; repeat: "off" | "all" | "one"; shuffle: boolean }
 
-let queueH: { next?: () => void; prev?: () => void } | null = null;
-export const setQueueHandlers = (h: { next?: () => void; prev?: () => void } | null) => { queueH = h; set({ hasQueue: !!h }); };
+let queueH: { next?: (auto?: boolean) => void; prev?: () => void } | null = null;
+export const setQueueHandlers = (h: { next?: (auto?: boolean) => void; prev?: () => void } | null) => { queueH = h; set({ hasQueue: !!h }); };
 export const nextTrack = () => queueH?.next?.();
 export const prevTrack = () => queueH?.prev?.();
 
-let state: EngineState = { track: null, paused: true, loading: false, error: null, pos: 0, dur: 0 };
+let state: EngineState = { repeat: "off", shuffle: false, track: null, paused: true, loading: false, error: null, pos: 0, dur: 0 };
 const subs = new Set<() => void>();
 const set = (p: Partial<EngineState>) => { state = { ...state, ...p }; subs.forEach(f => f()); };
 
@@ -25,10 +25,19 @@ const el = (): HTMLAudioElement => {
   audio.addEventListener("waiting", () => set({ loading: true }));
   audio.addEventListener("playing", () => set({ loading: false, paused: false }));
   audio.addEventListener("timeupdate", () => set({ pos: audio!.currentTime, dur: audio!.duration || 0 }));
-  audio.addEventListener("ended", () => { set({ paused: true, pos: 0 }); queueH?.next?.(); });
+  audio.addEventListener("ended", () => onEnded());
   audio.addEventListener("error", () => set({ loading: false, paused: true, error: "This track couldn't be played." }));
   return audio;
 };
+
+/** Song finished: repeat-one replays it, otherwise move on in the queue (the queue decides about wrapping). */
+const onEnded = () => {
+  if (state.repeat === "one") { seekMusic(0); if (mode === "yt") yt?.playVideo(); else void el().play().catch(() => undefined); return; }
+  set({ paused: true, pos: 0 });
+  queueH?.next?.(true);
+};
+export const cycleRepeat = () => set({ repeat: state.repeat === "off" ? "all" : state.repeat === "all" ? "one" : "off" });
+export const toggleShuffle = () => set({ shuffle: !state.shuffle });
 
 const media = (t: EngineTrack | null) => {
   if (!("mediaSession" in navigator)) return;
@@ -53,7 +62,7 @@ const loadYT = () => (ytPromise ??= new Promise<any>((resolve, reject) => {
     const inner = document.createElement("div"); host.appendChild(inner); document.body.appendChild(host);
     new w.YT.Player(inner, { height: "200", width: "200", playerVars: { autoplay: 1, playsinline: 1, controls: 0, rel: 0, origin: location.origin }, events: {
       onReady: (e: any) => resolve(e.target),
-      onStateChange: (e: any) => { const c = e.data; if (c === 1) set({ paused: false, loading: false }); else if (c === 2) set({ paused: true }); else if (c === 3) set({ loading: true }); else if (c === 0) { set({ paused: true, pos: 0 }); queueH?.next?.(); } },
+      onStateChange: (e: any) => { const c = e.data; if (c === 1) set({ paused: false, loading: false }); else if (c === 2) set({ paused: true }); else if (c === 3) set({ loading: true }); else if (c === 0) onEnded(); },
       onError: () => set({ loading: false, paused: true, error: "This track couldn't be played." }),
     } });
   };
