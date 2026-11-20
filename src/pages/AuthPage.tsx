@@ -160,7 +160,7 @@ const AuthPage = () => {
           setEmailOtpSent(true);
           void logSecurityEvent("otp", "email_otp_sent", sanitizedEmail, { reason: "signup" });
           setOtpCountdown(60);
-          toast.success("We sent a 6-digit code to your email — enter it below.");
+          toast.success("Confirmation email sent. Check your inbox for a link or verification code.");
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: sanitizedEmail, password });
@@ -216,7 +216,7 @@ const AuthPage = () => {
       if (error) throw error;
       void logSecurityEvent("otp", "email_otp_resent", sanitizeInput(email.toLowerCase().trim()));
       setOtpCountdown(60);
-      toast.success("New code sent to your email");
+      toast.success("Confirmation email sent. Check your inbox.");
     } catch (err: any) {
       toast.error(friendlyError(err.message));
     } finally {
@@ -566,7 +566,7 @@ const AuthPage = () => {
           ) : authMethod === "email" && emailOtpSent ? (
             <div className="space-y-4">
               <div>
-                <label className="text-caption text-muted-foreground block mb-1.5">Email verification code</label>
+                <label className="text-caption text-muted-foreground block mb-1.5">Confirm your email</label>
                 <input
                   value={emailOtp}
                   onChange={e => setEmailOtp(e.target.value.replace(/[^0-9]/g, ""))}
@@ -576,7 +576,7 @@ const AuthPage = () => {
                   className="w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-center text-2xl tracking-[0.5em] font-mono outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <p className="text-caption text-muted-foreground mt-2">
-                  Enter the 6-digit code sent to {email}
+                  We sent a confirmation email to {email}. Click its link or enter the 6-digit code here.
                 </p>
                 {otpCountdown > 0 ? (
                   <p className="text-[11px] text-muted-foreground mt-1">Resend available in {otpCountdown}s</p>

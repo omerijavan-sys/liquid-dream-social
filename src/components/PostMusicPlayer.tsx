@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Music2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation } from "react-router-dom";
 import { searchGlobalMusic } from "@/services/GlobalMusicService";
 import SpotifyEmbed, { spotifyIdOf } from "./SpotifyEmbed";
 
@@ -37,6 +38,8 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const activeKey = useRef<string>("");
+  const location = useLocation();
+  const lastPath = useRef(location.pathname);
 
   // Stop if another post's player takes over the shared audio element.
   useEffect(() => () => {
@@ -46,6 +49,15 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
   const [found, setFound] = useState<string | null>(null);
   const spId = spotifyIdOf(music.youtube_id) ?? found;
   const [spOpen, setSpOpen] = useState(false);
+
+  useEffect(() => {
+    if (lastPath.current === location.pathname) return;
+    lastPath.current = location.pathname;
+    sharedAudio?.pause();
+    currentUrl = null;
+    setPlaying(false);
+    setSpOpen(false);
+  }, [location.pathname]);
 
   const toggle = async () => {
     if (!spId && !music.stream_url) {
