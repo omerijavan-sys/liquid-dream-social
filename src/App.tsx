@@ -28,6 +28,7 @@ const WalletPage = lazy(() => import("./pages/WalletPage"));
 const ReelsPage = lazy(() => import("./pages/ReelsPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const CallPage = lazy(() => import("./pages/CallPage"));
+const GroupCallPage = lazy(() => import("./pages/GroupCallPage"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const CreatePostPage = lazy(() => import("./pages/CreatePostPage"));
 const SportsPage = lazy(() => import("./pages/SportsPage"));
@@ -112,6 +113,7 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<ProtectedRoute><PublicProfilePage /></ProtectedRoute>} />
             <Route path="/call/:userId" element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
+            <Route path="/gcall/:callId" element={<ProtectedRoute><GroupCallPage /></ProtectedRoute>} />
             <Route path="/sports" element={<ProtectedRoute><SportsPage /></ProtectedRoute>} />
             <Route path="/movies" element={<ProtectedRoute><MoviesPage /></ProtectedRoute>} />
             <Route path="/discover" element={<ProtectedRoute><DiscoverPage /></ProtectedRoute>} />

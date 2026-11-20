@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Music2, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import { searchGlobalMusic } from "@/services/GlobalMusicService";
-import { getMusicState, playSong, playUrl, seekMusic, toggleMusic, useMusic } from "@/services/MusicEngine";
+import { getMusicState, playSong, playUrl, seekMusic, stopMusic, toggleMusic, useMusic } from "@/services/MusicEngine";
 
 export interface PostMusic {
   title: string;
@@ -26,6 +26,10 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
   const start0 = music.start ?? 0;
   const len0 = music.len ?? 30;
   const seeked = useRef(false);
+  const alive = useRef(true);
+  const stopIfStale = () => {
+    if ((!alive.current || !visible.current) && getMusicState().track?.key === key) stopMusic();
+  };
 
   // jump to the poster's chosen section, and loop just that section
   useEffect(() => {
@@ -36,6 +40,7 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
   }, [mine, m.paused, m.pos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = async () => {
+    if (!alive.current) return;
     try {
       const artist = music.artist ?? "";
       if (music.stream_url) { await playUrl({ key, title: music.title, artist, artwork: music.art_url, url: music.stream_url }); return; }
@@ -44,6 +49,7 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
       const hit = (await searchGlobalMusic(`${clean(music.title)} ${clean(artist)}`.trim(), 5)).find(h => h.streamUrl);
       if (hit) await playUrl({ key, title: music.title, artist, artwork: music.art_url ?? hit.artwork, url: hit.streamUrl });
     } catch { /* silent: Instagram-style, no error spam while scrolling */ }
+    finally { stopIfStale(); } // the song may have finished loading after the post left the screen
   };
 
   // Plays by itself while the post is on screen, stops when you scroll away.
@@ -55,10 +61,17 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
       if (e.isIntersecting) {
         const otherPlaying = st.track && !st.track.key.startsWith("post|") && !st.paused;
         if (!userPaused.current && !otherPlaying) void start();
-      } else if (st.track?.key === key && !st.paused) toggleMusic();
+      } else if (st.track?.key === key) stopMusic();
     }, { threshold: 0.7 });
     obs.observe(el);
-    return () => { obs.disconnect(); if (getMusicState().track?.key === key && !getMusicState().paused) toggleMusic(); };
+    alive.current = true;
+    const onVis = () => { if (document.hidden && getMusicState().track?.key === key) stopMusic(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      alive.current = false; visible.current = false;
+      obs.disconnect(); document.removeEventListener("visibilitychange", onVis);
+      if (getMusicState().track?.key === key) stopMusic();
+    };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tap = () => {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Loader2, Palette, Paperclip, Send, Users, X, LogOut, UserPlus } from "lucide-react";
+import { ArrowLeft, Phone, Video as VideoIcon, Loader2, Palette, Paperclip, Send, Users, X, LogOut, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { themeById } from "@/utils/chatThemes";
 import { openLink } from "@/utils/openLink";
@@ -20,6 +21,13 @@ const rpc = (fn: string, args: Record<string, unknown>) =>
 
 const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const startCall = async (audio: boolean) => {
+    if (!user) return;
+    const { data, error } = await supabase.from("group_calls" as never).insert({ group_id: groupId, started_by: user.id, audio } as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null };
+    if (error || !data) { toast.error(error?.message ?? "Couldn't start the group call"); return; }
+    navigate(`/gcall/${data.id}${audio ? "?audio=1" : ""}`);
+  };
   const [group, setGroup] = useState<{ name: string; theme: string } | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [people, setPeople] = useState<Record<string, Person>>({});
@@ -121,6 +129,8 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
       <div className="flex items-center gap-3 border-b border-white/10 bg-black/40 px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl">
         <button onClick={onClose} aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
         <button onClick={() => setInfoOpen(true)} className="min-w-0 flex-1 text-left"><p className="truncate font-semibold">{group?.name ?? "…"}</p><p className="text-[11px] text-white/60">{members.length} members</p></button>
+        <button onClick={() => void startCall(true)} aria-label="Group voice call" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><Phone className="h-4 w-4" /></button>
+        <button onClick={() => void startCall(false)} aria-label="Group video call" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><VideoIcon className="h-4 w-4" /></button>
         <button onClick={() => setThemeOpen(true)} aria-label="Change theme" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><Palette className="h-4 w-4" /></button>
         <button onClick={() => setInfoOpen(true)} aria-label="Members" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><Users className="h-4 w-4" /></button>
       </div>
