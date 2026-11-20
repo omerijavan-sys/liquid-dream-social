@@ -87,19 +87,7 @@ jobs:
           tag_name: v${{ github.run_number }}
           name: Primegram APK Build ${{ github.run_number }}
           draft: false
-          prerelease: true
+          prerelease: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish APK to the website download
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk public/primegram-extreme.apk
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/primegram-extreme.apk
-          if git diff --cached --quiet; then echo "No APK change"; else
-            git commit -m "Update Android APK download [skip actions]"
-            git pull --rebase --autostash origin main
-            git push origin HEAD:main
-          fi

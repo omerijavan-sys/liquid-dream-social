@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Download, ExternalLink, Smartphone } from "lucide-react";
 
-export const ANDROID_APK_URL = "/primegram-extreme.apk";
+export const ANDROID_APK_URL = "https://github.com/omerijavan-sys/liquid-dream-social/releases/latest/download/app-debug.apk";
 export const PRIMEGRAM_ISA_DEV_URL = "https://primegram-extreme.is-a.dev";
 
 const AndroidDownloadCard = ({ compact = false }: { compact?: boolean }) => {
