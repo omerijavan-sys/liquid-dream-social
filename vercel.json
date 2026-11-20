@@ -5,6 +5,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/primegram.apk",
+      "destination": "/api/download"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
