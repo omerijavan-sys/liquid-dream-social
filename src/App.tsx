@@ -1,3 +1,4 @@
+import BackgroundAudio from "./components/BackgroundAudio";
 import PostMusicGuard from "./components/PostMusicGuard";
 import ConsentGate from "./components/ConsentGate";
 import NativeMediaPicker from "./components/NativeMediaPicker";
@@ -90,6 +91,7 @@ const App = () => (
         <BackButtonHandler />
         <NativeMediaPicker />
         <PostMusicGuard />
+        <BackgroundAudio />
         <UpdateChecker />
         <PaystackReturn />
         <SpotifyCallback />

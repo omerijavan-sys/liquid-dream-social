@@ -4,6 +4,7 @@ import { App as CapApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { finishNativeSpotify } from "@/services/SpotifyConnect";
 
 export const NATIVE_REDIRECT = "com.primegram.app://auth-callback";
 
@@ -25,6 +26,16 @@ const NativeAuthBridge = () => {
     const handle = CapApp.addListener("appUrlOpen", async ({ url }) => {
       if (!url.startsWith(NATIVE_REDIRECT)) return;
       try { await Browser.close(); } catch { /* already closed */ }
+      if (url.includes("spotify_code=") || url.includes("spotify_error=")) {
+        try {
+          const code = new URL(url).searchParams.get("spotify_code");
+          if (!code) throw new Error("Spotify login was cancelled");
+          await finishNativeSpotify(code);
+          toast.success("Spotify connected 🎧");
+          setTimeout(() => window.dispatchEvent(new Event("prime:openMusic")), 300);
+        } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't connect Spotify"); }
+        return;
+      }
       try {
         const u = new URL(url.replace("#", url.includes("?") ? "&" : "?"));
         const err = u.searchParams.get("error_description") || u.searchParams.get("error");

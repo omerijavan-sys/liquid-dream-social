@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Music2, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward, ListPlus, Send, Trash2, Shuffle, Repeat, Repeat1 } from "lucide-react";
+import { X, Search, Music2, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward, ListPlus, Send, Trash2, Shuffle, Repeat, Repeat1, Download, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { playSong, toggleMusic, seekMusic, stopMusic, useMusic, setQueueHandlers, getMusicState, cycleRepeat, toggleShuffle } from "@/services/MusicEngine";
+import { playSong, toggleMusic, seekMusic, stopMusic, useMusic, setQueue, nextTrack, prevTrack, queueItemById, cycleRepeat, toggleShuffle, getMusicState } from "@/services/MusicEngine";
 import { isSpotifyConnected, startSpotifyLogin, disconnectSpotify, initSpotifyPlayer, playOnSpotify, spotifyToggle, spotifySeek, spotifyNext, spotifyPrev, type SpState } from "@/services/SpotifyConnect";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SpotifyEmbed from "./SpotifyEmbed";
 import { openLink } from "@/utils/openLink";
+import { useDownloads, downloadSong, removeDownload, dlKey } from "@/services/MusicDownloads";
+import { Capacitor } from "@capacitor/core";
 
 /** Kept for older callers that import the default chart list; real music now comes from Spotify. */
 export const tracks: Array<{ title: string; artist: string; youtubeId: string }> = [];
 
 type Kind = "track" | "playlist" | "album";
-type Tab = Kind | "mine";
+type Tab = Kind | "mine" | "saved";
 interface MyList { name: string; items: Array<{ id: string; title: string; artist: string; artwork: string | null; kind: Kind }> }
 const LS_LISTS = "primegram:playlists";
 const readLists = (): MyList[] => { try { return JSON.parse(localStorage.getItem(LS_LISTS) || "[]"); } catch { return []; } };
@@ -23,6 +25,7 @@ interface Item { id: string; title: string; artist: string; artwork: string | nu
 const GENRES = ["Afrobeats", "Amapiano", "Gengetone", "Bongo Flava", "Hip Hop", "R&B", "Gospel", "Pop", "Reggae", "Rock", "Lo-fi", "Workout"];
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "mine", label: "My playlists" },
+  { id: "saved", label: "Downloaded" },
   { id: "track", label: "Songs" },
   { id: "playlist", label: "Playlists" },
   { id: "album", label: "Albums" },
@@ -42,6 +45,7 @@ const NowPlaying = ({ item, onClose, onNext, onPrev, onUse }: { item: Item; onCl
   const music = useMusic();
 
   const fallback = async () => {
+    if (item.kind === "track" && getMusicState().track?.key === `sp_${item.id}`) { setEngine("audio"); return; } // already started by the queue
     if (item.kind === "track") {
       stopMusic();
       if (await playSong(item.title, item.artist, item.artwork, `sp_${item.id}`)) { setEngine("audio"); return; }
@@ -60,7 +64,7 @@ const NowPlaying = ({ item, onClose, onNext, onPrev, onUse }: { item: Item; onCl
           if (!dead) { setEngine("spotify"); setNote("Press play to start the full song on Spotify."); }
           return;
         } catch (e) {
-          if (!dead) setNote((e instanceof Error ? e.message : "") === "account_error" ? "Spotify Premium is needed for full songs here — using the free full stream." : "");
+          if (!dead) setNote(Capacitor.isNativePlatform() ? "Spotify is connected. In the app, full songs play from the free full stream." : (e instanceof Error ? e.message : "") === "account_error" ? "Spotify Premium is needed for full songs here — using the free full stream." : "");
         }
       }
       if (!dead) await fallback();
@@ -103,9 +107,9 @@ const NowPlaying = ({ item, onClose, onNext, onPrev, onUse }: { item: Item; onCl
           <div className="flex items-center justify-between text-[10px] text-white/50"><span>{fmt(pos)}</span><span>{fmt(dur)}</span></div>
           <div className="mt-1 flex items-center justify-center gap-4">
             <button onClick={toggleShuffle} aria-label="Shuffle" className={music.shuffle ? "text-emerald-300" : "text-white/45"}><Shuffle className="h-5 w-5" /></button>
-            {(onPrev || spot) && <button onClick={() => (onPrev && item.kind === "track" ? onPrev() : void spotifyPrev())} aria-label="Previous song"><SkipBack className="h-5 w-5" /></button>}
+            {(music.hasQueue || spot) && <button onClick={() => (spot ? (onPrev && item.kind === "track" ? onPrev() : void spotifyPrev()) : prevTrack())} aria-label="Previous song"><SkipBack className="h-5 w-5" /></button>}
             <button onClick={toggle} aria-label={paused ? "Play" : "Pause"} className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400 text-black active:scale-95">{!spot && music.loading ? <Loader2 className="h-5 w-5 animate-spin" /> : paused ? <Play className="h-5 w-5 fill-current" /> : <Pause className="h-5 w-5 fill-current" />}</button>
-            {(onNext || spot) && <button onClick={() => (onNext && item.kind === "track" ? onNext() : void spotifyNext())} aria-label="Next song"><SkipForward className="h-5 w-5" /></button>}
+            {(music.hasQueue || spot) && <button onClick={() => (spot ? (onNext && item.kind === "track" ? onNext() : void spotifyNext()) : nextTrack())} aria-label="Next song"><SkipForward className="h-5 w-5" /></button>}
             <button onClick={cycleRepeat} aria-label="Repeat" className={music.repeat === "off" ? "text-white/45" : "text-emerald-300"}>{music.repeat === "one" ? <Repeat1 className="h-5 w-5" /> : <Repeat className="h-5 w-5" />}</button>
           </div>
         </>
@@ -133,7 +137,9 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   const [connected, setConnected] = useState(isSpotifyConnected());
   useEffect(() => { if (open) setConnected(isSpotifyConnected()); }, [open]);
 
-  const queue: Item[] = kind === "mine" ? (mineOpen !== null ? (lists[mineOpen]?.items ?? []) as Item[] : []) : items.filter(i => i.kind === "track");
+  const saved = useDownloads();
+  const savedItems: Item[] = saved.map(d => ({ id: d.id, title: d.title, artist: d.artist, artwork: d.artData || d.artwork, kind: "track" as Kind }));
+  const queue: Item[] = kind === "saved" ? savedItems : kind === "mine" ? (mineOpen !== null ? (lists[mineOpen]?.items ?? []) as Item[] : []) : items.filter(i => i.kind === "track");
   const qRef = useRef<Item[]>([]); qRef.current = queue;
   const nowRef = useRef<Item | null>(null); nowRef.current = now;
   const advance = (d: number, auto = false) => {
@@ -149,11 +155,36 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
     if (auto && repeat === "off" && n >= list.length) return; // end of the list
     setNow(list[(n + list.length) % list.length]);
   };
-  // lets the mini player, lock screen and auto-advance use next/previous
+  // the song can change from outside the hub (auto-advance, mini player, lock screen): keep the hub's player card in step
+  const music = useMusic();
   useEffect(() => {
-    if (now?.kind === "track") setQueueHandlers({ next: (auto) => advance(1, !!auto), prev: () => advance(-1) });
-    else setQueueHandlers(null);
-  }, [now?.id, now?.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+    const k = music.track?.key;
+    if (!k?.startsWith("sp_")) return;
+    const id = k.slice(3);
+    if (nowRef.current?.id === id) return;
+    const q = queueItemById(id);
+    if (q) setNow({ ...q, kind: "track" });
+  }, [music.track?.key]);
+  const playItem = (it: Item) => {
+    if (it.kind === "track") {
+      const list = qRef.current;
+      const idx = list.findIndex(x => x.id === it.id);
+      if (idx >= 0) setQueue(list.map(x => ({ id: x.id, title: x.title, artist: x.artist, artwork: x.artwork })), idx);
+      else setQueue([{ id: it.id, title: it.title, artist: it.artist, artwork: it.artwork }], 0);
+    }
+    setNow(it);
+  };
+  const savedKeys = new Set(saved.map(d => d.key));
+  const [saving, setSaving] = useState<string | null>(null);
+  const saveOffline = async (it: Item) => {
+    if (savedKeys.has(dlKey(it.id))) { await removeDownload(dlKey(it.id)); toast.success("Removed from your downloads"); return; }
+    setSaving(it.id);
+    const r = await downloadSong({ id: it.id, title: it.title, artist: it.artist, artwork: it.artwork });
+    setSaving(null);
+    if (r === "ok") toast.success(`Saved “${it.title}” — plays offline in the app`);
+    else if (r === "nosource") toast.error("This song can only be streamed, it can't be saved.");
+    else toast.error("Download failed. Check your connection and try again.");
+  };
 
   const saveLists = (l: MyList[]) => { setLists(l); writeLists(l); };
   const addToList = (idx: number, it: Item) => {
@@ -168,7 +199,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   const useInPost = (it: Item) => { stopMusic(); onClose(); navigate("/create", { state: { track: { title: it.title, artist: it.artist, artUrl: it.artwork } } }); };
 
   useEffect(() => {
-    if (!open || kind === "mine") return;
+    if (!open || kind === "mine" || kind === "saved") return;
     const term = query.trim().length >= 2 ? query.trim() : genre;
     const id = ++reqId.current;
     const t = setTimeout(async () => {
@@ -188,9 +219,12 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
 
   const SongRow = ({ it }: { it: Item }) => (
     <div className={`flex w-full items-center gap-2 rounded-2xl p-2.5 ${glass} ${now?.id === it.id ? "ring-1 ring-emerald-400/70" : ""}`}>
-      <button onClick={() => setNow(it)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <button onClick={() => playItem(it)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         {it.artwork ? <img src={it.artwork} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-xl object-cover" /> : <span className="h-12 w-12 shrink-0 rounded-xl bg-white/10" />}
         <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{it.title}</span><span className="block truncate text-xs text-white/60">{it.artist}</span></span>
+      </button>
+      <button onClick={() => void saveOffline(it)} aria-label={savedKeys.has(dlKey(it.id)) ? "Downloaded — tap to remove" : "Download to the app"} className="rounded-full p-2 hover:bg-white/10">
+        {saving === it.id ? <Loader2 className="h-4 w-4 animate-spin" /> : savedKeys.has(dlKey(it.id)) ? <CheckCircle2 className="h-4 w-4 text-emerald-300" /> : <Download className="h-4 w-4" />}
       </button>
       <button onClick={() => setAddFor(it)} aria-label="Add to playlist" className="rounded-full p-2 hover:bg-white/10"><ListPlus className="h-4 w-4" /></button>
       <button onClick={() => useInPost(it)} aria-label="Use in a post" className="rounded-full p-2 hover:bg-white/10"><Send className="h-4 w-4" /></button>
@@ -243,7 +277,13 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
 
           <div className={`relative z-10 mt-3 flex-1 overflow-y-auto px-4 ${now ? "pb-[26rem]" : "pb-8"}`}>
-            {kind === "mine" ? (
+            {kind === "saved" ? (
+              <div className="space-y-2">
+                <p className="px-1 text-xs text-white/50">Songs saved inside Primegram. They play without internet and are only available in the app.</p>
+                {savedItems.length === 0 && <div className={`rounded-2xl p-4 text-center text-sm text-white/60 ${glass}`}>Nothing downloaded yet. Tap the <Download className="inline h-4 w-4" /> button on any song.</div>}
+                {savedItems.map(it => <SongRow key={it.id} it={it} />)}
+              </div>
+            ) : kind === "mine" ? (
               <div className="space-y-2">
                 {mineOpen === null ? (
                   lists.length === 0

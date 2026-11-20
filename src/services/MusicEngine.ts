@@ -1,14 +1,36 @@
 import { useSyncExternalStore } from "react";
 import { findFullStream } from "./FullTrack";
 import { spotifyStop } from "./SpotifyConnect";
+import { getDownloadedUrl } from "./MusicDownloads";
 
 export interface EngineTrack { key: string; title: string; artist: string; artwork?: string | null; url?: string; yt?: string }
 export interface EngineState { track: EngineTrack | null; paused: boolean; loading: boolean; error: string | null; pos: number; dur: number; hasQueue?: boolean; repeat: "off" | "all" | "one"; shuffle: boolean }
 
-let queueH: { next?: (auto?: boolean) => void; prev?: () => void } | null = null;
-export const setQueueHandlers = (h: { next?: (auto?: boolean) => void; prev?: () => void } | null) => { queueH = h; set({ hasQueue: !!h }); };
-export const nextTrack = () => queueH?.next?.();
-export const prevTrack = () => queueH?.prev?.();
+// ---- global queue: next / previous / shuffle / repeat work from anywhere (mini player, lock screen, hub) ----
+export interface QItem { id: string; title: string; artist: string; artwork: string | null }
+let queue: QItem[] = []; let qi = -1;
+export const setQueue = (items: QItem[], index: number) => { queue = items; qi = index; set({ hasQueue: items.length > 1 }); };
+export const clearQueue = () => { queue = []; qi = -1; set({ hasQueue: false }); };
+export const queueItemById = (id: string) => queue.find(q => q.id === id) ?? null;
+const playIndex = async (i: number) => {
+  const q = queue[i]; if (!q) return;
+  qi = i;
+  const ok = await playSong(q.title, q.artist, q.artwork, `sp_${q.id}`);
+  if (!ok) set({ error: "No full version of that song was found." });
+};
+const advanceQueue = (d: 1 | -1, auto: boolean) => {
+  if (queue.length < 2) return;
+  if (d === -1 && state.pos > 4) { seekMusic(0); return; } // like most players: restart first, then go back
+  let n: number;
+  if (state.shuffle) { do { n = Math.floor(Math.random() * queue.length); } while (n === qi); }
+  else {
+    n = qi + d;
+    if (n >= queue.length || n < 0) { if (auto && state.repeat === "off") return; n = (n + queue.length) % queue.length; }
+  }
+  void playIndex(n);
+};
+export const nextTrack = () => advanceQueue(1, false);
+export const prevTrack = () => advanceQueue(-1, false);
 
 let state: EngineState = { repeat: "off", shuffle: false, track: null, paused: true, loading: false, error: null, pos: 0, dur: 0 };
 const subs = new Set<() => void>();
@@ -34,7 +56,7 @@ const el = (): HTMLAudioElement => {
 const onEnded = () => {
   if (state.repeat === "one") { seekMusic(0); if (mode === "yt") yt?.playVideo(); else void el().play().catch(() => undefined); return; }
   set({ paused: true, pos: 0 });
-  queueH?.next?.(true);
+  advanceQueue(1, true);
 };
 export const cycleRepeat = () => set({ repeat: state.repeat === "off" ? "all" : state.repeat === "all" ? "one" : "off" });
 export const toggleShuffle = () => set({ shuffle: !state.shuffle });
@@ -48,7 +70,7 @@ const media = (t: EngineTrack | null) => {
   ms.setActionHandler("pause", () => { if (mode === "yt") yt?.pauseVideo(); else el().pause(); });
   ms.setActionHandler("seekto", (d) => { if (d.seekTime != null) seekMusic(d.seekTime); });
   ms.setActionHandler("stop", () => stopMusic());
-  try { ms.setActionHandler("nexttrack", () => queueH?.next?.()); ms.setActionHandler("previoustrack", () => queueH?.prev?.()); } catch { /* unsupported */ }
+  try { ms.setActionHandler("nexttrack", () => nextTrack()); ms.setActionHandler("previoustrack", () => prevTrack()); } catch { /* unsupported */ }
 };
 
 // ---- YouTube embedded player (full-length songs for everyone, audio only) ----
@@ -100,6 +122,8 @@ export async function playSong(title: string, artist: string, artwork?: string |
   const k = key ?? `${title}|${artist}`;
   if (state.track?.key === k) { toggleIfPaused(); return true; }
   set({ loading: true, error: null });
+  const local = k.startsWith("sp_") ? await getDownloadedUrl(k) : null; // saved in the app → plays offline
+  if (local) { await playUrl({ key: k, title, artist, artwork, url: local }); return true; }
   const url = await findFullStream(title, artist);
   if (url) { await playUrl({ key: k, title, artist, artwork, url }); return true; }
   try {
@@ -120,4 +144,5 @@ export const toggleMusic = () => {
 export const seekMusic = (s: number) => { if (mode === "yt") yt?.seekTo(s, true); else el().currentTime = s; };
 export const stopMusic = () => { audio?.pause(); if (audio) audio.removeAttribute("src"); try { yt?.stopVideo(); } catch { /* ignore */ } media(null); set({ track: null, paused: true, loading: false, pos: 0, dur: 0 }); };
 export const getMusicState = () => state;
+export const subscribeMusic = (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; };
 export const useMusic = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => state);
