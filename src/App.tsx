@@ -1,3 +1,5 @@
+import ConsentGate from "./components/ConsentGate";
+import NativeMediaPicker from "./components/NativeMediaPicker";
 import { lazy, Suspense } from "react";
 import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
@@ -85,6 +87,7 @@ const App = () => (
       <BrowserRouter>
         <NativeAuthBridge />
         <BackButtonHandler />
+        <NativeMediaPicker />
         <UpdateChecker />
         <PaystackReturn />
         <SpotifyCallback />
@@ -93,6 +96,7 @@ const App = () => (
         <AuthProvider>
           <MuteProvider>
           <OnlineProvider>
+          <ConsentGate />
           <GlobalRealtimeListener />
           <NativePush />
           <Suspense fallback={<div className="min-h-screen bg-background" />}>

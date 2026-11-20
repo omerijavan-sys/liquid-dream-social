@@ -11,6 +11,8 @@ const content: Record<Kind, { title: string; sections: Array<[string, string]> }
       ["Your content", "You keep ownership of what you post. You grant Primegram a licence to host and display it to provide the service. Do not post illegal content, harassment, hate, or content that exploits minors. Adult content is allowed only in the sections that are age-gated and clearly marked."],
       ["Wallet, tips and subscriptions", "Wallet balances are held in KES. Creators receive 95% of tips and subscriptions; the remainder is a platform fee. Creator subscriptions are prepaid for one month and do not auto-renew. Subscription payments are non-refundable once access has been granted."],
       ["Withdrawals", "Withdrawal requests (minimum KES 50) are reviewed and paid manually to an M-Pesa number. Funds are held when you request a withdrawal and are refunded if you cancel or the request is rejected. Accounts may be reviewed for fraud before payment."],
+      ["Camera, microphone, photos and notifications", "With your permission the app uses the camera and microphone for calls and posting, your photos and videos so you can choose media to share, and notifications for messages and calls. You can turn any of these off in your phone settings."],
+      ["Music", "Songs are streamed from third-party services for personal listening inside the app. Do not use music in a way that infringes someone else's rights."],
       ["Enforcement", "We may remove content or suspend accounts that violate these terms. You can report content or users from the app."],
       ["Deleting your account", "You can delete your account in Settings → Security. Any remaining wallet balance is forfeited, so withdraw it first."],
       ["Contact", "Questions? Use Settings → Help & Support → Contact Support."],
@@ -21,6 +23,7 @@ const content: Record<Kind, { title: string; sections: Array<[string, string]> }
     sections: [
       ["What we collect", "Account details (email or phone number), profile information, content you post, messages, wallet and payment records, and basic device information needed to run the app."],
       ["How we use it", "To provide the service, secure accounts, process payments and withdrawals, show you relevant content, and handle reports and support requests."],
+      ["Photos, camera and microphone", "Photos and videos are read from your device only when you choose them to post or send. Camera and microphone are used only during calls, video recording and similar features, and are never used in the background."],
       ["Sharing", "We do not sell your personal data. Data is processed by infrastructure providers (hosting, database, SMS and email delivery, and payment processing) strictly to run Primegram."],
       ["Your controls", "Edit your profile, set your account to private, control who can message you, block users, download a copy of your data, or delete your account at any time from Settings."],
       ["Security", "Data is encrypted in transit and protected by row-level access controls. You can enable two-factor authentication and sign out of all devices from Settings → Security."],
