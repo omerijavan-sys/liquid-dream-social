@@ -14,7 +14,7 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import LiquidBackground from "@/components/LiquidBackground";
 import {
   Shield, Users, FileText, Video, MessageCircle, Flag, Trash2, ArrowLeft,
-  BadgeCheck, Search, ScrollText, Loader2, Banknote,
+  BadgeCheck, Search, ScrollText, Loader2, Banknote, TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -96,6 +96,18 @@ const AdminPage = () => {
       return (data ?? []) as any[];
     },
   });
+
+  const { data: revenue } = useQuery({
+    queryKey: ["admin", "revenue"],
+    enabled,
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("admin_revenue");
+      if (error) throw error;
+      return data as any;
+    },
+  });
+  const kes = (n: unknown) => `KES ${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
   const { data: tickets } = useQuery({
     queryKey: ["admin", "tickets"],
@@ -225,6 +237,8 @@ const AdminPage = () => {
   );
 
   const stats = [
+    { label: "Primegram revenue", value: kes(revenue?.total), icon: TrendingUp },
+    { label: "Revenue (30d)", value: kes(revenue?.last30), icon: TrendingUp },
     { label: "Users", value: profiles?.length ?? 0, icon: Users },
     { label: "Posts", value: posts?.length ?? 0, icon: FileText },
     { label: "Reels", value: reels?.length ?? 0, icon: Video },
@@ -274,6 +288,7 @@ const AdminPage = () => {
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="content">Content</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="revenue">Revenue</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
               <TabsTrigger value="tickets">Support ({(tickets ?? []).filter((t: any) => t.status === "open").length})</TabsTrigger>
               <TabsTrigger value="audit">Audit log</TabsTrigger>
@@ -391,6 +406,40 @@ const AdminPage = () => {
                   </CardContent>
                 </Card>
               ))}
+            </TabsContent>
+
+            <TabsContent value="revenue" className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                {[
+                  ["Total profit", revenue?.total],
+                  ["Today", revenue?.today],
+                  ["Last 30 days", revenue?.last30],
+                  ["Primegram plans", revenue?.by_kind?.plan],
+                  ["Post boosts", revenue?.by_kind?.boost],
+                  ["Fees on tips & creator subs", revenue?.by_kind?.fee],
+                  ["Payments processed", revenue?.gross_volume],
+                  ["Paystack fees (cost)", revenue?.paystack_fees],
+                  ["Creator payouts owed", revenue?.creator_payouts_owed],
+                  ["Creator payouts paid", revenue?.creator_payouts_paid],
+                ].map(([label, v]) => (
+                  <Card key={String(label)} className={glass}><CardContent className="p-4">
+                    <p className="text-lg font-bold">{kes(v)}</p><p className="text-xs text-muted-foreground">{label}</p>
+                  </CardContent></Card>
+                ))}
+              </div>
+              <Card className={glass}><CardHeader className="pb-2"><CardTitle className="text-sm">By month</CardTitle></CardHeader><CardContent className="space-y-1 text-sm">
+                {(revenue?.months ?? []).length === 0 && <p className="text-muted-foreground">No revenue yet.</p>}
+                {(revenue?.months ?? []).map((m: any) => <div key={m.m} className="flex justify-between"><span>{m.m}</span><span className="font-medium">{kes(m.amount)}</span></div>)}
+              </CardContent></Card>
+              <Card className={glass}><CardHeader className="pb-2"><CardTitle className="text-sm">Recent earnings</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">
+                {(revenue?.recent ?? []).length === 0 && <p className="text-muted-foreground">Nothing yet. Plans, boosts and platform fees show here automatically.</p>}
+                {(revenue?.recent ?? []).map((r: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between gap-3 border-b border-white/10 pb-2">
+                    <div className="min-w-0"><p className="truncate">{r.source}</p><p className="text-xs text-muted-foreground">{r.username ? `@${r.username} · ` : ""}{new Date(r.at).toLocaleString()}</p></div>
+                    <span className="shrink-0 font-semibold text-emerald-400">+{kes(r.amount)}</span>
+                  </div>
+                ))}
+              </CardContent></Card>
             </TabsContent>
 
             <TabsContent value="withdrawals" className="mt-4 space-y-3">
