@@ -1,3 +1,4 @@
+import PostMusicGuard from "./components/PostMusicGuard";
 import ConsentGate from "./components/ConsentGate";
 import NativeMediaPicker from "./components/NativeMediaPicker";
 import { lazy, Suspense } from "react";
@@ -88,6 +89,7 @@ const App = () => (
         <NativeAuthBridge />
         <BackButtonHandler />
         <NativeMediaPicker />
+        <PostMusicGuard />
         <UpdateChecker />
         <PaystackReturn />
         <SpotifyCallback />

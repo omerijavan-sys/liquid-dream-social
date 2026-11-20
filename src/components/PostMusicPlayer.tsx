@@ -67,7 +67,20 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
     alive.current = true;
     const onVis = () => { if (document.hidden && getMusicState().track?.key === key) stopMusic(); };
     document.addEventListener("visibilitychange", onVis);
+    // watchdog: if the post is hidden, detached or off-screen (e.g. another page opened over it), the song must not play
+    const dog = window.setInterval(() => {
+      const st = getMusicState();
+      if (st.track?.key !== key) return;
+      const node = rootRef.current;
+      let shown = false;
+      if (node && node.isConnected) {
+        const r = node.getBoundingClientRect();
+        shown = r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight && node.getClientRects().length > 0;
+      }
+      if (!shown) stopMusic();
+    }, 600);
     return () => {
+      window.clearInterval(dog);
       alive.current = false; visible.current = false;
       obs.disconnect(); document.removeEventListener("visibilitychange", onVis);
       if (getMusicState().track?.key === key) stopMusic();
