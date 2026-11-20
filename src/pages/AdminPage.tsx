@@ -174,7 +174,7 @@ const AdminPage = () => {
 
   const setBadges = async (
     userId: string,
-    patch: { is_verified?: boolean; is_official?: boolean },
+    patch: { is_verified?: boolean; is_official?: boolean; badge?: string | null },
   ) => {
     const { error } = await supabase.from("profiles").update(patch).eq("user_id", userId);
     if (error) return toast.error(error.message);
@@ -299,20 +299,30 @@ const AdminPage = () => {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate flex items-center gap-1">
                         @{p.username || "unknown"}
-                        <VerifiedBadge isVerified={p.is_verified} isOfficial={p.is_official} />
+                        <VerifiedBadge isVerified={p.is_verified} isOfficial={p.is_official} badge={p.badge} />
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {p.display_name || "—"}
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setBadges(p.user_id, { is_verified: !p.is_verified })}
+                    <select
+                      aria-label="Badge"
+                      value={p.is_official ? "official" : p.badge ?? (p.is_verified ? "verified" : "")}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const patch: Record<string, unknown> = { is_official: v === "official", is_verified: v === "verified", badge: ["blue", "gold", "black", "all_access"].includes(v) ? v : null };
+                        void setBadges(p.user_id, patch as never);
+                      }}
+                      className="rounded-lg border border-white/15 bg-black/40 px-2 py-1 text-xs"
                     >
-                      <BadgeCheck className="h-4 w-4 mr-1" />
-                      {p.is_verified ? "Unverify" : "Verify"}
-                    </Button>
+                      <option value="">No badge</option>
+                      <option value="verified">Verified (blue tick)</option>
+                      <option value="official">Official (gold shield)</option>
+                      <option value="blue">Prime Blue</option>
+                      <option value="gold">Prime Gold</option>
+                      <option value="black">Founder Black</option>
+                      <option value="all_access">All Access</option>
+                    </select>
                   </CardContent>
                 </Card>
               ))}
@@ -322,7 +332,11 @@ const AdminPage = () => {
               {(posts ?? []).map((post: any) => (
                 <Card key={post.id} className={glass}>
                   <CardContent className="p-3 flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                    {post.media_url && post.media_type === "video"
+                      ? <video src={post.media_url} poster={post.thumbnail_url || undefined} controls preload="metadata" playsInline className="h-24 w-16 shrink-0 rounded-lg bg-black object-cover" />
+                      : post.media_url && post.media_type !== "text"
+                        ? <a href={post.media_url} target="_blank" rel="noreferrer" className="shrink-0"><img src={post.media_url} alt="" loading="lazy" className="h-24 w-16 rounded-lg bg-black object-cover" /></a>
+                        : <FileText className="h-4 w-4 text-muted-foreground shrink-0" />}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm truncate">{post.caption || "No caption"}</p>
                       <p className="text-xs text-muted-foreground">
@@ -338,7 +352,7 @@ const AdminPage = () => {
               {(reels ?? []).map((reel: any) => (
                 <Card key={reel.id} className={glass}>
                   <CardContent className="p-3 flex items-center gap-3">
-                    <Video className="h-4 w-4 text-muted-foreground shrink-0" />
+                    {reel.video_url ? <video src={reel.video_url} poster={reel.thumbnail_url || undefined} controls preload="metadata" playsInline className="h-24 w-16 shrink-0 rounded-lg bg-black object-cover" /> : <Video className="h-4 w-4 text-muted-foreground shrink-0" />}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm truncate">{reel.caption || "Reel"}</p>
                       <p className="text-xs text-muted-foreground">

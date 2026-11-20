@@ -72,7 +72,7 @@ const ProfilePage = () => {
     const fetchData = async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("display_name, username, bio, avatar_url, is_verified, is_official")
+        .select("display_name, username, bio, avatar_url, is_verified, is_official, badge")
         .eq("user_id", user.id)
         .single();
       if (data) setProfile(data);
@@ -136,7 +136,7 @@ const ProfilePage = () => {
       <div className="sticky top-0 z-30 border-b border-amber-200/20 bg-[#08090d]/85 backdrop-blur-xl safe-area-top">
         <div className="relative z-10 flex items-center gap-3 px-3 py-2.5">
           <button onClick={() => navigate(-1)} aria-label="Back" className="depth-press text-amber-100"><ArrowLeft className="h-4 w-4" /></button>
-          <span className="flex flex-1 items-center gap-1 text-sm font-bold text-white">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} /></span>
+          <span className="flex flex-1 items-center gap-1 text-sm font-bold text-white">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={(profile as any)?.badge} /></span>
           <button onClick={() => setAuraOpen(true)} aria-label="Aura dashboard" className="depth-press text-amber-200"><Sparkles className="h-5 w-5" /></button>
           <button onClick={() => setPlanOpen(true)} aria-label="Fan subscription price" className="depth-press text-amber-200"><BadgeDollarSign className="h-5 w-5" /></button>
           <button onClick={() => setAnalyticsOpen(true)} aria-label="Analytics dashboard" className="depth-press text-amber-200"><BarChart3 className="h-5 w-5" /></button>
@@ -169,7 +169,7 @@ const ProfilePage = () => {
             <button onClick={() => setListMode("following")} className="depth-press"><p className="text-base font-bold text-white">{myFollowing.size}</p><p className="text-[10px] text-white/65">Following</p></button>
           </div>
         </div>
-        <p className="text-sm font-bold text-white">{profile?.display_name || "User"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} /></p>
+        <p className="text-sm font-bold text-white">{profile?.display_name || "User"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={(profile as any)?.badge} /></p>
         <p className="mt-1 text-xs text-white/60">{profile?.bio || "No bio yet"}</p>
 
         <div className="mt-3 flex gap-2">

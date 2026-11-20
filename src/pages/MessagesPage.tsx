@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2, Paperclip, Square, Play as PlayIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -10,6 +10,10 @@ import { useOnline } from "@/contexts/OnlineContext";
 import { Button } from "@/components/ui/button";
 import { SwipeRow, MessageActionSheet, linkify, firstUrl } from "@/components/MessageGestures";
 import { openLink } from "@/utils/openLink";
+import GroupChat from "@/components/GroupChat";
+import NewGroupSheet from "@/components/NewGroupSheet";
+import { themeById } from "@/utils/chatThemes";
+import { Users } from "lucide-react";
 import { X, Globe } from "lucide-react";
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
@@ -63,6 +67,16 @@ const MessagesPage = () => {
   const { ids: onlineIds } = useOnline();
   const [conversations, setConversations] = useState<ChatUser[]>([]);
   const [activeChat, setActiveChat] = useState<ChatUser | null>(null);
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; theme: string }>>([]);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const loadGroups = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase.from("chat_group_members" as never).select("group_id, chat_groups(id, name, theme)").eq("user_id", user.id);
+    const rows = ((data ?? []) as unknown as Array<{ chat_groups: { id: string; name: string; theme: string } | null }>).map(r => r.chat_groups).filter(Boolean) as Array<{ id: string; name: string; theme: string }>;
+    setGroups(rows);
+  }, [user]);
+  useEffect(() => { void loadGroups(); }, [loadGroups, activeGroup]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
@@ -600,6 +614,8 @@ const MessagesPage = () => {
     );
   }
 
+  if (activeGroup) return <GroupChat groupId={activeGroup} onClose={() => { setActiveGroup(null); void loadGroups(); }} />;
+
   const displayList = searchUser.trim() ? searchResults : conversations;
 
   return (
@@ -609,6 +625,7 @@ const MessagesPage = () => {
         <div className="flex items-center gap-3 px-5 py-4 relative z-10">
           <button onClick={() => navigate("/")} aria-label="Back to home" className="depth-press rounded-full p-1.5 hover:bg-amber-300/10 active:scale-90"><ArrowLeft className="w-5 h-5 text-amber-200" /></button>
           <span className="text-headline text-amber-100 text-base flex-1">Messages</span>
+          <button onClick={() => setNewGroupOpen(true)} aria-label="New group" className="depth-press flex items-center gap-1.5 rounded-full border border-amber-200/30 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold text-amber-200"><Users className="h-4 w-4" />New group</button>
         </div>
       </div>
 
@@ -629,6 +646,12 @@ const MessagesPage = () => {
       </div>
 
       <div className="relative z-10 space-y-2 px-4">
+        {!searchUser.trim() && groups.map((g) => (
+          <button key={g.id} onClick={() => setActiveGroup(g.id)} className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left backdrop-blur-xl">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-black" style={{ background: themeById(g.theme).mine }}><Users className="h-5 w-5" /></span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-amber-100">{g.name}</span><span className="text-xs text-white/50">Group chat</span></span>
+          </button>
+        ))}
         {displayList.length === 0 && (
           <div className="text-center text-white/50 text-sm py-10">
             {searchUser.trim() ? "No users found" : "No conversations yet. Search for users to start chatting!"}
@@ -659,6 +682,7 @@ const MessagesPage = () => {
           </motion.div>
         ))}
       </div>
+      {newGroupOpen && <NewGroupSheet onClose={() => setNewGroupOpen(false)} onCreated={(id) => { setNewGroupOpen(false); setActiveGroup(id); }} />}
       <button
         type="button"
         aria-label="Compose message"

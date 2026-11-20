@@ -139,7 +139,7 @@ const PublicProfilePage = () => {
       const [profileRes, postsRes, followersRes, followingRes, followRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("user_id,username,display_name,bio,avatar_url,is_verified,is_official")
+          .select("user_id,username,display_name,bio,avatar_url,is_verified,is_official,badge")
           .eq("user_id", userId)
           .maybeSingle(),
         supabase
@@ -247,7 +247,7 @@ const PublicProfilePage = () => {
               <div className="mt-4">
                 <h2 className="flex items-center gap-1 font-semibold text-foreground">
                   {profile.display_name || profile.username || "User"}
-                  <VerifiedBadge isVerified={profile.is_verified} isOfficial={profile.is_official} />
+                  <VerifiedBadge isVerified={profile.is_verified} isOfficial={profile.is_official} badge={(profile as any).badge} />
                 </h2>
                 {profile.username && <p className="text-sm text-muted-foreground">@{profile.username}</p>}
                 {profile.bio && <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/80">{profile.bio}</p>}

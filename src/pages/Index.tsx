@@ -74,7 +74,7 @@ const Index = () => {
         const userIds = [...new Set(sorted.map(p => p.user_id))];
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("user_id, display_name, username, avatar_url, is_verified, is_official")
+          .select("user_id, display_name, username, avatar_url, is_verified, is_official, badge")
           .in("user_id", userIds);
 
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
@@ -180,6 +180,7 @@ const Index = () => {
                 index={i}
                 postId={post.id}
                 authorId={post.user_id}
+                badge={(post.profile as any)?.badge}
                 isVerified={post.profile?.is_verified}
                 isOfficial={post.profile?.is_official}
                 views={post.views_count || 0}
