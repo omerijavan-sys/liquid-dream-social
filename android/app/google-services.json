@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "897353327893",
+    "project_id": "primegram-86331",
+    "storage_bucket": "primegram-86331.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:897353327893:android:29258fb5541507b9e2f51c",
+        "android_client_info": {
+          "package_name": "com.primegram.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3bcEy7lO304JtBZLagDDuRWYiT25Ljt0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
