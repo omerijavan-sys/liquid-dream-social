@@ -26,35 +26,30 @@ async function accessToken(sa: { client_email: string; private_key: string }) {
 
 type Msg = Record<string, unknown>;
 
-/** Three short reply ideas for a chat message. AI with a tight timeout, plain heuristics as fallback so the push is never delayed. */
-async function suggestReplies(text: string): Promise<string[]> {
-  const t = text.trim();
-  const fallback = (): string[] => {
-    if (/\?\s*$/.test(t)) return ["Yes", "No", "Let me check"];
-    if (/^(hi|hey|hello|yo|sup|good (morning|evening|afternoon))\b/i.test(t)) return ["Hey! 👋", "Hi, how are you?", "What's up?"];
-    if (/(thank|thanks|thx)/i.test(t)) return ["You're welcome!", "Anytime 🙌", "No problem"];
-    if (/(where|when|what time)/i.test(t)) return ["On my way", "Give me a minute", "I'll let you know"];
-    return ["👍", "Okay!", "Talk later"];
-  };
-  if (!t || t.startsWith("📷") || t.startsWith("🎥") || t.startsWith("🎤")) return ["❤️", "Nice!", "Thanks!"];
+async function suggest(name: string, text: string): Promise<string[]> {
+  const fallback = ["👍", "Okay", "Thanks!"];
+  if (!text.trim()) return fallback;
   try {
     const key = Deno.env.get("AI_API_KEY");
     const base = (Deno.env.get("AI_BASE_URL") ?? (key ? "https://api.openai.com/v1" : "https://text.pollinations.ai/openai")).replace(/\/$/, "");
-    const r = await fetch(`${base}/chat/completions`, {
-      method: "POST", signal: AbortSignal.timeout(2500),
+    const url = key ? `${base}/chat/completions` : base;
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 3500);
+    const r = await fetch(url, {
+      method: "POST", signal: ctrl.signal,
       headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
-      body: JSON.stringify({ model: Deno.env.get("AI_MODEL") ?? (key ? "gpt-4o-mini" : "openai-fast"), temperature: 0.7, max_tokens: 60,
-        messages: [
-          { role: "system", content: "You write quick-reply buttons for a chat app. Reply with ONLY a JSON array of exactly 3 short, natural, different replies (max 4 words each, casual tone, may use one emoji) that the receiver could send back to the message." },
-          { role: "user", content: t.slice(0, 300) },
-        ] }),
+      body: JSON.stringify({ model: Deno.env.get("AI_MODEL") ?? (key ? "gpt-4o-mini" : "openai"), temperature: 0.7, max_tokens: 80, messages: [
+        { role: "system", content: "You write quick chat replies. Reply ONLY with a JSON array of exactly 3 short, natural, friendly replies (max 6 words each, at most one emoji) that the user could send back to the message. No other text." },
+        { role: "user", content: `${name}: ${text.slice(0, 300)}` },
+      ] }),
     });
-    if (!r.ok) return fallback();
+    clearTimeout(t);
+    if (!r.ok) return fallback;
     const out = (await r.json())?.choices?.[0]?.message?.content ?? "";
-    const arr = JSON.parse(out.slice(out.indexOf("["), out.lastIndexOf("]") + 1));
-    const clean = (Array.isArray(arr) ? arr : []).map((x) => String(x).trim().slice(0, 40)).filter(Boolean).slice(0, 3);
-    return clean.length >= 2 ? clean : fallback();
-  } catch { return fallback(); }
+    const m = String(out).match(/\[[\s\S]*\]/);
+    const arr = m ? JSON.parse(m[0]) : [];
+    const clean = arr.filter((x: unknown) => typeof x === "string" && x.trim()).map((x: string) => x.trim().slice(0, 40)).slice(0, 3);
+    return clean.length ? clean : fallback;
+  } catch { return fallback; }
 }
 
 Deno.serve(async (req) => {
@@ -70,7 +65,7 @@ Deno.serve(async (req) => {
       return data?.display_name || data?.username || "Someone";
     };
 
-    let targets: string[] = []; let build: (() => Msg) | null = null;
+    let targets: string[] = []; let build: ((tok: string) => Msg) | null = null;
     if (typeof input.id === "string") {
       // claim the message once so retries never double-notify
       const { data: msg } = await db.from("messages").update({ notified_at: new Date().toISOString() }).eq("id", input.id).is("notified_at", null).select("id,sender_id,receiver_id,content,media_type").maybeSingle();
@@ -78,9 +73,9 @@ Deno.serve(async (req) => {
       const name = await nameOf(msg.sender_id);
       const body = msg.media_type === "image" ? "📷 Photo" : msg.media_type === "video" ? "🎥 Video" : msg.media_type === "audio" ? "🎤 Voice message" : msg.media_type ? "Shared a post" : (msg.content || "").slice(0, 120);
       targets = [msg.receiver_id];
-      const suggestions = JSON.stringify(await suggestReplies(msg.media_type ? "" : (msg.content || "")));
+      const sg = JSON.stringify(await suggest(name, msg.media_type ? "" : (msg.content || "")));
       // Data-only so the app can draw the notification itself with a Reply box and the suggested replies.
-      build = () => ({ data: { type: "message", kind: "dm", title: name, body, sender: msg.sender_id, suggestions }, android: { priority: "HIGH" } });
+      build = (tok) => ({ data: { type: "message", title: name, body, sender: msg.sender_id, tag: `dm-${msg.sender_id}`, suggestions: sg, tok }, android: { priority: "HIGH" } });
     } else if (typeof input.group_msg === "string") {
       const { data: gm } = await db.from("group_messages").select("id,group_id,sender_id,content,media_type").eq("id", input.group_msg).maybeSingle();
       if (!gm) return ok({ skipped: "missing" });
@@ -91,21 +86,20 @@ Deno.serve(async (req) => {
       const sender = await nameOf(gm.sender_id);
       targets = (mem ?? []).map((m: { user_id: string }) => m.user_id).filter((u: string) => u !== gm.sender_id);
       const body = `${sender}: ${gm.media_type ? "📎 Media" : (gm.content || "").slice(0, 100)}`;
-      const suggestions = JSON.stringify(await suggestReplies(gm.media_type ? "" : (gm.content || "")));
-      build = () => ({ data: { type: "message", kind: "group", title: g?.name ?? "Group", body, group: gm.group_id, sender: gm.sender_id, suggestions }, android: { priority: "HIGH" } });
+      const sg = JSON.stringify(await suggest(sender, gm.media_type ? "" : (gm.content || "")));
+      build = (tok) => ({ data: { type: "group", title: g?.name ?? "Group", body, group: gm.group_id, tag: `grp-${gm.group_id}`, suggestions: sg, tok }, android: { priority: "HIGH" } });
     } else if (typeof input.call === "string") {
       const { data: c } = await db.from("call_invitations").select("id,caller_id,receiver_id,audio,status,created_at").eq("id", input.call).maybeSingle();
       if (!c || c.status !== "ringing") return ok({ skipped: "call not ringing" });
       const name = await nameOf(c.caller_id);
       targets = [c.receiver_id];
-      build = () => ({
-        notification: { title: `Incoming ${c.audio ? "voice" : "video"} call`, body: `${name} is calling you` },
-        data: { type: "call", call_id: c.id, sender: c.caller_id, audio: c.audio ? "1" : "0" },
-        android: { priority: "HIGH", ttl: "45s", notification: { channel_id: "calls", tag: `call-${c.id}`, sound: "default", default_vibrate_timings: true, notification_priority: "PRIORITY_MAX", visibility: "PUBLIC", sticky: false } },
+      build = (tok) => ({
+        data: { type: "call", title: `Incoming ${c.audio ? "voice" : "video"} call`, body: `${name} is calling you`, tag: `call-${c.id}`, call_id: c.id, sender: c.caller_id, audio: c.audio ? "1" : "0", tok },
+        android: { priority: "HIGH", ttl: "45s" },
       });
     } else if (typeof input.test === "string") {
       targets = [input.test];
-      build = () => ({ notification: { title: "Primegram", body: "Test notification ✅" }, data: { type: "message" }, android: { priority: "HIGH", notification: { channel_id: "messages", sound: "default" } } });
+      build = (tok) => ({ data: { type: "message", title: "Primegram", body: "Test notification ✅", tag: "test", suggestions: JSON.stringify(["Nice!", "Got it", "👍"]), tok }, android: { priority: "HIGH" } });
     } else return ok({ error: "nothing to send" }, 400);
 
     const { data: tokens } = await db.from("push_tokens").select("token").in("user_id", targets);
@@ -113,7 +107,7 @@ Deno.serve(async (req) => {
     const at = await accessToken(sa);
     let sent = 0; const errors: string[] = [];
     for (const t of tokens) {
-      const message = { ...build!(), token: t.token };
+      const message = { ...build!(t.token), token: t.token };
       const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
         method: "POST", headers: { Authorization: `Bearer ${at}`, "Content-Type": "application/json" }, body: JSON.stringify({ message }),
       });

@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /** Grab a still frame from a video file to use as a cover picture. */
-export async function captureVideoThumb(file: File | Blob, at = 0.4): Promise<Blob | null> {
+export async function captureVideoThumb(file: File | Blob, at = 1.2): Promise<Blob | null> {
   const url = URL.createObjectURL(file);
   try {
     const video = document.createElement("video");

@@ -22,9 +22,10 @@ public class NotifyService extends MessagingService {
     @Override
     public void onMessageReceived(@NonNull RemoteMessage msg) {
         Map<String, String> d = msg.getData();
-        boolean chat = "message".equals(d.get("type")) && d.get("body") != null && d.get("title") != null;
-        if (!chat || MainActivity.isForeground()) { super.onMessageReceived(msg); return; }
-        show(this, d);
+        String type = d.get("type");
+        boolean ours = d.get("body") != null && d.get("title") != null && ("message".equals(type) || "group".equals(type) || "call".equals(type));
+        if (!ours || MainActivity.isForeground()) { super.onMessageReceived(msg); return; }
+        if ("call".equals(type)) showCall(this, d); else show(this, d);
     }
 
     static void ensureChannel(Context c) {
@@ -38,13 +39,34 @@ public class NotifyService extends MessagingService {
         }
     }
 
-    static int idFor(Map<String, String> d) { return (d.get("kind") + ":" + (d.get("kind") != null && d.get("kind").equals("group") ? d.get("group") : d.get("sender"))).hashCode(); }
+    static int idFor(Map<String, String> d) { return (d.get("tag") != null ? d.get("tag") : d.get("title")).hashCode(); }
+
+    /** Incoming call: loud heads-up notification on the calls channel; tapping opens the app where the call rings. */
+    static void showCall(Context c, Map<String, String> d) {
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm.getNotificationChannel("calls") == null) {
+                NotificationChannel ch = new NotificationChannel("calls", "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
+                ch.enableVibration(true); ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+                nm.createNotificationChannel(ch);
+            }
+        }
+        int nid = idFor(d);
+        Intent open = new Intent(c, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pi = PendingIntent.getActivity(c, nid, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        NotificationCompat.Builder b = new NotificationCompat.Builder(c, "calls")
+            .setSmallIcon(R.drawable.ic_stat_primegram).setContentTitle(d.get("title")).setContentText(d.get("body"))
+            .setCategory(NotificationCompat.CATEGORY_CALL).setPriority(NotificationCompat.PRIORITY_MAX)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setContentIntent(pi).setFullScreenIntent(pi, true).setTimeoutAfter(45000).setAutoCancel(true);
+        ((NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE)).notify(nid, b.build());
+    }
 
     static PendingIntent replyIntent(Context c, Map<String, String> d, int nid, String fixedText, boolean mutable, int code) {
         Intent i = new Intent(c, ReplyReceiver.class);
         i.setAction("com.primegram.app.REPLY." + code + "." + nid);
         i.putExtra("nid", nid);
-        i.putExtra("kind", d.get("kind"));
+        i.putExtra("kind", "group".equals(d.get("type")) ? "group" : "dm");
         i.putExtra("to", d.get("sender"));
         i.putExtra("group", d.get("group"));
         i.putExtra("title", d.get("title"));

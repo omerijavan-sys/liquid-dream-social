@@ -41,6 +41,7 @@ const CallPage = () => {
   const [muted, setMuted] = useState(false);
   const [videoOn, setVideoOn] = useState(!audioOnly);
   const [facing, setFacing] = useState<"user" | "environment">("user");
+  const [switchingCamera, setSwitchingCamera] = useState(false);
   const [callTime, setCallTime] = useState(0);
   const [peerName, setPeerName] = useState("User");
   const [status, setStatus] = useState<Status>("ringing");
@@ -291,8 +292,9 @@ const CallPage = () => {
 
   const flipping = useRef(false);
   const flipCamera = async () => {
-    if (flipping.current || !streamRef.current) return;
+    if (flipping.current || !streamRef.current || audioOnly) return;
     flipping.current = true;
+    setSwitchingCamera(true);
     const next = facing === "user" ? "environment" : "user";
     const old = streamRef.current.getVideoTracks()[0];
     const wasEnabled = old ? old.enabled : true;
@@ -329,6 +331,7 @@ const CallPage = () => {
       toast.error("Couldn't switch camera");
     } finally {
       flipping.current = false;
+      setSwitchingCamera(false);
     }
   };
 
@@ -423,9 +426,9 @@ const CallPage = () => {
             >
               {videoOn ? <Video className="w-6 h-6 text-white" /> : <VideoOff className="w-6 h-6 text-destructive" />}
             </Button>
-            <Button variant="ghost" size="icon" disabled={audioOnly}
+            <Button variant="ghost" size="icon" disabled={audioOnly || switchingCamera}
               onClick={flipCamera}
-              aria-label="Switch camera"
+              aria-label={switchingCamera ? "Switching camera" : "Switch camera"}
               className="depth-press w-14 h-14 rounded-full bg-white/15 flex items-center justify-center"
             >
               <RefreshCw className="w-6 h-6 text-white" />

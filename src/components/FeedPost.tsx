@@ -2,7 +2,7 @@ import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, MessageCircle, Send, Bookmark, Play, Pause, Loader2, Volume2, VolumeX, MoreHorizontal, Link2, Flag, EyeOff, UserMinus, User, X, Maximize2, Eye, Rocket } from "lucide-react";
+import { Heart, MessageCircle, Send, Bookmark, Loader2, Volume2, VolumeX, MoreHorizontal, Link2, Flag, EyeOff, UserMinus, User, X, Maximize2, Eye, Rocket } from "lucide-react";
 import { useMute } from "@/contexts/MuteContext";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,9 +64,9 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
   const [hidden, setHidden] = useState(() => !!postId && readSet(HIDDEN_KEY).has(postId));
   const [likeCount, setLikeCount] = useState(likes);
   const [showHeart, setShowHeart] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [, setIsPlaying] = useState(false);
   const lastTap = useRef(0);
   const tapTimer = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -194,10 +194,10 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
   useEffect(() => {
     if (!isVideo || !autoPlay || !wrapRef.current) return;
     const obs = new IntersectionObserver(([entry]) => {
-      setIsVisible(entry.isIntersecting);
       const el = videoRef.current;
-      if (entry.isIntersecting) { el?.play().then(() => setIsPlaying(true)).catch(() => {}); }
-      else { el?.pause(); setIsPlaying(false); }
+      setIsVisible(entry.isIntersecting);
+      if (entry.isIntersecting) { el?.play().catch(() => {}); }
+      else { el?.pause(); }
     }, { threshold: 0.5 });
     obs.observe(wrapRef.current);
     return () => obs.disconnect();
@@ -215,8 +215,8 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
 
   const togglePlayPause = () => {
     const v = videoRef.current; if (!v) return;
-    if (v.paused) v.play().then(() => setIsPlaying(true)).catch(() => {});
-    else { v.pause(); setIsPlaying(false); }
+    if (v.paused) v.play().catch(() => {});
+    else v.pause();
   };
 
   // Double tap = like; single tap = open full screen (images) / play-pause (videos).

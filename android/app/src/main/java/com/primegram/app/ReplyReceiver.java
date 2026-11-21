@@ -31,12 +31,12 @@ public class ReplyReceiver extends BroadcastReceiver {
                 android.content.SharedPreferences p = NotifyConfigPlugin.prefs(ctx);
                 String base = p.getString("url", null), key = p.getString("key", null), token = p.getString("token", null);
                 if (base != null && token != null) {
-                    HttpURLConnection c = (HttpURLConnection) new URL(base + "/functions/v1/notif-reply").openConnection();
+                    HttpURLConnection c = (HttpURLConnection) new URL(base + "/functions/v1/quick-reply").openConnection();
                     c.setRequestMethod("POST"); c.setDoOutput(true); c.setConnectTimeout(15000); c.setReadTimeout(20000);
                     c.setRequestProperty("Content-Type", "application/json");
                     if (key != null) { c.setRequestProperty("apikey", key); }
                     JSONObject j = new JSONObject();
-                    j.put("token", token); j.put("kind", kind); j.put("to", to); j.put("group", group); j.put("text", msg);
+                    j.put("token", token); j.put("to", to); j.put("group", group); j.put("text", msg);
                     try (OutputStream o = c.getOutputStream()) { o.write(j.toString().getBytes("UTF-8")); }
                     ok = c.getResponseCode() == 200;
                 }

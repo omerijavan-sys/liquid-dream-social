@@ -17,7 +17,7 @@ export function useUploadJobs() {
  * Runs an upload/publish job without blocking the screen. The person taps once, lands back on the feed
  * and a progress line under the Primegram header tracks the job until it finishes.
  */
-export function runInBackground<T>(label: string, job: (setProgress: (msg: string) => void) => Promise<T>, onDone?: (r: T) => void) {
+export function runInBackground<T>(label: string, job: (setProgress: (msg: string) => void) => Promise<T>, onDone?: (r: T) => void, onError?: (error: unknown) => void) {
   const entry: UploadJob = { id: nextId++, label, message: `${label}…`, pct: 4, status: "running" };
   jobs.push(entry); emit();
   // Storage uploads don't report bytes, so ease towards 92% while the job runs and snap to 100% when it lands.
@@ -32,5 +32,6 @@ export function runInBackground<T>(label: string, job: (setProgress: (msg: strin
     .catch((e) => {
       window.clearInterval(tick); entry.status = "error"; emit(); remove(300);
       toast.error(e instanceof Error ? e.message : `${label} failed`);
+      onError?.(e);
     });
 }
