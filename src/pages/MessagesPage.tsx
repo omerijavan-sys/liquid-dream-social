@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2, Paperclip, Square, Play as PlayIcon } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,11 +10,13 @@ import { useOnline } from "@/contexts/OnlineContext";
 import { Button } from "@/components/ui/button";
 import { SwipeRow, MessageActionSheet, linkify, firstUrl } from "@/components/MessageGestures";
 import { openLink } from "@/utils/openLink";
+import { replyWithAi } from "@/services/aiAutoReply";
 import GroupChat from "@/components/GroupChat";
 import NewGroupSheet from "@/components/NewGroupSheet";
 import { themeById } from "@/utils/chatThemes";
 import { Users } from "lucide-react";
 import { X, Globe } from "lucide-react";
+import GroupChats from "@/components/GroupChats";
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
 type SpeechRecognitionLike = {
@@ -63,9 +65,11 @@ const MSG_COLS = "id, sender_id, receiver_id, content, created_at, read, media_u
 
 const MessagesPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { ids: onlineIds } = useOnline();
   const [conversations, setConversations] = useState<ChatUser[]>([]);
+  const [chatMode, setChatMode] = useState<"direct" | "groups">("direct");
   const [activeChat, setActiveChat] = useState<ChatUser | null>(null);
   const [groups, setGroups] = useState<Array<{ id: string; name: string; theme: string }>>([]);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
@@ -99,8 +103,53 @@ const MessagesPage = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const [voiceSearch, setVoiceSearch] = useState(false);
+  const handledAiReplyRef = useRef<string | null>(null);
 
   useEffect(() => () => speechRecognitionRef.current?.stop(), []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const targetId = params.get("to");
+    if (params.get("aiReply") !== "1" || !targetId || !user || targetId === user.id) return;
+    const actionKey = `${user.id}:${targetId}`;
+    if (handledAiReplyRef.current === actionKey) return;
+    handledAiReplyRef.current = actionKey;
+    window.history.replaceState({}, "", `/messages?to=${encodeURIComponent(targetId)}`);
+    if (!window.confirm("Send an AI-generated reply to this message? The recipient will be told it was written by AI.")) {
+      handledAiReplyRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    const sendAiReply = async () => {
+      const { data, error } = await supabase.from("messages")
+        .select("id, sender_id, receiver_id, content, created_at")
+        .eq("sender_id", targetId)
+        .eq("receiver_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("The original message could not be found.");
+      const { data: newerOutgoing, error: outgoingError } = await supabase.from("messages")
+        .select("id")
+        .eq("sender_id", user.id)
+        .eq("receiver_id", targetId)
+        .gt("created_at", data.created_at)
+        .limit(1)
+        .maybeSingle();
+      if (outgoingError) throw outgoingError;
+      if (newerOutgoing) return;
+      const toastId = toast.loading("Writing your AI reply…");
+      await replyWithAi(user, data);
+      if (!cancelled) toast.success("AI reply sent and labeled for the recipient.", { id: toastId });
+    };
+    void sendAiReply().catch(error => {
+      if (!cancelled) toast.error(error instanceof Error ? error.message : "Couldn't send the AI reply.");
+    }).finally(() => {
+      if (handledAiReplyRef.current === actionKey) handledAiReplyRef.current = null;
+    });
+    return () => { cancelled = true; };
+  }, [user, location.search]);
 
   // Deep link: /messages?to=<userId> opens that person's direct chat.
   useEffect(() => {
@@ -446,6 +495,23 @@ const MessagesPage = () => {
     } catch { /* cancelled */ }
   };
 
+  if (chatMode === "groups" && user) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-[#050505] px-4 pb-24">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_15%_25%,rgba(124,58,237,.12),transparent_36%),radial-gradient(ellipse_at_85%_18%,rgba(34,211,238,.11),transparent_36%),radial-gradient(ellipse_at_58%_92%,rgba(212,175,55,.07),transparent_42%)]" />
+        <header className="relative z-10 -mx-4 mb-4 flex items-center gap-3 px-5 py-4 liquid-glass-elevated safe-area-top">
+          <button onClick={() => navigate("/")} aria-label="Back to home" className="depth-press rounded-full p-1.5 hover:bg-amber-300/10"><ArrowLeft className="h-5 w-5 text-amber-200" /></button>
+          <span className="flex-1 text-base text-amber-100 text-headline">Messages</span>
+        </header>
+        <div className="relative z-10 mx-auto mb-5 flex max-w-lg rounded-full border border-white/10 bg-white/[0.03] p-1" role="tablist" aria-label="Message type">
+          <button type="button" role="tab" aria-selected="false" onClick={() => setChatMode("direct")} className="flex-1 rounded-full px-4 py-2 text-sm text-white/55 transition hover:text-white">Direct</button>
+          <button type="button" role="tab" aria-selected="true" onClick={() => setChatMode("groups")} className="flex-1 rounded-full bg-amber-200/15 px-4 py-2 text-sm font-medium text-amber-100">Groups</button>
+        </div>
+        <div className="relative z-10 mx-auto max-w-lg"><GroupChats userId={user.id} /></div>
+      </div>
+    );
+  }
+
   if (activeChat) {
     return (
           <div className="relative flex h-dvh flex-col overflow-hidden bg-[#050505]">
@@ -627,6 +693,11 @@ const MessagesPage = () => {
           <span className="text-headline text-amber-100 text-base flex-1">Messages</span>
           <button onClick={() => setNewGroupOpen(true)} aria-label="New group" className="depth-press flex items-center gap-1.5 rounded-full border border-amber-200/30 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold text-amber-200"><Users className="h-4 w-4" />New group</button>
         </div>
+      </div>
+
+      <div className="relative z-10 mx-4 mb-2 flex rounded-full border border-white/10 bg-white/[0.03] p-1" role="tablist" aria-label="Message type">
+        <button type="button" role="tab" aria-selected="true" onClick={() => setChatMode("direct")} className="flex-1 rounded-full bg-amber-200/15 px-4 py-2 text-sm font-medium text-amber-100">Direct</button>
+        <button type="button" role="tab" aria-selected="false" onClick={() => setChatMode("groups")} className="flex-1 rounded-full px-4 py-2 text-sm text-white/55 transition hover:text-white">Groups</button>
       </div>
 
       <div className="relative z-10 px-4 py-3">

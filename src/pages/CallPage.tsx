@@ -41,6 +41,7 @@ const CallPage = () => {
   const [muted, setMuted] = useState(false);
   const [videoOn, setVideoOn] = useState(!audioOnly);
   const [facing, setFacing] = useState<"user" | "environment">("user");
+  const [switchingCamera, setSwitchingCamera] = useState(false);
   const [callTime, setCallTime] = useState(0);
   const [peerName, setPeerName] = useState("User");
   const [status, setStatus] = useState<Status>("ringing");
@@ -290,25 +291,38 @@ const CallPage = () => {
   };
 
   const flipCamera = async () => {
+    if (switchingCamera || audioOnly) return;
     const next = facing === "user" ? "environment" : "user";
+    setSwitchingCamera(true);
+    let fresh: MediaStream | null = null;
     try {
-      const fresh = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: next },
+      fresh = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: next }, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       const newTrack = fresh.getVideoTracks()[0];
-      const sender = pcRef.current?.getSenders().find((s) => s.track?.kind === "video");
-      if (sender && newTrack) await sender.replaceTrack(newTrack);
-      const old = streamRef.current?.getVideoTracks()[0];
-      if (old && streamRef.current) {
-        streamRef.current.removeTrack(old);
-        old.stop();
-        streamRef.current.addTrack(newTrack);
+      const stream = streamRef.current;
+      const oldTrack = stream?.getVideoTracks()[0];
+      const sender = pcRef.current?.getSenders().find((item) => item.track?.kind === "video");
+      if (!newTrack || !stream || !sender) throw new Error("Camera switching is unavailable for this call.");
+      newTrack.enabled = videoOn;
+      await sender.replaceTrack(newTrack);
+      if (oldTrack) {
+        stream.removeTrack(oldTrack);
+        oldTrack.stop();
       }
-      if (localVideoRef.current) localVideoRef.current.srcObject = streamRef.current;
+      stream.addTrack(newTrack);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        await localVideoRef.current.play().catch(() => undefined);
+      }
+      fresh = null;
       setFacing(next);
-    } catch {
-      /* single-camera device */
+    } catch (error) {
+      fresh?.getTracks().forEach((track) => track.stop());
+      toast.error(error instanceof Error ? error.message : "Couldn't switch cameras. Check camera permission and try again.");
+    } finally {
+      setSwitchingCamera(false);
     }
   };
 
@@ -403,9 +417,9 @@ const CallPage = () => {
             >
               {videoOn ? <Video className="w-6 h-6 text-white" /> : <VideoOff className="w-6 h-6 text-destructive" />}
             </Button>
-            <Button variant="ghost" size="icon" disabled={audioOnly}
+            <Button variant="ghost" size="icon" disabled={audioOnly || switchingCamera}
               onClick={flipCamera}
-              aria-label="Switch camera"
+              aria-label={switchingCamera ? "Switching camera" : "Switch camera"}
               className="depth-press w-14 h-14 rounded-full bg-white/15 flex items-center justify-center"
             >
               <RefreshCw className="w-6 h-6 text-white" />

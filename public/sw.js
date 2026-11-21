@@ -51,17 +51,30 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  const data = event.notification.data || {};
+  const senderId = data.senderId;
+  let path = data.url || '/';
+  if (senderId && event.action === 'reply') {
+    path = `/messages?to=${encodeURIComponent(senderId)}`;
+  } else if (senderId && event.action === 'ai-reply') {
+    path = `/messages?to=${encodeURIComponent(senderId)}&aiReply=1`;
+  }
+  const target = new URL(path, self.location.origin).href;
   event.waitUntil(self.clients.openWindow(target));
 });
 
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text() }; }
+  const senderId = typeof data.senderId === 'string' ? data.senderId : undefined;
   event.waitUntil(self.registration.showNotification(data.title || 'Primegram', {
     body: data.body || '',
     icon: '/favicon.png',
     badge: '/favicon.png',
-    data: { url: data.url || '/' },
+    data: { url: data.url || '/', senderId },
+    actions: senderId ? [
+      { action: 'reply', title: 'Reply' },
+      { action: 'ai-reply', title: 'AI reply' },
+    ] : [],
   }));
 });

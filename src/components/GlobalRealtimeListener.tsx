@@ -16,12 +16,21 @@ interface Ring {
   audio?: boolean;
 }
 
-const showBrowserNotification = async (title: string, body: string, url: string, tag: string) => {
+const showBrowserNotification = async (title: string, body: string, url: string, tag: string, senderId?: string) => {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   try {
     if ("serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.ready;
-      await registration.showNotification(title, { body, icon: "/favicon.png", tag, data: { url } });
+      await registration.showNotification(title, {
+        body,
+        icon: "/favicon.png",
+        tag,
+        data: { url, senderId },
+        actions: senderId ? [
+          { action: "reply", title: "Reply" },
+          { action: "ai-reply", title: "AI reply" },
+        ] : [],
+      } as NotificationOptions & { actions?: Array<{ action: string; title: string }> });
       return;
     }
     const notice = new Notification(title, { body, icon: "/favicon.png", tag });
@@ -114,7 +123,7 @@ const GlobalRealtimeListener = () => {
             .maybeSingle();
           const name = data?.display_name || data?.username || "New message";
           if (prefs.push && document.hidden) {
-            void showBrowserNotification(name, "New message on Primegram", "/messages", `message-${row.id}`);
+            void showBrowserNotification(name, "New message on Primegram", `/messages?to=${encodeURIComponent(row.sender_id)}`, `message-${row.id}`, row.sender_id);
           }
           toast(name, {
             description: String(row.content ?? "").slice(0, 120),
