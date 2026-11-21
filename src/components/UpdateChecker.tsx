@@ -3,6 +3,7 @@ import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor
 import { App as CapApp } from "@capacitor/app";
 import { X } from "lucide-react";
 import { toast } from "sonner";
+import { setAppUpdate } from "@/utils/updateStore";
 
 type UpdatePlugin = {
   download(o: { url: string }): Promise<{ size: number }>;
@@ -35,7 +36,7 @@ const UpdateChecker = () => {
       const build = Number(String(rel?.tag_name ?? "").replace(/\D/g, ""));
       const assets: { name: string; browser_download_url: string }[] = rel?.assets ?? [];
       const asset = assets.find(a => a.name === "primegram.apk") ?? assets.find(a => a.name.endsWith(".apk"));
-      if (build > INSTALLED && asset?.browser_download_url) setUpdate({ build, url: asset.browser_download_url });
+      if (build > INSTALLED && asset?.browser_download_url) { const u = { build, url: asset.browser_download_url }; setUpdate(u); setAppUpdate(u); }
     } catch { /* offline: try again next time */ }
   }, []);
 
@@ -79,7 +80,13 @@ const UpdateChecker = () => {
     setHidden(true); setOpen(false);
   };
 
-  if (!update || hidden) return null;
+  useEffect(() => {
+    const o = () => { setHidden(false); setOpen(true); };
+    window.addEventListener("prime:open-update", o);
+    return () => window.removeEventListener("prime:open-update", o);
+  }, []);
+
+  if (!update || (hidden && !open)) return null;
   return (
     <>
       {open && (

@@ -5,6 +5,7 @@ import { BadgeDollarSign, BarChart3, Sparkles, Eye, Heart, MessageCircle, Users,
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 
+interface ReelRow { id: string; caption: string | null; thumbnail_url: string | null; video_url: string; likes_count: number | null; views_count: number | null; created_at: string; source_post_id: string | null }
 interface PostRow { id: string; caption: string | null; media_url: string | null; media_type: string | null; likes_count: number | null; views_count: number | null; created_at: string }
 
 const AURA = { like: 5, comment: 10, view: 1, reelLike: 6 };
@@ -15,11 +16,34 @@ const LEVELS = [
   { min: 5000, name: "Blazing", color: "from-amber-400 to-orange-500" },
   { min: 20000, name: "Legend", color: "from-yellow-300 to-amber-500" },
 ];
-const levelFor = (n: number) => [...LEVELS].reverse().find(l => n >= l.min) ?? LEVELS[0];
+export const levelFor = (n: number) => [...LEVELS].reverse().find(l => n >= l.min) ?? LEVELS[0];
+
+const GLOWS = ["", "rgba(56,189,248,.55)", "rgba(217,70,239,.6)", "rgba(251,146,60,.7)", "rgba(250,204,21,.85)"];
+/** Box-shadow for the profile picture. The higher the aura level, the stronger the glow (Spark has none). */
+export const auraGlowStyle = (aura: number): React.CSSProperties => {
+  const i = LEVELS.indexOf(levelFor(aura));
+  if (i <= 0) return {};
+  const c = GLOWS[i];
+  return { boxShadow: `0 0 ${10 + i * 6}px ${2 + i}px ${c}, 0 0 ${24 + i * 12}px ${i * 2}px ${c.replace(/[\d.]+\)$/, ".25)")}` };
+};
+
+/** Aura points + global rank for a user (cheap server-side calculation). */
+export function useAuraRank(userId: string | undefined) {
+  const [v, setV] = useState<{ aura: number; rank: number; total: number } | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let dead = false;
+    void (supabase.rpc as any)("aura_rank", { _user: userId }).then(({ data }: { data: { aura: number; rank: number; total_users: number }[] | null }) => {
+      const r = data?.[0]; if (!dead && r) setV({ aura: Number(r.aura), rank: r.rank, total: r.total_users });
+    });
+    return () => { dead = true; };
+  }, [userId]);
+  return v;
+}
 
 function useProfileStats(userId: string, enabled: boolean) {
-  const [state, setState] = useState<{ loading: boolean; posts: PostRow[]; comments: Record<string, number>; reelCount: number; reelLikes: number; reelViews: number; followers: number; following: number }>({
-    loading: true, posts: [], comments: {}, reelCount: 0, reelLikes: 0, reelViews: 0, followers: 0, following: 0,
+  const [state, setState] = useState<{ loading: boolean; posts: PostRow[]; reels: ReelRow[]; comments: Record<string, number>; reelComments: Record<string, number>; reelCount: number; reelLikes: number; reelViews: number; followers: number; following: number }>({
+    loading: true, posts: [], reels: [], comments: {}, reelComments: {}, reelCount: 0, reelLikes: 0, reelViews: 0, followers: 0, following: 0,
   });
   useEffect(() => {
     if (!enabled) return;
@@ -27,7 +51,7 @@ function useProfileStats(userId: string, enabled: boolean) {
     void (async () => {
       const [{ data: posts }, { data: reels }, f1, f2] = await Promise.all([
         supabase.from("posts").select("id, caption, media_url, media_type, likes_count, views_count, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(200),
-        supabase.from("reels").select("id, likes_count, views_count").eq("user_id", userId).limit(200),
+        supabase.from("reels").select("id, caption, thumbnail_url, video_url, likes_count, views_count, created_at, source_post_id").eq("user_id", userId).order("created_at", { ascending: false }).limit(200),
         supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", userId),
         supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", userId),
       ]);
@@ -37,10 +61,16 @@ function useProfileStats(userId: string, enabled: boolean) {
         const { data: c } = await supabase.from("post_comments").select("post_id").in("post_id", list.map(p => p.id));
         for (const row of c ?? []) comments[row.post_id] = (comments[row.post_id] ?? 0) + 1;
       }
-      const r = (reels ?? []) as unknown as Array<{ likes_count: number | null; views_count: number | null }>;
+      // Reels made automatically from a video post are the same content, so only stand-alone reels are counted on top of posts.
+      const r = ((reels ?? []) as unknown as ReelRow[]).filter(x => !x.source_post_id);
+      const reelComments: Record<string, number> = {};
+      if (r.length) {
+        const { data: rc } = await supabase.from("reel_comments").select("reel_id").in("reel_id", r.map(x => x.id));
+        for (const row of rc ?? []) reelComments[row.reel_id] = (reelComments[row.reel_id] ?? 0) + 1;
+      }
       if (cancelled) return;
       setState({
-        loading: false, posts: list, comments,
+        loading: false, posts: list, comments, reels: r, reelComments,
         reelCount: r.length,
         reelLikes: r.reduce((s, x) => s + (x.likes_count ?? 0), 0),
         reelViews: r.reduce((s, x) => s + (x.views_count ?? 0), 0),
@@ -52,13 +82,40 @@ function useProfileStats(userId: string, enabled: boolean) {
   return state;
 }
 
+type Item = { key: string; kind: "post" | "reel"; id: string; caption: string | null; thumb: string | null; video: string | null; likes: number; views: number; comments: number; aura: number; created_at: string };
+
+function useItems(s: ReturnType<typeof useProfileStats>): Item[] {
+  return useMemo(() => {
+    const posts: Item[] = s.posts.map(p => {
+      const likes = p.likes_count ?? 0, views = p.views_count ?? 0, comments = s.comments[p.id] ?? 0;
+      return { key: `p${p.id}`, kind: "post", id: p.id, caption: p.caption, thumb: p.media_type === "video" ? ((p as any).thumbnail_url ?? null) : p.media_url, video: p.media_type === "video" ? p.media_url : null, likes, views, comments, aura: likes * AURA.like + comments * AURA.comment + views * AURA.view, created_at: p.created_at };
+    });
+    const reels: Item[] = s.reels.map(r => {
+      const likes = r.likes_count ?? 0, views = r.views_count ?? 0, comments = s.reelComments[r.id] ?? 0;
+      return { key: `r${r.id}`, kind: "reel", id: r.id, caption: r.caption, thumb: r.thumbnail_url, video: r.video_url, likes, views, comments, aura: likes * AURA.reelLike + comments * AURA.comment + views, created_at: r.created_at };
+    });
+    return [...posts, ...reels];
+  }, [s]);
+}
+
+const Thumb = ({ it }: { it: Item }) => (
+  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-secondary">
+    {it.thumb ? <img src={it.thumb} alt="" className="h-full w-full object-cover" /> : it.video ? <VideoThumb src={it.video} /> : null}
+    {it.kind === "reel" && <Film className="absolute bottom-0.5 right-0.5 h-3 w-3 text-white drop-shadow" />}
+  </div>
+);
+
 export const AuraDialog = ({ userId, open, onOpenChange }: { userId: string; open: boolean; onOpenChange: (o: boolean) => void }) => {
   const s = useProfileStats(userId, open);
-  const ranked = useMemo(() => s.posts.map(p => {
-    const likes = p.likes_count ?? 0, views = p.views_count ?? 0, comments = s.comments[p.id] ?? 0;
-    return { ...p, likes, views, comments, aura: likes * AURA.like + comments * AURA.comment + views * AURA.view };
-  }).sort((a, b) => b.aura - a.aura), [s]);
-  const total = ranked.reduce((n, p) => n + p.aura, 0) + s.reelLikes * AURA.reelLike + s.reelViews;
+  const rank = useAuraRank(open ? userId : undefined);
+  const [board, setBoard] = useState<{ user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; aura: number }[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    void (supabase.rpc as any)("aura_leaderboard", { _limit: 5 }).then(({ data }: { data: typeof board | null }) => setBoard(data ?? []));
+  }, [open]);
+  const items = useItems(s);
+  const ranked = useMemo(() => [...items].sort((a, b) => b.aura - a.aura), [items]);
+  const total = ranked.reduce((n, p) => n + p.aura, 0);
   const level = levelFor(total);
   const next = LEVELS.find(l => l.min > total);
   const max = ranked[0]?.aura || 1;
@@ -69,24 +126,38 @@ export const AuraDialog = ({ userId, open, onOpenChange }: { userId: string; ope
         {s.loading ? <p className="py-8 text-center text-sm text-muted-foreground">Calculating aura…</p> : (
           <div className="space-y-4">
             <div className={`rounded-2xl bg-gradient-to-br ${level.color} p-4 text-white`}>
-              <p className="text-xs uppercase tracking-widest opacity-80">Total aura</p>
+              <p className="text-xs uppercase tracking-widest opacity-80">Aura points</p>
               <p className="text-4xl font-extrabold">{total.toLocaleString()}</p>
               <p className="text-sm font-semibold">{level.name}{next ? ` · ${(next.min - total).toLocaleString()} to ${next.name}` : " · Max level"}</p>
             </div>
-            <p className="text-xs text-muted-foreground">Each post earns {AURA.like} aura per like, {AURA.comment} per comment and {AURA.view} per view. Reels count too.</p>
+            <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">Aura rank</p>
+              <p className="text-3xl font-extrabold text-foreground">{rank ? `#${rank.rank.toLocaleString()}` : "…"}<span className="ml-2 text-sm font-medium text-muted-foreground">{rank ? `of ${rank.total.toLocaleString()} creators` : ""}</span></p>
+              {board.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground">Top aura on Primegram</p>
+                  {board.map((b, i) => (
+                    <div key={b.user_id} className={`flex items-center gap-2 rounded-lg px-2 py-1 text-sm ${b.user_id === userId ? "bg-primary/20" : ""}`}>
+                      <span className="w-5 text-center font-bold text-primary">{i + 1}</span>
+                      <span className="h-6 w-6 shrink-0 overflow-hidden rounded-full bg-secondary">{b.avatar_url && <img src={b.avatar_url} alt="" className="h-full w-full object-cover" />}</span>
+                      <span className="min-w-0 flex-1 truncate text-foreground">{b.username || b.display_name || "user"}</span>
+                      <span className="font-semibold text-foreground">{Number(b.aura).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Posts earn {AURA.like} aura per like, reels {AURA.reelLike}; every comment is {AURA.comment} and every viewer is {AURA.view}. When your aura levels up, your profile picture glows.</p>
             <div className="space-y-2">
               {ranked.length === 0 && <p className="text-sm text-muted-foreground">No posts yet. Post something to start earning aura.</p>}
               {ranked.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-xl border border-border/40 p-2">
+                <div key={p.key} className="flex items-center gap-3 rounded-xl border border-border/40 p-2">
                   <span className="w-6 text-center text-sm font-bold text-primary">#{i + 1}</span>
-                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-secondary">
-                    {p.media_url && p.media_type !== "video" && <img src={p.media_url} alt="" className="h-full w-full object-cover" />}
-                    {p.media_url && p.media_type === "video" && <VideoThumb src={p.media_url} poster={(p as any).thumbnail_url} />}
-                  </div>
+                  <Thumb it={p} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-foreground">{p.caption || "Untitled post"}</p>
+                    <p className="truncate text-sm text-foreground">{p.kind === "reel" ? "Reel · " : ""}{p.caption || (p.kind === "reel" ? "Untitled reel" : "Untitled post")}</p>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(4, (p.aura / max) * 100)}%` }} /></div>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">{p.likes} likes · {p.comments} comments · {p.views} views</p>
+                    <p className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground"><span className="flex items-center gap-0.5"><Eye className="h-3 w-3" />{p.views.toLocaleString()} viewers</span><span>{p.likes} likes</span><span>{p.comments} comments</span></p>
                   </div>
                   <span className="text-sm font-bold text-foreground">{p.aura.toLocaleString()}</span>
                 </div>
@@ -101,10 +172,11 @@ export const AuraDialog = ({ userId, open, onOpenChange }: { userId: string; ope
 
 export const AnalyticsDialog = ({ userId, isOwner, open, onOpenChange }: { userId: string; isOwner: boolean; open: boolean; onOpenChange: (o: boolean) => void }) => {
   const s = useProfileStats(userId, open);
+  const items = useItems(s);
   const totals = useMemo(() => {
     const likes = s.posts.reduce((n, p) => n + (p.likes_count ?? 0), 0) + s.reelLikes;
     const views = s.posts.reduce((n, p) => n + (p.views_count ?? 0), 0) + s.reelViews;
-    const comments = Object.values(s.comments).reduce((n, c) => n + c, 0);
+    const comments = Object.values(s.comments).reduce((n, c) => n + c, 0) + Object.values(s.reelComments).reduce((n, c) => n + c, 0);
     const interactions = likes + comments;
     return { likes, views, comments, engagement: views ? (interactions / views) * 100 : 0 };
   }, [s]);
@@ -113,12 +185,12 @@ export const AnalyticsDialog = ({ userId, isOwner, open, onOpenChange }: { userI
     for (let i = 13; i >= 0; i--) {
       const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
       const next = new Date(d); next.setDate(d.getDate() + 1);
-      out.push({ label: String(d.getDate()), likes: s.posts.filter(p => { const t = new Date(p.created_at); return t >= d && t < next; }).length });
+      out.push({ label: String(d.getDate()), likes: items.filter(p => { const t = new Date(p.created_at); return t >= d && t < next; }).length });
     }
     return out;
-  }, [s]);
+  }, [items]);
   const maxDay = Math.max(1, ...days.map(d => d.likes));
-  const top = [...s.posts].sort((a, b) => (b.views_count ?? 0) - (a.views_count ?? 0)).slice(0, 3);
+  const byViews = [...items].sort((a, b) => b.views - a.views).slice(0, 30);
   const Stat = ({ icon: Icon, label, value }: { icon: typeof Eye; label: string; value: string }) => (
     <div className="rounded-xl border border-border/40 p-3"><Icon className="mb-1 h-4 w-4 text-primary" /><p className="text-lg font-bold text-foreground">{value}</p><p className="text-[11px] text-muted-foreground">{label}</p></div>
   );
@@ -133,11 +205,11 @@ export const AnalyticsDialog = ({ userId, isOwner, open, onOpenChange }: { userI
               <Stat icon={Heart} label="Total likes" value={totals.likes.toLocaleString()} />
               <Stat icon={MessageCircle} label="Comments" value={totals.comments.toLocaleString()} />
               <Stat icon={Users} label="Followers" value={s.followers.toLocaleString()} />
-              <Stat icon={Film} label="Reels" value={String(s.reelCount)} />
+              <Stat icon={Film} label="Posts + reels" value={`${s.posts.length + s.reels.length} (${s.reels.length} reels)`} />
               <Stat icon={BarChart3} label="Engagement rate" value={`${totals.engagement.toFixed(1)}%`} />
             </div>
             <div>
-              <p className="mb-2 text-xs font-semibold text-muted-foreground">Posts in the last 14 days</p>
+              <p className="mb-2 text-xs font-semibold text-muted-foreground">Posts and reels in the last 14 days</p>
               <div className="flex h-20 items-end gap-1">
                 {days.map((d, i) => (
                   <div key={i} className="flex flex-1 flex-col items-center gap-1">
@@ -147,10 +219,18 @@ export const AnalyticsDialog = ({ userId, isOwner, open, onOpenChange }: { userI
                 ))}
               </div>
             </div>
-            {top.length > 0 && (
+            {byViews.length > 0 && (
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">Top posts by views</p>
-                {top.map(p => <p key={p.id} className="truncate text-sm text-foreground">{(p.views_count ?? 0).toLocaleString()} views · {p.caption || "Untitled post"}</p>)}
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">Viewers per post and reel</p>
+                <div className="space-y-1.5">
+                  {byViews.map(p => (
+                    <div key={p.key} className="flex items-center gap-2.5 rounded-xl border border-border/40 p-2">
+                      <Thumb it={p} />
+                      <p className="min-w-0 flex-1 truncate text-sm text-foreground">{p.kind === "reel" ? "Reel · " : ""}{p.caption || (p.kind === "reel" ? "Untitled reel" : "Untitled post")}</p>
+                      <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-foreground"><Eye className="h-3.5 w-3.5 text-primary" />{p.views.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             {!isOwner && <p className="text-[11px] text-muted-foreground">Earnings and payouts are only visible to the account owner.</p>}

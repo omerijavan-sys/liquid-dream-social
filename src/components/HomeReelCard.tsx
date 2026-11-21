@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMute } from "@/contexts/MuteContext";
 import { toast } from "sonner";
 import ShareSheet from "@/components/ShareSheet";
+import { countReelView } from "@/utils/reelViews";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 
 /** A reel shown in the home feed; its video only loads and plays while nearby. */
@@ -23,16 +24,22 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
+    let viewTimer = 0;
     const io = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) setNear(true);
       const video = videoRef.current;
-      if (!video) return;
-      if (entry.isIntersecting && entry.intersectionRatio >= 0.6) void video.play().catch(() => {});
-      else video.pause();
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+        if (video) void video.play().catch(() => {});
+        window.clearTimeout(viewTimer);
+        viewTimer = window.setTimeout(() => countReelView(reel.id), 1500);
+      } else {
+        window.clearTimeout(viewTimer);
+        video?.pause();
+      }
     }, { threshold: [0, 0.6], rootMargin: "300px 0px" });
     io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    return () => { window.clearTimeout(viewTimer); io.disconnect(); };
+  }, [reel.id]);
 
   useEffect(() => {
     if (!user) return;

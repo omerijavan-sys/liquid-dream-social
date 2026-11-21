@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
 import { motion } from "framer-motion";
-import { ArrowLeft, Settings, Sparkles, BarChart3, BadgeDollarSign, Grid3X3, Bookmark, Heart, Camera, Film, X } from "lucide-react";
+import { ArrowLeft, Settings, Sparkles, BarChart3, BadgeDollarSign, Grid3X3, Bookmark, Heart, Camera, Film, X, Eye } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,7 @@ import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import FollowListDialog, { FollowButton } from "@/components/FollowListDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { AuraDialog, AnalyticsDialog, CreatorPlanDialog } from "@/components/ProfileDashboards";
+import { AuraDialog, AnalyticsDialog, CreatorPlanDialog, auraGlowStyle, useAuraRank } from "@/components/ProfileDashboards";
 
 interface Profile {
   display_name: string | null;
@@ -40,6 +40,9 @@ const ProfilePage = () => {
   const [tabPosts, setTabPosts] = useState<any[]>([]);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [auraOpen, setAuraOpen] = useState(false);
+  const aura = useAuraRank(user?.id);
+  const glow = auraGlowStyle(aura?.aura ?? 0);
+  const [reelTotal, setReelTotal] = useState(0);
   const [planOpen, setPlanOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
@@ -48,7 +51,7 @@ const ProfilePage = () => {
     if (!user || tab === "posts") return;
     const load = async () => {
       if (tab === "reels") {
-        const { data } = await supabase.from("reels").select("id, video_url, caption, thumbnail_url").eq("user_id", user.id).order("created_at", { ascending: false });
+        const { data } = await supabase.from("reels").select("id, video_url, caption, thumbnail_url, views_count").eq("user_id", user.id).order("created_at", { ascending: false });
         setTabPosts((data || []).map((reel) => ({ ...reel, media_url: reel.video_url, media_type: "video" })));
         return;
       }
@@ -98,6 +101,8 @@ const ProfilePage = () => {
         .neq("media_type", "story")
         .order("created_at", { ascending: false });
       setPosts(userPosts || []);
+      const { count } = await supabase.from("reels").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("source_post_id", null);
+      setReelTotal(count ?? 0);
     };
     fetchData();
   }, [user]);
@@ -137,7 +142,7 @@ const ProfilePage = () => {
         <div className="relative z-10 flex items-center gap-3 px-3 py-2.5">
           <button onClick={() => navigate(-1)} aria-label="Back" className="depth-press text-amber-100"><ArrowLeft className="h-4 w-4" /></button>
           <span className="flex flex-1 items-center gap-1 text-sm font-bold text-white">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={(profile as any)?.badge} /></span>
-          <button onClick={() => setAuraOpen(true)} aria-label="Aura dashboard" className="depth-press text-amber-200"><Sparkles className="h-5 w-5" /></button>
+          <button onClick={() => setAuraOpen(true)} aria-label="Aura dashboard" className={`depth-press text-amber-200 ${Object.keys(glow).length ? "aura-glow-icon" : ""}`}><Sparkles className="h-5 w-5" /></button>
           <button onClick={() => setPlanOpen(true)} aria-label="Fan subscription price" className="depth-press text-amber-200"><BadgeDollarSign className="h-5 w-5" /></button>
           <button onClick={() => setAnalyticsOpen(true)} aria-label="Analytics dashboard" className="depth-press text-amber-200"><BarChart3 className="h-5 w-5" /></button>
           <button onClick={() => navigate("/settings")} aria-label="Settings" className="depth-press text-amber-200"><Settings className="h-5 w-5" /></button>
@@ -149,7 +154,7 @@ const ProfilePage = () => {
           <div className="relative">
             <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
             <button onClick={() => setAvatarOpen(true)} aria-label="View profile picture" className="depth-press relative">
-              <div className="prime-profile-avatar flex h-16 w-16 items-center justify-center overflow-hidden rounded-full">
+              <div style={glow} className={`prime-profile-avatar flex h-16 w-16 items-center justify-center overflow-hidden rounded-full ${Object.keys(glow).length ? "aura-glow" : ""}`}>
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
@@ -164,7 +169,7 @@ const ProfilePage = () => {
             </button>
           </div>
           <div className="flex flex-1 items-center justify-around text-center">
-            <div className="prime-profile-post-count flex h-[4.5rem] w-[4.5rem] flex-col items-center justify-center rounded-full"><p className="text-base font-bold text-white">{posts.length}</p><p className="text-[10px] text-white/65">Posts</p></div>
+            <div className="prime-profile-post-count flex h-[4.5rem] w-[4.5rem] flex-col items-center justify-center rounded-full"><p className="text-base font-bold text-white">{posts.length + reelTotal}</p><p className="text-[10px] text-white/65">Posts</p></div>
             <button onClick={() => setListMode("followers")} className="depth-press"><p className="text-base font-bold text-white">{followersCount}</p><p className="text-[10px] text-white/65">Followers</p></button>
             <button onClick={() => setListMode("following")} className="depth-press"><p className="text-base font-bold text-white">{myFollowing.size}</p><p className="text-[10px] text-white/65">Following</p></button>
           </div>
@@ -249,6 +254,7 @@ const ProfilePage = () => {
                 <img src={post.media_url} alt="" className="w-full h-full object-cover" loading="lazy" />
               )}
               {post.media_type === "video" && <Film className="absolute right-2 top-2 h-4 w-4 text-white drop-shadow" />}
+              <span className="absolute bottom-1 left-1.5 flex items-center gap-1 text-[10px] font-semibold text-white drop-shadow"><Eye className="h-3 w-3" />{(post.views_count ?? 0).toLocaleString()}</span>
             </motion.button>
           ))}
         </div>

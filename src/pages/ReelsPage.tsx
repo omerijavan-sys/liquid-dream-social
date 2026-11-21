@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import CreatorTipButton from "@/components/CreatorTipButton";
 import { runInBackground } from "@/utils/backgroundUpload";
+import { countReelView } from "@/utils/reelViews";
 import FilterStrip from "@/components/FilterStrip";
 import { bakeVideoFilter } from "@/utils/bakeVideo";
 import { captureVideoThumb } from "@/utils/videoThumb";
@@ -54,6 +55,8 @@ const ReelsPage = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const viewedReel = reels[currentIndex]?.id;
+  useEffect(() => { if (!viewedReel) return; const t = window.setTimeout(() => countReelView(viewedReel), 1500); return () => window.clearTimeout(t); }, [viewedReel]);
   // Start muted so browsers allow scroll-triggered autoplay. Users can enable
   // sound with the volume button after playback has started.
   const { muted, toggleMuted } = useMute();

@@ -7,7 +7,7 @@ import { ArrowLeft, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2,
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { FollowButton } from "@/components/FollowListDialog";
 import CommentsSection from "@/components/CommentsSection";
-import { AuraDialog, AnalyticsDialog } from "@/components/ProfileDashboards";
+import { AuraDialog, AnalyticsDialog, auraGlowStyle, useAuraRank } from "@/components/ProfileDashboards";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -48,6 +48,10 @@ const PublicProfilePage = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [auraOpen, setAuraOpen] = useState(false);
+  const aura = useAuraRank(userId);
+  const glow = auraGlowStyle(aura?.aura ?? 0);
+  const [reelTotal, setReelTotal] = useState(0);
+  useEffect(() => { if (!userId) return; void supabase.from("reels").select("id", { count: "exact", head: true }).eq("user_id", userId).is("source_post_id", null).then(({ count }) => setReelTotal(count ?? 0)); }, [userId]);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [posts, setPosts] = useState<ProfilePost[]>([]);
   const [followers, setFollowers] = useState(0);
@@ -229,7 +233,7 @@ const PublicProfilePage = () => {
           <>
             <section className="p-5">
               <div className="flex items-center gap-5">
-                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-primary to-accent p-0.5">
+                <div style={glow} className={`h-20 w-20 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-primary to-accent p-0.5 ${Object.keys(glow).length ? "aura-glow" : ""}`}>
                   <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-background text-2xl font-bold text-primary">
                     {profile.avatar_url ? (
                       <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
@@ -239,7 +243,7 @@ const PublicProfilePage = () => {
                   </div>
                 </div>
                 <div className="grid flex-1 grid-cols-3 text-center">
-                  <div><p className="text-lg font-bold text-foreground">{posts.length}</p><p className="text-caption text-muted-foreground">Posts</p></div>
+                  <div><p className="text-lg font-bold text-foreground">{posts.length + reelTotal}</p><p className="text-caption text-muted-foreground">Posts</p></div>
                   <div><p className="text-lg font-bold text-foreground">{followers.toLocaleString()}</p><p className="text-caption text-muted-foreground">Followers</p></div>
                   <div><p className="text-lg font-bold text-foreground">{followingCount.toLocaleString()}</p><p className="text-caption text-muted-foreground">Following</p></div>
                 </div>
@@ -331,6 +335,7 @@ const PublicProfilePage = () => {
                     {post.media_type === "video" && (
                       <span className="absolute right-2 top-2 text-[10px] font-semibold text-white drop-shadow">VIDEO</span>
                     )}
+                    <span className="absolute bottom-1 left-1.5 text-[10px] font-semibold text-white drop-shadow">👁 {(post.views_count ?? 0).toLocaleString()}</span>
                   </motion.button>
                 ))}
               </div>
