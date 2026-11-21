@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import { ArrowUpCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { setAppUpdate } from "@/utils/updateStore";
@@ -44,28 +45,15 @@ const UpdateChecker = () => {
     if (!Capacitor.isNativePlatform()) return;
     void check();
     const h = CapApp.addListener("appStateChange", ({ isActive }) => { if (isActive) void check(); });
-    const p = AppUpdate.addListener("progress", e => setProg(e));
-    return () => { void h.then(x => x.remove()); void p.then(x => x.remove()).catch(() => undefined); };
+    return () => { void h.then(x => x.remove()); };
   }, [check]);
 
-  const launchInstaller = async () => {
-    const r = await AppUpdate.install();
-    if (r.needsPermission) toast("Allow Primegram to install updates, then tap Upgrade again.");
-  };
-
+  // No self-installer permission in the app (Play Protect treats those as risky), so Upgrade opens the
+  // signed APK download in the browser and Android's normal installer takes over.
   const upgrade = async () => {
-    if (!update || busyRef.current) return;
-    if (downloaded) { await launchInstaller().catch(() => toast.error("Couldn't open the installer")); return; }
-    busyRef.current = true; setBusy(true); setProg({ pct: 0, received: 0, total: 0 });
-    try {
-      await AppUpdate.download({ url: update.url });
-      setDownloaded(true);
-      await launchInstaller();
-    } catch (e) {
-      toast.error(e instanceof Error && e.message ? e.message : "Download failed. Check your connection and try again.");
-    } finally {
-      busyRef.current = false; setBusy(false);
-    }
+    if (!update) return;
+    try { await Browser.open({ url: update.url }); }
+    catch { toast.error("Couldn't open the download. Try again."); }
   };
 
   // The update prompt pops up by itself when a newer build exists (once per build until the app is reopened).
