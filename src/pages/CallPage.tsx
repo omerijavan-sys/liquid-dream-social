@@ -13,6 +13,15 @@ import { Button } from "@/components/ui/button";
 
 
 
+/** Mark the invitation ended (retrying) so the other phone stops ringing immediately. */
+const endInvitation = async (id: string) => {
+  for (let i = 0; i < 3; i++) {
+    const { error } = await supabase.from("call_invitations").update({ status: "ended" }).eq("id", id).in("status", ["ringing", "accepted"]);
+    if (!error) return;
+    await new Promise(r => setTimeout(r, 400));
+  }
+};
+
 type Status = "ringing" | "connecting" | "connected" | "ended";
 
 const CallPage = () => {
@@ -79,7 +88,7 @@ const CallPage = () => {
     endedRef.current = true;
     send("hangup");
     // If we hang up while still ringing, cancel the recipient's ringtone.
-    if (callId) void supabase.from("call_invitations").update({ status: "ended" }).eq("id", callId);
+    if (callId) void endInvitation(callId);
     setStatus("ended");
     cleanup();
     setTimeout(() => navigate(exitPath, { replace: true }), 600);
@@ -246,6 +255,8 @@ const CallPage = () => {
       setStatus("ended");
     });
 
+    const onHide = () => { if (callId) void endInvitation(callId); };
+    window.addEventListener("pagehide", onHide);
     const timer = setInterval(() => { if (pcRef.current?.connectionState === "connected") setCallTime(t => t + 1); }, 1000);
     // Give up if the other side never answers within 45 seconds.
     const noAnswer = setTimeout(() => {
@@ -260,7 +271,8 @@ const CallPage = () => {
       clearTimeout(noAnswer);
       if (readyTimer) clearInterval(readyTimer);
       if (invitationChannel) void supabase.removeChannel(invitationChannel);
-      if (callId) void supabase.from("call_invitations").update({ status: "ended" }).eq("id", callId);
+      if (callId) void endInvitation(callId);
+      window.removeEventListener("pagehide", onHide);
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

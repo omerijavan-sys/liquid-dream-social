@@ -78,7 +78,7 @@ const VerifiedTab = ({ balance, refresh }: { balance: number | null; refresh: ()
   };
   return (
     <div className="space-y-3">
-      {tier && <p className="text-sm">Current tier: <b className="text-primary capitalize">{tier}</b></p>}
+      {tier && <p className="text-sm">Current tier: <b className={`capitalize ${TIERS.find(t => t.id === tier)?.color ?? "text-[#F5B800]"}`}>{tier.replace("_", " ")}</b></p>}
       <div className={`${card} flex items-center justify-between gap-3 border-amber-200/30`}>
         <p className="text-sm text-white/75">Wallet balance: <b className="text-amber-100">{balance === null ? "Loading…" : `${balance.toLocaleString()} KES`}</b></p>
         <Button size="sm" variant="secondary" onClick={() => navigate("/wallet")}>Top up wallet</Button>

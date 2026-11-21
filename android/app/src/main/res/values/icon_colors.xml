@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_bg_gold">#D4AF37</color>
+    <color name="ic_bg_midnight">#0B0B12</color>
+    <color name="ic_bg_violet">#6D28D9</color>
+    <color name="ic_bg_emerald">#059669</color>
+    <color name="ic_bg_rose">#E11D48</color>
+    <color name="ic_bg_sky">#0284C7</color>
+</resources>

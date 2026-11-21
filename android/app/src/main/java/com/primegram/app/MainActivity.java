@@ -1,5 +1,14 @@
 package com.primegram.app;
 
+import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
-public class MainActivity extends BridgeActivity {}
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(AppIconPlugin.class);
+        registerPlugin(GalleryPlugin.class);
+        registerPlugin(MusicServicePlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}

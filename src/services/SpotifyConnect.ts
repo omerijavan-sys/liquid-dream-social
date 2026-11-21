@@ -1,9 +1,14 @@
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 
 const LS = "primegram:spotify";
 const SCOPES = "streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state";
 interface Tok { access: string; refresh: string; exp: number }
-const redirectUri = () => `${window.location.origin}/`;
+const SITE = "https://primegram-extreme.vercel.app/";
+const isNative = () => Capacitor.isNativePlatform();
+// The installed app can't use its own https://localhost address with Spotify, so login returns through the website, which hands the code back to the app.
+const redirectUri = () => (isNative() ? SITE : `${window.location.origin}/`);
+const changed = () => window.dispatchEvent(new Event("prime:spotifyChanged"));
 
 const load = (): Tok | null => { try { return JSON.parse(localStorage.getItem(LS) || "null"); } catch { return null; } };
 const save = (t: Tok | null) => { try { t ? localStorage.setItem(LS, JSON.stringify(t)) : localStorage.removeItem(LS); } catch { /* ignore */ } };
@@ -20,16 +25,25 @@ const b64 = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf
 const rand = () => b64(crypto.getRandomValues(new Uint8Array(32)).buffer);
 
 export const isSpotifyConnected = () => !!load();
-export const disconnectSpotify = () => save(null);
+export const disconnectSpotify = () => { save(null); changed(); };
 
 export async function startSpotifyLogin() {
   const id = await clientId();
   const verifier = rand();
   const challenge = b64(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
-  try { sessionStorage.setItem("primegram:spVerifier", verifier); localStorage.setItem("primegram:spReturn", window.location.pathname + window.location.search); } catch { /* ignore */ }
+  try { sessionStorage.setItem("primegram:spVerifier", verifier); localStorage.setItem("primegram:spVerifier", verifier); localStorage.setItem("primegram:spReturn", window.location.pathname + window.location.search); } catch { /* ignore */ }
   const u = new URL("https://accounts.spotify.com/authorize");
-  u.search = new URLSearchParams({ client_id: id, response_type: "code", redirect_uri: redirectUri(), scope: SCOPES, code_challenge_method: "S256", code_challenge: challenge, state: "primegram-spotify" }).toString();
+  u.search = new URLSearchParams({ client_id: id, response_type: "code", redirect_uri: redirectUri(), scope: SCOPES, code_challenge_method: "S256", code_challenge: challenge, state: isNative() ? "primegram-spotify-app" : "primegram-spotify" }).toString();
+  if (isNative()) { const { Browser } = await import("@capacitor/browser"); await Browser.open({ url: u.toString() }); return; }
   window.location.assign(u.toString());
+}
+
+/** Installed app: the website bounced the Spotify code back through com.primegram.app://auth-callback?spotify_code=… */
+export async function finishNativeSpotify(code: string) {
+  const verifier = localStorage.getItem("primegram:spVerifier");
+  if (!verifier) throw new Error("Login expired, try again");
+  await tokenRequest({ grant_type: "authorization_code", code, redirect_uri: redirectUri(), code_verifier: verifier });
+  changed();
 }
 
 async function tokenRequest(params: Record<string, string>): Promise<Tok> {
@@ -50,9 +64,10 @@ export async function finishSpotifyLogin(): Promise<boolean> {
   if (p.get("state") !== "primegram-spotify") return false;
   const code = p.get("code");
   window.history.replaceState({}, "", window.location.pathname);
-  const verifier = sessionStorage.getItem("primegram:spVerifier");
+  const verifier = sessionStorage.getItem("primegram:spVerifier") || localStorage.getItem("primegram:spVerifier");
   if (!code || !verifier) return true;
   await tokenRequest({ grant_type: "authorization_code", code, redirect_uri: redirectUri(), code_verifier: verifier });
+  changed();
   return true;
 }
 

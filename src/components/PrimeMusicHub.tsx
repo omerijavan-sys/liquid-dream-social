@@ -1,21 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Music2, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward } from "lucide-react";
-import { findFullStream } from "@/services/FullTrack";
-import { isSpotifyConnected, startSpotifyLogin, disconnectSpotify, initSpotifyPlayer, playOnSpotify, spotifyToggle, spotifySeek, spotifyNext, spotifyPrev, spotifyStop, type SpState } from "@/services/SpotifyConnect";
+import { X, Search, Music2, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward, ListPlus, Send, Trash2, Shuffle, Repeat, Repeat1, Download, CheckCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { playSong, toggleMusic, seekMusic, stopMusic, useMusic, setQueue, nextTrack, prevTrack, queueItemById, cycleRepeat, toggleShuffle, getMusicState } from "@/services/MusicEngine";
+import { isSpotifyConnected, startSpotifyLogin, disconnectSpotify, initSpotifyPlayer, playOnSpotify, spotifyToggle, spotifySeek, spotifyNext, spotifyPrev, type SpState } from "@/services/SpotifyConnect";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SpotifyEmbed from "./SpotifyEmbed";
 import { openLink } from "@/utils/openLink";
+import { useDownloads, downloadSong, removeDownload, dlKey } from "@/services/MusicDownloads";
+import { Capacitor } from "@capacitor/core";
 
 /** Kept for older callers that import the default chart list; real music now comes from Spotify. */
 export const tracks: Array<{ title: string; artist: string; youtubeId: string }> = [];
 
 type Kind = "track" | "playlist" | "album";
+type Tab = Kind | "mine" | "saved";
+interface MyList { name: string; items: Array<{ id: string; title: string; artist: string; artwork: string | null; kind: Kind }> }
+const LS_LISTS = "primegram:playlists";
+const readLists = (): MyList[] => { try { return JSON.parse(localStorage.getItem(LS_LISTS) || "[]"); } catch { return []; } };
+const writeLists = (l: MyList[]) => { try { localStorage.setItem(LS_LISTS, JSON.stringify(l)); } catch { /* ignore */ } };
 interface Item { id: string; title: string; artist: string; artwork: string | null; kind: Kind }
 
 const GENRES = ["Afrobeats", "Amapiano", "Gengetone", "Bongo Flava", "Hip Hop", "R&B", "Gospel", "Pop", "Reggae", "Rock", "Lo-fi", "Workout"];
-const TABS: Array<{ id: Kind; label: string }> = [
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "mine", label: "My playlists" },
+  { id: "saved", label: "Downloaded" },
   { id: "track", label: "Songs" },
   { id: "playlist", label: "Playlists" },
   { id: "album", label: "Albums" },
@@ -26,60 +36,58 @@ const glass = "border border-white/15 bg-white/[0.07] backdrop-blur-2xl shadow-[
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-/** Plays the selected item: full Spotify (Premium, connected) → full free stream → Spotify preview embed. */
-const NowPlaying = ({ item, onClose }: { item: Item; onClose: () => void }) => {
+/** Plays the selected item: full Spotify (Premium, connected) → full free stream (keeps playing in background) → Spotify preview embed. */
+const NowPlaying = ({ item, onClose, onNext, onPrev, onUse }: { item: Item; onClose: () => void; onNext?: () => void; onPrev?: () => void; onUse?: () => void }) => {
   const [engine, setEngine] = useState<"loading" | "spotify" | "audio" | "embed">("loading");
   const [note, setNote] = useState("");
   const [st, setSt] = useState<SpState>({ paused: true, position: 0, duration: 0 });
-  const [src, setSrc] = useState<string | null>(null);
   const [spotifyStarted, setSpotifyStarted] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const music = useMusic();
+
+  const fallback = async () => {
+    if (item.kind === "track" && getMusicState().track?.key === `sp_${item.id}`) { setEngine("audio"); return; } // already started by the queue
+    if (item.kind === "track") {
+      stopMusic();
+      if (await playSong(item.title, item.artist, item.artwork, `sp_${item.id}`)) { setEngine("audio"); return; }
+    }
+    setEngine("embed");
+    setNote(item.kind === "track" ? "No full version found — playing Spotify's preview." : "Connect Spotify (Premium) to play full playlists and albums.");
+  };
 
   useEffect(() => {
     let dead = false;
-    setEngine("loading"); setNote(""); setSrc(null); setSpotifyStarted(false); setSt({ paused: true, position: 0, duration: 0 });
+    setEngine("loading"); setNote(""); setSpotifyStarted(false); setSt({ paused: true, position: 0, duration: 0 });
     (async () => {
       if (isSpotifyConnected()) {
         try {
           await initSpotifyPlayer((s) => { if (!dead) setSt(s); });
-          if (!dead) {
-            setEngine("spotify");
-            setNote("Ready for full playback. Press play to start on Spotify.");
-          }
+          if (!dead) { setEngine("spotify"); setNote("Press play to start the full song on Spotify."); }
           return;
         } catch (e) {
-          const m = e instanceof Error ? e.message : "";
-          if (!dead) setNote(m === "account_error" ? "Spotify Premium is needed for full songs here." : "");
+          if (!dead) setNote(Capacitor.isNativePlatform() ? "Spotify is connected. In the app, full songs play from the free full stream." : (e instanceof Error ? e.message : "") === "account_error" ? "Spotify Premium is needed for full songs here — using the free full stream." : "");
         }
       }
-      if (item.kind === "track") {
-        const url = await findFullStream(item.title, item.artist);
-        if (dead) return;
-        if (url) { setSrc(url); setEngine("audio"); return; }
-      }
-      if (!dead) { setEngine("embed"); setNote(n => n || (item.kind === "track" ? "No full version found — playing Spotify's preview." : "Connect Spotify (Premium) to play full playlists and albums.")); }
+      if (!dead) await fallback();
     })();
-    return () => { dead = true; spotifyStop(); audioRef.current?.pause(); };
+    return () => { dead = true; };
   }, [item.id, item.kind]);
 
-  const a = audioRef.current;
   const toggle = () => {
     if (engine === "spotify") {
-      if (spotifyStarted) {
-        void spotifyToggle();
-        return;
-      }
+      if (spotifyStarted) { void spotifyToggle(); return; }
+      stopMusic();
       void playOnSpotify(item.kind, item.id)
         .then(() => { setSpotifyStarted(true); setSt((state) => ({ ...state, paused: false })); setNote(""); })
-        .catch(() => setNote("Spotify could not start playback. Confirm the connected account is Premium, then try again."));
+        .catch(() => { setNote("Spotify couldn't start (Premium required) — using the free full stream."); void fallback(); });
       return;
     }
-    if (a) { a.paused ? void a.play() : a.pause(); }
+    toggleMusic();
   };
-  const paused = engine === "spotify" ? st.paused : st.paused;
-  const seek = (v: number) => { if (engine === "spotify") spotifySeek(v * 1000); else if (a) a.currentTime = v; };
-  const pos = engine === "spotify" ? st.position / 1000 : st.position;
-  const dur = engine === "spotify" ? st.duration / 1000 : st.duration;
+  const spot = engine === "spotify";
+  const paused = spot ? st.paused : music.paused;
+  const seek = (v: number) => { if (spot) spotifySeek(v * 1000); else seekMusic(v); };
+  const pos = spot ? st.position / 1000 : music.pos;
+  const dur = spot ? st.duration / 1000 : music.dur;
 
   return (
     <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
@@ -87,34 +95,38 @@ const NowPlaying = ({ item, onClose }: { item: Item; onClose: () => void }) => {
       <div className="mb-2 flex items-center gap-3">
         {item.artwork && <img src={item.artwork} alt="" className="h-12 w-12 rounded-xl object-cover" />}
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="truncate text-xs text-white/60">{item.artist}</p></div>
+        {item.kind === "track" && onUse && <button onClick={onUse} aria-label="Use in a post" title="Use in a post" className="rounded-full bg-emerald-400/20 p-1.5 text-emerald-300"><Send className="h-4 w-4" /></button>}
         <button onClick={() => openLink(`https://open.spotify.com/${item.kind}/${item.id}`)} aria-label="Open in Spotify" className="rounded-full p-1.5 hover:bg-white/10"><ExternalLink className="h-4 w-4" /></button>
         <button onClick={onClose} aria-label="Close player" className="rounded-full p-1.5 hover:bg-white/10"><X className="h-4 w-4" /></button>
       </div>
       {engine === "loading" && <div className="flex items-center justify-center gap-2 py-4 text-xs text-white/60"><Loader2 className="h-4 w-4 animate-spin" />Finding the full song…</div>}
       {engine === "embed" && <SpotifyEmbed key={`${item.kind}-${item.id}`} trackId={item.id} kind={item.kind} />}
-      {(engine === "spotify" || engine === "audio") && (
+      {(spot || engine === "audio") && (
         <>
-          {src && <audio ref={audioRef} src={src} autoPlay
-            onPlay={() => setSt(s => ({ ...s, paused: false }))} onPause={() => setSt(s => ({ ...s, paused: true }))}
-            onTimeUpdate={e => setSt(s => ({ ...s, position: e.currentTarget.currentTime, duration: e.currentTarget.duration || 0 }))}
-            onError={() => { setSrc(null); setEngine("embed"); setNote("Couldn't stream the full song — playing Spotify's preview."); }} />}
           <input type="range" min={0} max={Math.max(1, dur)} step={1} value={Math.min(pos, dur || 0)} onChange={e => seek(Number(e.target.value))} className="w-full accent-emerald-400" aria-label="Seek" />
           <div className="flex items-center justify-between text-[10px] text-white/50"><span>{fmt(pos)}</span><span>{fmt(dur)}</span></div>
-          <div className="mt-1 flex items-center justify-center gap-5">
-            {engine === "spotify" && <button onClick={() => void spotifyPrev()} aria-label="Previous"><SkipBack className="h-5 w-5" /></button>}
-            <button onClick={toggle} aria-label={paused ? "Play" : "Pause"} className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400 text-black active:scale-95">{paused ? <Play className="h-5 w-5 fill-current" /> : <Pause className="h-5 w-5 fill-current" />}</button>
-            {engine === "spotify" && <button onClick={() => void spotifyNext()} aria-label="Next"><SkipForward className="h-5 w-5" /></button>}
+          <div className="mt-1 flex items-center justify-center gap-4">
+            <button onClick={toggleShuffle} aria-label="Shuffle" className={music.shuffle ? "text-emerald-300" : "text-white/45"}><Shuffle className="h-5 w-5" /></button>
+            {(music.hasQueue || spot) && <button onClick={() => (spot ? (onPrev && item.kind === "track" ? onPrev() : void spotifyPrev()) : prevTrack())} aria-label="Previous song"><SkipBack className="h-5 w-5" /></button>}
+            <button onClick={toggle} aria-label={paused ? "Play" : "Pause"} className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400 text-black active:scale-95">{!spot && music.loading ? <Loader2 className="h-5 w-5 animate-spin" /> : paused ? <Play className="h-5 w-5 fill-current" /> : <Pause className="h-5 w-5 fill-current" />}</button>
+            {(music.hasQueue || spot) && <button onClick={() => (spot ? (onNext && item.kind === "track" ? onNext() : void spotifyNext()) : nextTrack())} aria-label="Next song"><SkipForward className="h-5 w-5" /></button>}
+            <button onClick={cycleRepeat} aria-label="Repeat" className={music.repeat === "off" ? "text-white/45" : "text-emerald-300"}>{music.repeat === "one" ? <Repeat1 className="h-5 w-5" /> : <Repeat className="h-5 w-5" />}</button>
           </div>
         </>
       )}
       {note && <p className="mt-1 text-center text-[10px] text-white/55">{note}</p>}
-      {engine !== "loading" && <p className="mt-0.5 text-center text-[10px] text-emerald-300/70">{engine === "spotify" ? "Full song · Spotify Premium" : engine === "audio" ? "Full song · free stream" : "Preview"}</p>}
+      {engine !== "loading" && <p className="mt-0.5 text-center text-[10px] text-emerald-300/70">{spot ? "Full song · Spotify Premium" : engine === "audio" ? "Full song · keeps playing in the background" : "Preview"}</p>}
     </motion.div>
   );
 };
 
 const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
-  const [kind, setKind] = useState<Kind>("track");
+  const navigate = useNavigate();
+  const [kind, setKind] = useState<Tab>("track");
+  const [lists, setLists] = useState<MyList[]>(readLists);
+  const [mineOpen, setMineOpen] = useState<number | null>(null);
+  const [addFor, setAddFor] = useState<Item | null>(null);
+  const [newName, setNewName] = useState("");
   const [query, setQuery] = useState("");
   const [genre, setGenre] = useState<string>("Afrobeats");
   const [items, setItems] = useState<Item[]>([]);
@@ -125,8 +137,69 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
   const [connected, setConnected] = useState(isSpotifyConnected());
   useEffect(() => { if (open) setConnected(isSpotifyConnected()); }, [open]);
 
+  const saved = useDownloads();
+  const savedItems: Item[] = saved.map(d => ({ id: d.id, title: d.title, artist: d.artist, artwork: d.artData || d.artwork, kind: "track" as Kind }));
+  const queue: Item[] = kind === "saved" ? savedItems : kind === "mine" ? (mineOpen !== null ? (lists[mineOpen]?.items ?? []) as Item[] : []) : items.filter(i => i.kind === "track");
+  const qRef = useRef<Item[]>([]); qRef.current = queue;
+  const nowRef = useRef<Item | null>(null); nowRef.current = now;
+  const advance = (d: number, auto = false) => {
+    const list = qRef.current; const cur = nowRef.current;
+    if (!list.length) return;
+    const i = cur ? list.findIndex(x => x.id === cur.id) : -1;
+    const { shuffle, repeat } = getMusicState();
+    if (shuffle && list.length > 1) {
+      let j = i; while (j === i) j = Math.floor(Math.random() * list.length);
+      setNow(list[j]); return;
+    }
+    const n = i + d;
+    if (auto && repeat === "off" && n >= list.length) return; // end of the list
+    setNow(list[(n + list.length) % list.length]);
+  };
+  // the song can change from outside the hub (auto-advance, mini player, lock screen): keep the hub's player card in step
+  const music = useMusic();
   useEffect(() => {
-    if (!open) return;
+    const k = music.track?.key;
+    if (!k?.startsWith("sp_")) return;
+    const id = k.slice(3);
+    if (nowRef.current?.id === id) return;
+    const q = queueItemById(id);
+    if (q) setNow({ ...q, kind: "track" });
+  }, [music.track?.key]);
+  const playItem = (it: Item) => {
+    if (it.kind === "track") {
+      const list = qRef.current;
+      const idx = list.findIndex(x => x.id === it.id);
+      if (idx >= 0) setQueue(list.map(x => ({ id: x.id, title: x.title, artist: x.artist, artwork: x.artwork })), idx);
+      else setQueue([{ id: it.id, title: it.title, artist: it.artist, artwork: it.artwork }], 0);
+    }
+    setNow(it);
+  };
+  const savedKeys = new Set(saved.map(d => d.key));
+  const [saving, setSaving] = useState<string | null>(null);
+  const saveOffline = async (it: Item) => {
+    if (savedKeys.has(dlKey(it.id))) { await removeDownload(dlKey(it.id)); toast.success("Removed from your downloads"); return; }
+    setSaving(it.id);
+    const r = await downloadSong({ id: it.id, title: it.title, artist: it.artist, artwork: it.artwork });
+    setSaving(null);
+    if (r === "ok") toast.success(`Saved “${it.title}” — plays offline in the app`);
+    else if (r === "nosource") toast.error("This song can only be streamed, it can't be saved.");
+    else toast.error("Download failed. Check your connection and try again.");
+  };
+
+  const saveLists = (l: MyList[]) => { setLists(l); writeLists(l); };
+  const addToList = (idx: number, it: Item) => {
+    const l = lists.map((x, i) => i === idx && !x.items.some(y => y.id === it.id) ? { ...x, items: [...x.items, { id: it.id, title: it.title, artist: it.artist, artwork: it.artwork, kind: "track" as Kind }] } : x);
+    saveLists(l); setAddFor(null); toast.success(`Added to ${l[idx].name}`);
+  };
+  const createList = (it: Item) => {
+    const name = newName.trim(); if (!name) return;
+    const l = [...lists, { name, items: [{ id: it.id, title: it.title, artist: it.artist, artwork: it.artwork, kind: "track" as Kind }] }];
+    saveLists(l); setNewName(""); setAddFor(null); toast.success(`Created "${name}"`);
+  };
+  const useInPost = (it: Item) => { stopMusic(); onClose(); navigate("/create", { state: { track: { title: it.title, artist: it.artist, artUrl: it.artwork } } }); };
+
+  useEffect(() => {
+    if (!open || kind === "mine" || kind === "saved") return;
     const term = query.trim().length >= 2 ? query.trim() : genre;
     const id = ++reqId.current;
     const t = setTimeout(async () => {
@@ -139,10 +212,24 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
         setError(data?.error === "Spotify is not configured" ? "Spotify isn't connected yet." : "Couldn't reach Spotify. Check your connection and try again.");
         return;
       }
-      setItems((data.items as Item[]).map(i => ({ ...i, kind })));
+      setItems((data.items as Item[]).map(i => ({ ...i, kind: kind as Kind })));
     }, query ? 400 : 0);
     return () => clearTimeout(t);
   }, [open, query, genre, kind]);
+
+  const SongRow = ({ it }: { it: Item }) => (
+    <div className={`flex w-full items-center gap-2 rounded-2xl p-2.5 ${glass} ${now?.id === it.id ? "ring-1 ring-emerald-400/70" : ""}`}>
+      <button onClick={() => playItem(it)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        {it.artwork ? <img src={it.artwork} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-xl object-cover" /> : <span className="h-12 w-12 shrink-0 rounded-xl bg-white/10" />}
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{it.title}</span><span className="block truncate text-xs text-white/60">{it.artist}</span></span>
+      </button>
+      <button onClick={() => void saveOffline(it)} aria-label={savedKeys.has(dlKey(it.id)) ? "Downloaded — tap to remove" : "Download to the app"} className="rounded-full p-2 hover:bg-white/10">
+        {saving === it.id ? <Loader2 className="h-4 w-4 animate-spin" /> : savedKeys.has(dlKey(it.id)) ? <CheckCircle2 className="h-4 w-4 text-emerald-300" /> : <Download className="h-4 w-4" />}
+      </button>
+      <button onClick={() => setAddFor(it)} aria-label="Add to playlist" className="rounded-full p-2 hover:bg-white/10"><ListPlus className="h-4 w-4" /></button>
+      <button onClick={() => useInPost(it)} aria-label="Use in a post" className="rounded-full p-2 hover:bg-white/10"><Send className="h-4 w-4" /></button>
+    </div>
+  );
 
   return (
     <AnimatePresence>
@@ -190,18 +277,38 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
 
           <div className={`relative z-10 mt-3 flex-1 overflow-y-auto px-4 ${now ? "pb-[26rem]" : "pb-8"}`}>
+            {kind === "saved" ? (
+              <div className="space-y-2">
+                <p className="px-1 text-xs text-white/50">Songs saved inside Primegram. They play without internet and are only available in the app.</p>
+                {savedItems.length === 0 && <div className={`rounded-2xl p-4 text-center text-sm text-white/60 ${glass}`}>Nothing downloaded yet. Tap the <Download className="inline h-4 w-4" /> button on any song.</div>}
+                {savedItems.map(it => <SongRow key={it.id} it={it} />)}
+              </div>
+            ) : kind === "mine" ? (
+              <div className="space-y-2">
+                {mineOpen === null ? (
+                  lists.length === 0
+                    ? <div className={`rounded-2xl p-4 text-center text-sm text-white/60 ${glass}`}>No playlists yet. Tap the <ListPlus className="inline h-4 w-4" /> button on any song to start one.</div>
+                    : lists.map((l, i) => (
+                      <div key={l.name + i} className={`flex items-center gap-3 rounded-2xl p-3 ${glass}`}>
+                        <button onClick={() => setMineOpen(i)} className="min-w-0 flex-1 text-left"><p className="truncate text-sm font-semibold">{l.name}</p><p className="text-xs text-white/60">{l.items.length} songs</p></button>
+                        <button aria-label="Delete playlist" onClick={() => saveLists(lists.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-white/50" /></button>
+                      </div>
+                    ))
+                ) : (
+                  <>
+                    <button onClick={() => setMineOpen(null)} className="text-xs text-emerald-300">← All playlists</button>
+                    <p className="text-sm font-semibold">{lists[mineOpen]?.name}</p>
+                    {(lists[mineOpen]?.items ?? []).map(it => <SongRow key={it.id} it={it as Item} />)}
+                  </>
+                )}
+              </div>
+            ) : (<>
             {loading && <div className="flex items-center justify-center gap-2 py-10 text-sm text-white/60"><Loader2 className="h-4 w-4 animate-spin" />Loading from Spotify…</div>}
             {!loading && error && <div className={`rounded-2xl p-4 text-center text-sm text-white/80 ${glass}`}>{error}</div>}
             {!loading && !error && items.length === 0 && <div className={`rounded-2xl p-4 text-center text-sm text-white/60 ${glass}`}>Nothing found. Try another search.</div>}
             {!loading && !error && (
               <div className={kind === "track" ? "space-y-2" : "grid grid-cols-2 gap-3"}>
-                {items.map(it => kind === "track" ? (
-                  <button key={it.id} onClick={() => setNow(it)}
-                    className={`flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition active:scale-[0.99] ${glass} ${now?.id === it.id ? "ring-1 ring-emerald-400/70" : ""}`}>
-                    {it.artwork ? <img src={it.artwork} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-xl object-cover" /> : <span className="h-12 w-12 shrink-0 rounded-xl bg-white/10" />}
-                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{it.title}</span><span className="block truncate text-xs text-white/60">{it.artist}</span></span>
-                  </button>
-                ) : (
+                {items.map(it => kind === "track" ? <SongRow key={it.id} it={it} /> : (
                   <button key={it.id} onClick={() => setNow(it)} className={`overflow-hidden rounded-2xl text-left transition active:scale-[0.98] ${glass} ${now?.id === it.id ? "ring-1 ring-emerald-400/70" : ""}`}>
                     {it.artwork ? <img src={it.artwork} alt="" loading="lazy" className="aspect-square w-full object-cover" /> : <div className="aspect-square w-full bg-white/10" />}
                     <div className="p-2.5"><p className="truncate text-sm font-semibold">{it.title}</p><p className="truncate text-[11px] text-white/60">{it.artist}</p></div>
@@ -209,9 +316,23 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                 ))}
               </div>
             )}
+            </>)}
           </div>
 
-          <AnimatePresence>{now && <NowPlaying item={now} onClose={() => setNow(null)} />}</AnimatePresence>
+          {addFor && (
+            <div className="absolute inset-0 z-30 flex items-end bg-black/60" onClick={() => setAddFor(null)}>
+              <div onClick={e => e.stopPropagation()} className={`w-full space-y-2 rounded-t-3xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] ${glass}`}>
+                <p className="text-sm font-semibold">Add “{addFor.title}” to…</p>
+                {lists.map((l, i) => <button key={l.name + i} onClick={() => addToList(i, addFor)} className="block w-full rounded-xl bg-white/10 px-3 py-2 text-left text-sm">{l.name}</button>)}
+                <div className="flex gap-2">
+                  <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New playlist name" className="min-w-0 flex-1 rounded-xl bg-white/10 px-3 py-2 text-sm outline-none placeholder:text-white/40" />
+                  <button onClick={() => createList(addFor)} className="rounded-xl bg-emerald-400 px-4 text-sm font-semibold text-black">Create</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <AnimatePresence>{now && <NowPlaying item={now} onClose={() => { setNow(null); stopMusic(); }} onNext={queue.length > 1 ? () => advance(1) : undefined} onPrev={queue.length > 1 ? () => advance(-1) : undefined} onUse={() => useInPost(now)} />}</AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>

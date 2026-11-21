@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { toast } from "sonner";
 import { finishSpotifyLogin } from "@/services/SpotifyConnect";
 
@@ -7,6 +8,13 @@ import { finishSpotifyLogin } from "@/services/SpotifyConnect";
 const SpotifyCallback = () => {
   const navigate = useNavigate();
   useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("state") === "primegram-spotify-app" && !Capacitor.isNativePlatform()) {
+      // opened in the phone's browser tab: hand the result back to the Primegram app
+      const code = q.get("code");
+      window.location.replace(`com.primegram.app://auth-callback?${code ? `spotify_code=${encodeURIComponent(code)}` : "spotify_error=1"}`);
+      return;
+    }
     if (new URLSearchParams(window.location.search).get("state") !== "primegram-spotify") return;
     void finishSpotifyLogin()
       .then((handled) => {

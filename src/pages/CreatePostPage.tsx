@@ -25,6 +25,7 @@ import { runInBackground } from "@/utils/backgroundUpload";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { toast } from "sonner";
 import { CAMERA_CONSTRAINTS, VIDEO_BITRATE } from "@/utils/media";
+import MusicClipPicker from "@/components/MusicClipPicker";
 import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
 
 type Mode = "upload" | "camera";
@@ -89,6 +90,7 @@ const CreatePostPage = () => {
   const [aiBusy, setAiBusy] = useState(false);
   const [nativeZoomMax, setNativeZoomMax] = useState(1);
   const [track, setTrack] = useState<PickedTrack | null>(null);
+  const [clip, setClip] = useState({ start: 0, len: 30 });
   const [musicOpen, setMusicOpen] = useState(false);
   const [isAdult, setIsAdult] = useState(false);
 
@@ -429,7 +431,7 @@ const CreatePostPage = () => {
       return;
     }
     // Snapshot everything, then upload in the background so the person can keep using the app.
-    const snap = { file, caption, track, isAdult, mediaType, uid: user.id };
+    const snap = { file, caption, track, clip, isAdult, mediaType, uid: user.id };
     const hadMedia = Boolean(file);
     setUploading(true);
     runInBackground(snap.mediaType === "video" ? "Uploading your video" : "Sharing your post", async (progress) => {
@@ -458,6 +460,7 @@ const CreatePostPage = () => {
         music_art_url: snap.track?.artUrl ?? null,
         music_url: snap.track?.streamUrl ?? null,
         music_youtube_id: snap.track?.youtubeId ?? null,
+        ...(snap.track ? { music_start: snap.clip.start, music_len: snap.clip.len } : {}),
         is_adult: snap.isAdult,
         thumbnail_url: thumbnailUrl,
       } as any);
@@ -699,11 +702,12 @@ const CreatePostPage = () => {
                 <span className="text-xs text-foreground truncate flex-1">
                   {track.title} — {track.artist}
                 </span>
-                <button onClick={() => setTrack(null)} aria-label="Remove track">
+                <button onClick={() => { setTrack(null); setClip({ start: 0, len: 30 }); }} aria-label="Remove track">
                   <X className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
               </div>
             )}
+            {track && <MusicClipPicker track={track} start={clip.start} len={clip.len} onChange={(start, len) => setClip({ start, len })} />}
           </>
         ) : mode === "camera" ? (
           <div className="fixed inset-0 z-50 bg-black flex flex-col gap-3 p-3 safe-area-top overflow-y-auto">

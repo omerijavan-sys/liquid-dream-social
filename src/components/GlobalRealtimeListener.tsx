@@ -49,6 +49,26 @@ const GlobalRealtimeListener = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [ring, setRing] = useState<Ring | null>(null);
+  const [gring, setGring] = useState<{ id: string; group: string; audio: boolean } | null>(null);
+
+  // Incoming group calls (RLS only delivers rows for groups I belong to)
+  useEffect(() => {
+    if (!user) return;
+    const ch = supabase.channel(`group-calls-${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "group_calls" }, async ({ new: row }) => {
+        const r = row as { id: string; group_id: string; started_by: string; audio: boolean };
+        if (r.started_by === user.id) return;
+        const { data } = await supabase.from("chat_groups" as never).select("name").eq("id", r.group_id).maybeSingle() as { data: { name: string } | null };
+        setGring({ id: r.id, group: data?.name ?? "Group", audio: r.audio });
+        setTimeout(() => setGring(c => (c?.id === r.id ? null : c)), 45000);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "group_calls" }, ({ new: row }) => {
+        const r = row as { id: string; status: string };
+        if (r.status === "ended") setGring(c => (c?.id === r.id ? null : c));
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;
@@ -151,6 +171,20 @@ const GlobalRealtimeListener = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Safety net: stop ringing as soon as the caller cancels, or after 45s no matter what.
+  useEffect(() => {
+    if (!ring) return;
+    let dead = false;
+    const check = async () => {
+      const { data } = await supabase.from("call_invitations").select("status, created_at").eq("id", ring.id).maybeSingle();
+      if (dead) return;
+      if (!data || data.status !== "ringing" || Date.now() - Date.parse(data.created_at) > 45000) setRing(null);
+    };
+    const t = setInterval(check, 1500);
+    const hard = setTimeout(() => setRing(null), 45000);
+    return () => { dead = true; clearInterval(t); clearTimeout(hard); };
+  }, [ring?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Never overlay the modal while already on a call screen.
   const onCallScreen = location.pathname.startsWith("/call/");
 
@@ -162,7 +196,13 @@ const GlobalRealtimeListener = () => {
     setRing(null);
   };
 
-  return (
+  return (<>
+    <IncomingCallModal
+      isOpen={!!gring && !ring && !onCallScreen}
+      callerName={gring ? `${gring.group} · group ${gring.audio ? "voice" : "video"} call` : ""}
+      onJoin={() => { if (!gring) return; const g = gring; setGring(null); navigate(`/gcall/${g.id}${g.audio ? "?audio=1" : ""}`); }}
+      onDecline={() => setGring(null)}
+    />
     <IncomingCallModal
       isOpen={!!ring && !onCallScreen}
       callerName={ring?.callerName || ""}
@@ -176,7 +216,7 @@ const GlobalRealtimeListener = () => {
       }}
       onDecline={decline}
     />
-  );
+  </>);
 };
 
 export default GlobalRealtimeListener;

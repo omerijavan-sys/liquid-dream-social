@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
 import AndroidDownloadCard from "@/components/AndroidDownloadCard";
 import AccountManagement from "@/components/AccountManagement";
+import AppIconPicker from "@/components/AppIconPicker";
 import PayoutSetup from "@/components/PayoutSetup";
 import { enablePush, disablePush } from "@/utils/pushSubscribe";
 import { PrivacyPanel, BlockedPanel, SecurityExtras, HelpPanel, WalletShortcut, ContentPanel, PrimeMembershipCard } from "@/components/SettingsExtras";
@@ -457,6 +458,7 @@ const SettingsPage = () => {
             <Button className="w-full" disabled={monetizationSaving} onClick={() => void saveCreatorProfile()}>
               {monetizationSaving ? "Saving..." : creatorActive ? "Save Creator Plan" : "Register as a Creator"}
             </Button>
+            <AppIconPicker />
             <PayoutSetup />
             {monetizationLoading ? <p className="text-sm text-muted-foreground">Loading dashboard...</p> : creatorActive && (
               <section className="liquid-glass rounded-2xl p-4 relative z-10">

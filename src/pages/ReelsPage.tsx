@@ -1,3 +1,7 @@
+import PostMusicPlayer from "@/components/PostMusicPlayer";
+import MusicClipPicker from "@/components/MusicClipPicker";
+import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
+import { useMute } from "@/contexts/MuteContext";
 import ShareSheet from "@/components/ShareSheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,6 +25,9 @@ const ReelsPage = () => {
   const [creating, setCreating] = useState(false);
   const [caption, setCaption] = useState("");
   const [musicTitle, setMusicTitle] = useState("");
+  const [reelTrack, setReelTrack] = useState<PickedTrack | null>(null);
+  const [reelClip, setReelClip] = useState({ start: 0, len: 30 });
+  const [reelPicker, setReelPicker] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [opts, setOpts] = useState(() => { const p = readContentPrefs(); return { allow_comments: p.reelDefaultComments, allow_download: p.reelDefaultDownload, hide_likes: false, visibility: "public" as "public" | "followers" }; });
   const [suggesting, setSuggesting] = useState(false);
@@ -37,7 +44,7 @@ const ReelsPage = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   // Start muted so browsers allow scroll-triggered autoplay. Users can enable
   // sound with the volume button after playback has started.
-  const [muted, setMuted] = useState(true);
+  const { muted, toggleMuted } = useMute();
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,8 +142,8 @@ const ReelsPage = () => {
 
   const handleCreateReel = () => {
     if (!user || !videoFile) { toast.error("Select a video"); return; }
-    const snap = { file: videoFile, caption, musicTitle, opts, uid: user.id };
-    setCreating(false); setCaption(""); setMusicTitle(""); setVideoFile(null); setVideoPreview(null); setSuggestions([]);
+    const snap = { file: videoFile, caption, musicTitle: reelTrack?.title ?? musicTitle, track: reelTrack, clip: reelClip, opts, uid: user.id };
+    setCreating(false); setCaption(""); setMusicTitle(""); setReelTrack(null); setReelClip({ start: 0, len: 30 }); setVideoFile(null); setVideoPreview(null); setSuggestions([]);
     runInBackground("Uploading your reel", async (progress) => {
       progress("Preparing cover…");
       const thumbnail_url = await uploadVideoCover(snap.uid, snap.file);
@@ -146,7 +153,7 @@ const ReelsPage = () => {
       const { error: uploadErr } = await supabase.storage.from("media").upload(path, snap.file);
       if (uploadErr) throw uploadErr;
       const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
-      const { error } = await supabase.from("reels").insert({ user_id: snap.uid, caption: snap.caption || null, music_title: snap.musicTitle || null, video_url: publicUrl, thumbnail_url, ...snap.opts } as any);
+      const { error } = await supabase.from("reels").insert({ user_id: snap.uid, caption: snap.caption || null, music_title: snap.musicTitle || null, music_artist: snap.track?.artist ?? null, music_art_url: snap.track?.artUrl ?? null, music_url: snap.track?.streamUrl ?? null, ...(snap.track ? { music_start: snap.clip.start, music_len: snap.clip.len } : {}), video_url: publicUrl, thumbnail_url, ...snap.opts } as any);
       if (error) throw error;
     }, () => { void fetchReels(true); });
     toast.info("Uploading in the background — keep browsing");
@@ -296,7 +303,7 @@ const ReelsPage = () => {
                   <video
                     ref={el => { if (el) videoRefs.current.set(i, el); }}
                     src={reel.video_url}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain bg-black"
                     loop
                     playsInline
                     muted={muted}
@@ -350,7 +357,7 @@ const ReelsPage = () => {
                   </button>
                 )}
                 <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
-                <button onClick={(e) => { e.stopPropagation(); setMuted(!muted); }} className="depth-press">
+                <button onClick={(e) => { e.stopPropagation(); toggleMuted(); }} className="depth-press">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11">
                     {muted ? <VolumeX className="h-5 w-5 text-amber-100" /> : <Volume2 className="h-5 w-5 text-amber-100" />}
                   </div>
@@ -372,7 +379,10 @@ const ReelsPage = () => {
                     {reel.profile?.display_name || "User"} <span className="text-amber-300">●</span>
                   </button>
                   {(reel.caption || reel.music_title) && (
-                    <p className="truncate text-xs text-white/65">{reel.caption || `♪ ${reel.music_title}`}</p>
+                    <>
+                    {reel.caption && <p className="truncate text-xs text-white/65">{reel.caption}</p>}
+                    {reel.music_title && <div className="text-white/80"><PostMusicPlayer music={{ title: reel.music_title, artist: reel.music_artist, art_url: reel.music_art_url, stream_url: reel.music_url, start: reel.music_start, len: reel.music_len }} /></div>}
+                    </>
                   )}
                 </div>
               </div>
@@ -435,7 +445,9 @@ const ReelsPage = () => {
               </div>
               <div className="liquid-glass rounded-2xl p-4 relative z-10">
                 <label className="text-caption text-muted-foreground block mb-2">Music (optional)</label>
-                <input value={musicTitle} onChange={e => setMusicTitle(e.target.value)} placeholder="Add music title..." className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none" />
+                <button type="button" onClick={() => setReelPicker(true)} className="w-full text-left text-sm text-foreground">{reelTrack ? `♪ ${reelTrack.title} — ${reelTrack.artist}` : "Tap to choose a song…"}</button>
+                {reelTrack && <MusicClipPicker track={reelTrack} start={reelClip.start} len={reelClip.len} onChange={(start, len) => setReelClip({ start, len })} />}
+                <MusicPicker open={reelPicker} onClose={() => setReelPicker(false)} onPick={(t) => { setReelTrack(t); setMusicTitle(t.title); }} />
               </div>
             </div>
           </motion.div>

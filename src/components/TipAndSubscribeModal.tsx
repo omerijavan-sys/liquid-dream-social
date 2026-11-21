@@ -87,11 +87,29 @@ const TipAndSubscribeModal = ({ open, onOpenChange, mode, creatorId, creatorName
       if (!msg && error) { try { msg = (await (error as { context?: Response }).context?.json())?.error; } catch { /* ignore */ } }
       throw new Error(msg || "Couldn't start the payment");
     }
-    // Full-page redirect to Paystack's hosted checkout (works in browsers and the Android app,
-    // and can't be blocked like an embedded popup). We verify on return in <PaystackReturn />.
-    try { localStorage.setItem("primegram:payReturn", JSON.stringify({ ref: data.reference, mode, path: window.location.pathname + window.location.search, at: Date.now() })); } catch { /* ignore */ }
-    window.location.assign(data.authorization_url);
-    await new Promise(() => undefined); // navigation in progress
+    const reference: string = data.reference;
+    // Small in-page checkout (Paystack popup) like before; fall back to the hosted page if it can't load.
+    let PaystackPop: (new () => { resumeTransaction: (code: string, cb: Record<string, unknown>) => void }) | null = null;
+    try { PaystackPop = (await import("@paystack/inline-js")).default as never; } catch { PaystackPop = null; }
+    if (!PaystackPop) {
+      try { localStorage.setItem("primegram:payReturn", JSON.stringify({ ref: reference, mode, path: window.location.pathname + window.location.search, at: Date.now() })); } catch { /* ignore */ }
+      window.location.assign(data.authorization_url);
+      await new Promise(() => undefined);
+      return;
+    }
+    const Pop = PaystackPop;
+    await new Promise<void>((resolve, reject) => {
+      new Pop().resumeTransaction(data.access_code, {
+        onSuccess: () => resolve(),
+        onCancel: () => reject(new Error("Payment cancelled")),
+        onError: (e: { message?: string }) => reject(new Error(e?.message || "Payment failed")),
+      });
+    });
+    toast.loading("Confirming payment…", { id: "ps-confirm" });
+    const ok = await pollLedger(reference);
+    toast.dismiss("ps-confirm");
+    if (!ok) throw new Error("Payment received but not confirmed yet. It will appear shortly.");
+    finish(mode === "topup" ? "Wallet topped up" : mode === "tip" ? "Tip sent 🎉" : "Subscription unlocked 🎉");
   };
 
   const pay = async () => {
