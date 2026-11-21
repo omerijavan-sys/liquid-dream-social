@@ -3,6 +3,7 @@ import PostMusicGuard from "./components/PostMusicGuard";
 import ConsentGate from "./components/ConsentGate";
 import NativeMediaPicker from "./components/NativeMediaPicker";
 import { lazy, Suspense } from "react";
+import SplashLoader from "@/components/SplashLoader";
 import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
 import NativePush from "@/components/NativePush";
@@ -55,7 +56,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const isGuest = localStorage.getItem('guestMode') === 'true';
   
-  if (loading) return <div className="min-h-screen bg-background" />;
+  if (loading) return <SplashLoader />;
   if (!user && !isGuest) return <Navigate to="/welcome" replace />;
   return <>{children}</>;
 };
@@ -64,13 +65,13 @@ const HomeRoute = () => {
   const { user, loading } = useAuth();
   const isGuest = localStorage.getItem("guestMode") === "true";
 
-  if (loading) return <div className="min-h-screen bg-background" />;
+  if (loading) return <SplashLoader />;
   return user || isGuest ? <Index /> : <PublicLandingPage />;
 };
 
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-background" />;
+  if (loading) return <SplashLoader />;
   if (user) {
     const params = new URLSearchParams(window.location.search);
     if (params.get("addAccount") === "1") return <>{children}</>;
@@ -103,7 +104,7 @@ const App = () => (
           <ConsentGate />
           <GlobalRealtimeListener />
           <NativePush />
-          <Suspense fallback={<div className="min-h-screen bg-background" />}>
+          <Suspense fallback={<SplashLoader />}>
           <Routes>
             <Route path="/welcome" element={<AuthRoute><WelcomePage /></AuthRoute>} />
             <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />

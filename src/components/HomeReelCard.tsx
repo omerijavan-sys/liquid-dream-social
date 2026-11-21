@@ -1,11 +1,12 @@
 import { useMute } from "@/contexts/MuteContext";
 import { useEffect, useRef, useState } from "react";
-import { Film, Heart, MessageCircle, Play, Share2, Volume2, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Share2, Volume2, VolumeX } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ShareSheet from "@/components/ShareSheet";
+import { BLANK_POSTER } from "@/lib/blankPoster";
 
 /** A reel shown in the home feed with the same card chrome as a normal post. The video only
  *  loads and plays while it is on screen, so scrolling stays smooth. */
@@ -59,12 +60,11 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
           <p className="truncate text-sm font-semibold text-foreground">{reel.profile?.display_name || "User"}</p>
           <p className="text-[11px] text-muted-foreground">{timeAgo}</p>
         </div>
-        <span className="flex items-center gap-1 rounded-full bg-fuchsia-400/15 px-2 py-1 text-[10px] font-semibold text-fuchsia-300"><Film className="h-3 w-3" />Reel</span>
       </div>
-      <div ref={boxRef} className="relative aspect-[4/5] w-full bg-black" onClick={() => navigate(`/reels?r=${reel.id}`)}>
-        {reel.thumbnail_url && <img src={reel.thumbnail_url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-contain" />}
+      <div ref={boxRef} className="relative flex w-full items-center justify-center bg-background/40" onClick={() => { const v = videoRef.current; if (!v) return; if (v.paused) void v.play().catch(() => {}); else v.pause(); }}>
+        {reel.thumbnail_url && !near && <img src={reel.thumbnail_url} alt="" loading="lazy" decoding="async" className="h-auto max-h-[75vh] min-h-[30vh] w-full object-contain bg-background" />}
         {near && (
-          <video ref={videoRef} src={reel.thumbnail_url ? reel.video_url : `${reel.video_url}#t=0.1`} poster={reel.thumbnail_url || undefined} className="absolute inset-0 h-full w-full object-contain" muted={muted} loop playsInline preload="metadata" onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)} />
+          <video ref={videoRef} src={reel.thumbnail_url ? reel.video_url : `${reel.video_url}#t=0.1`} poster={reel.thumbnail_url || BLANK_POSTER} className="h-auto max-h-[75vh] w-full bg-background object-contain" muted={muted} loop playsInline preload="auto" onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)} />
         )}
         <button aria-label={muted ? "Unmute" : "Mute"} onClick={e => { e.stopPropagation(); toggleMuted(); }} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 backdrop-blur">{muted ? <VolumeX className="h-4 w-4 text-white" /> : <Volume2 className="h-4 w-4 text-white" />}</button>
       </div>

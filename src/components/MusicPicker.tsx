@@ -83,7 +83,7 @@ const MusicPicker = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[90] bg-background/80 backdrop-blur-xl flex items-end sm:items-center sm:justify-center"
+          className="fixed inset-0 z-[120] bg-background/80 backdrop-blur-xl flex items-end sm:items-center sm:justify-center"
           onClick={onClose}
         >
           <motion.div

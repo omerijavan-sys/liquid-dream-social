@@ -1,3 +1,4 @@
+import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -202,6 +203,16 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
     return () => obs.disconnect();
   }, [isVideo, autoPlay, near]);
 
+  // If a visible video is still empty after 6s (a stalled request), reload it once instead of spinning forever.
+  useEffect(() => {
+    if (!isVideo || !near || !isVisible) return;
+    const t = window.setTimeout(() => {
+      const v = videoRef.current;
+      if (v && v.readyState < 2) { v.load(); void v.play().catch(() => {}); }
+    }, 6000);
+    return () => window.clearTimeout(t);
+  }, [isVideo, near, isVisible]);
+
   const togglePlayPause = () => {
     const v = videoRef.current; if (!v) return;
     if (v.paused) v.play().then(() => setIsPlaying(true)).catch(() => {});
@@ -286,21 +297,24 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               <video
                 ref={videoRef}
                 src={coverImg ? image : `${image}#t=0.1`}
-                poster={coverImg}
+                poster={coverImg || BLANK_POSTER}
                 className="w-full h-auto max-h-[75vh] object-contain bg-background"
                 playsInline
                 muted={muted}
                 loop
-                preload={isVisible ? "auto" : "metadata"}
-                onLoadStart={() => setVideoLoading(true)}
+                preload="auto"
                 onCanPlay={() => setVideoLoading(false)}
+                onLoadedData={() => setVideoLoading(false)}
                 onWaiting={() => setVideoLoading(true)}
-                onPlaying={() => setVideoLoading(false)}
+                onPlaying={() => { setVideoLoading(false); setIsPlaying(true); }}
+                onPause={() => setIsPlaying(false)}
+                onTimeUpdate={() => { if (videoLoading) setVideoLoading(false); }}
+                onError={() => { const v = videoRef.current; if (v) window.setTimeout(() => v.load(), 1500); setVideoLoading(false); }}
               />
               )}
               {videoLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/40 pointer-events-none">
-                  <Loader2 className="w-10 h-10 text-foreground animate-spin" />
+                <div className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden pointer-events-none">
+                  <div className="h-full w-1/3 animate-[loadbar_1s_ease-in-out_infinite] bg-primary" />
                 </div>
               )}
               <button
@@ -317,9 +331,6 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               >
                 <Maximize2 className="w-4 h-4 text-foreground" />
               </button>
-              <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full liquid-glass flex items-center justify-center pointer-events-none">
-                {isPlaying ? <Pause className="w-4 h-4 text-foreground" /> : <Play className="w-4 h-4 text-foreground" />}
-              </div>
             </div>
           ) : (
             // Natural aspect ratio: square, portrait, landscape and panoramas all show whole.

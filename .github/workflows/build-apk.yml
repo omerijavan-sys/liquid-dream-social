@@ -70,20 +70,21 @@ jobs:
       - name: Build APK
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          ./gradlew assembleRelease -PappBuild=${{ github.run_number }} --stacktrace --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/primegram.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: primegram-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/release/primegram.apk
           retention-days: 30
 
       - name: Create Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          files: android/app/build/outputs/apk/release/primegram.apk
           tag_name: v${{ github.run_number }}
           name: Primegram APK Build ${{ github.run_number }}
           draft: false

@@ -1,3 +1,4 @@
+import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, ChevronRight, Play, MessageCircle, Send } from "lucide-react";
@@ -10,6 +11,11 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { isVideoMedia } from "@/utils/media";
 import { useNavigate } from "react-router-dom";
+import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
+import MusicClipPicker from "@/components/MusicClipPicker";
+import PostMusicPlayer from "@/components/PostMusicPlayer";
+import { stopMusic } from "@/services/MusicEngine";
+import { Music } from "lucide-react";
 
 interface StoryBubbleProps {
   name: string;
@@ -57,6 +63,7 @@ interface StoryView {
   display_name: string;
   created_at: string;
   progress?: number;
+  music?: { title: string; artist?: string | null; art_url?: string | null; stream_url?: string | null; youtube_id?: string | null; start?: number | null; len?: number | null } | null;
 }
 
 const StoriesBar = () => {
@@ -94,7 +101,7 @@ const StoriesBar = () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from("posts")
-        .select("id, media_url, user_id, created_at, thumbnail_url")
+        .select("id, media_url, user_id, created_at, thumbnail_url, music_title, music_artist, music_art_url, music_url, music_youtube_id, music_start, music_len")
         .eq("media_type", "story")
         .gte("created_at", twentyFourHoursAgo)
         .order("created_at", { ascending: false })
@@ -114,6 +121,7 @@ const StoriesBar = () => {
           cover_url: profileMap.get(s.user_id)?.avatar_url || (s as any).thumbnail_url || (isVideoMedia(s.media_url || "") ? null : s.media_url),
           display_name: profileMap.get(s.user_id)?.display_name || "User",
           created_at: s.created_at,
+          music: (s as any).music_title ? { title: (s as any).music_title, artist: (s as any).music_artist, art_url: (s as any).music_art_url, stream_url: (s as any).music_url, youtube_id: (s as any).music_youtube_id, start: (s as any).music_start, len: (s as any).music_len } : null,
         })));
       }
     };
@@ -175,12 +183,29 @@ const StoriesBar = () => {
     toast.success("Story reaction sent");
   };
 
+  const [pending, setPending] = useState<File | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [storyTrack, setStoryTrack] = useState<PickedTrack | null>(null);
+  const [storyClip, setStoryClip] = useState({ start: 0, len: 15 });
+  const [musicOpen, setMusicOpen] = useState(false);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (fileRef.current) fileRef.current.value = "";
     if (!file || !user) return;
-    const uid = user.id;
-    const name = user.user_metadata?.full_name || "You";
+    setPending(file); setPendingUrl(URL.createObjectURL(file)); setStoryTrack(null); setStoryClip({ start: 0, len: 15 });
+  };
+  const cancelPending = () => { if (pendingUrl) URL.revokeObjectURL(pendingUrl); setPending(null); setPendingUrl(null); setStoryTrack(null); stopMusic(); };
+  const postPending = () => {
+    if (!pending || !user) return;
+    const file = pending, track = storyTrack, clip = storyClip;
+    cancelPending();
+    publishStory(file, track, clip);
+  };
+
+  const publishStory = (file: File, track: PickedTrack | null, clip: { start: number; len: number }) => {
+    const uid = user!.id;
+    const name = user!.user_metadata?.full_name || "You";
     const isVideo = file.type.startsWith("video/");
     setUploading(true);
     runInBackground("Posting your story", async (progress) => {
@@ -192,12 +217,16 @@ const StoriesBar = () => {
       const { error: uploadErr } = await supabase.storage.from("media").upload(path, file);
       if (uploadErr) throw uploadErr;
       const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
-      const { data: post, error } = await supabase.from("posts").insert({ user_id: uid, media_url: publicUrl, media_type: "story", caption: "Story", thumbnail_url } as any).select("id").single();
+      const { data: post, error } = await supabase.from("posts").insert({
+        user_id: uid, media_url: publicUrl, media_type: "story", caption: "Story", thumbnail_url,
+        ...(track ? { music_title: track.title, music_artist: track.artist, music_art_url: track.artUrl ?? null, music_url: track.streamUrl ?? null, music_youtube_id: track.youtubeId ?? null, music_start: clip.start, music_len: clip.len } : {}),
+      } as any).select("id").single();
       if (error) throw error;
       return { id: post.id, publicUrl, thumbnail_url };
     }, (r) => {
       setUploading(false);
-      setStories(prev => [{ id: r.id, user_id: uid, image_url: r.publicUrl, cover_url: r.thumbnail_url || (isVideo ? null : r.publicUrl), display_name: name, created_at: new Date().toISOString() }, ...prev]);
+      const music = track ? { title: track.title, artist: track.artist, art_url: track.artUrl, stream_url: track.streamUrl, youtube_id: track.youtubeId, start: clip.start, len: clip.len } : null;
+      setStories(prev => [{ id: r.id, user_id: uid, image_url: r.publicUrl, cover_url: r.thumbnail_url || (isVideo ? null : r.publicUrl), display_name: name, created_at: new Date().toISOString(), music }, ...prev]);
     });
     setTimeout(() => setUploading(false), 1500);
   };
@@ -236,6 +265,22 @@ const StoriesBar = () => {
   return (
     <>
       <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileSelect} />
+      {pending && pendingUrl && createPortal(
+        <div className="fixed inset-0 z-[110] flex flex-col bg-background">
+          <div className="relative min-h-0 flex-1 bg-black">
+            {pending.type.startsWith("video/") ? <video src={pendingUrl} poster={BLANK_POSTER} autoPlay loop muted playsInline className="h-full w-full object-contain" /> : <img src={pendingUrl} alt="Story preview" className="h-full w-full object-contain" />}
+            <button onClick={cancelPending} aria-label="Cancel" className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="max-h-[45vh] space-y-2 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <button onClick={() => setMusicOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-xl liquid-glass py-2.5 text-sm font-medium text-foreground"><Music className="h-4 w-4 text-primary" />{storyTrack ? "Change music" : "Add music"}</button>
+            {storyTrack && <>
+              <div className="flex items-center gap-2 rounded-xl liquid-glass px-3 py-2"><Music className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="flex-1 truncate text-xs text-foreground">{storyTrack.title} — {storyTrack.artist}</span><button onClick={() => { setStoryTrack(null); stopMusic(); }} aria-label="Remove music"><X className="h-3.5 w-3.5 text-muted-foreground" /></button></div>
+              <MusicClipPicker track={storyTrack} start={storyClip.start} len={storyClip.len} onChange={(start, len) => setStoryClip({ start, len })} />
+            </>}
+            <Button onClick={postPending} className="w-full rounded-xl">Share to your story</Button>
+          </div>
+          <MusicPicker open={musicOpen} onClose={() => setMusicOpen(false)} onPick={t => { setStoryTrack(t); setMusicOpen(false); }} />
+        </div>, document.body)}
       <div className="overflow-x-auto scrollbar-none py-3 px-4">
         <div className="flex gap-3">
           <StoryBubble name={uploading ? "Posting..." : "Your Story"} initial="+" gradient="linear-gradient(135deg, hsl(210, 100%, 60%), hsl(260, 80%, 60%))" hasNew={false} index={0} onClick={handleAddStory} isAdd />
@@ -253,6 +298,7 @@ const StoriesBar = () => {
               <div className="h-0.5 bg-muted rounded-full overflow-hidden">
                 <motion.div className="h-full bg-primary rounded-full" style={{ width: `${storyProgress * 100}%` }} />
               </div>
+              {viewingStory.music?.title && <div key={viewingStory.id} className="mt-2"><PostMusicPlayer music={viewingStory.music} /></div>}
               <div className="flex items-center justify-between mt-3">
                 <div className="flex items-center gap-2">
                   <button
@@ -276,7 +322,7 @@ const StoriesBar = () => {
             <div className="absolute inset-0 flex items-center justify-center">
               {isVideoMedia(viewingStory.image_url) ? (
                 <button type="button" aria-label={paused ? "Resume story" : "Pause story"} onClick={() => setPaused(value => !value)} className="relative h-full w-full">
-                  <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} poster={viewingStory.cover_url || undefined} autoPlay playsInline className="h-full w-full object-contain" onEnded={advance} onTimeUpdate={event => {
+                  <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} poster={viewingStory.cover_url || BLANK_POSTER} autoPlay playsInline className="h-full w-full object-contain" onEnded={advance} onTimeUpdate={event => {
                     const video = event.currentTarget;
                     if (Number.isFinite(video.duration)) {
                       const progress = video.currentTime / video.duration;

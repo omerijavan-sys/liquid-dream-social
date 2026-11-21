@@ -1,3 +1,4 @@
+import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useEffect, useRef, useState } from "react";
 import { Heart, MessageCircle, Send, X, Volume2, VolumeX, Eye, Play } from "lucide-react";
 import { toast } from "sonner";
@@ -82,9 +83,8 @@ const MediaViewer = ({ post, onClose }: { post: ViewerPost | null; onClose: () =
 
               <div className="relative flex min-h-0 flex-1 items-center justify-center" onClick={isVideo ? tapVideo : undefined}>
                 {isVideo
-                  ? <video ref={videoRef} src={post.media_url ?? undefined} autoPlay loop playsInline muted={muted} className="h-full w-full object-contain" />
+                  ? <video ref={videoRef} poster={BLANK_POSTER} src={post.media_url ?? undefined} autoPlay loop playsInline muted={muted} className="h-full w-full object-contain" />
                   : post.media_url ? <img src={post.media_url} alt="" className="max-h-full max-w-full object-contain" /> : <p className="p-8 text-center text-lg">{post.caption}</p>}
-                {isVideo && paused && <span className="pointer-events-none absolute flex h-16 w-16 items-center justify-center rounded-full bg-black/50"><Play className="h-8 w-8 fill-white" /></span>}
               </div>
 
               {/* action rail */}

@@ -26,6 +26,37 @@ async function accessToken(sa: { client_email: string; private_key: string }) {
 
 type Msg = Record<string, unknown>;
 
+/** Three short reply ideas for a chat message. AI with a tight timeout, plain heuristics as fallback so the push is never delayed. */
+async function suggestReplies(text: string): Promise<string[]> {
+  const t = text.trim();
+  const fallback = (): string[] => {
+    if (/\?\s*$/.test(t)) return ["Yes", "No", "Let me check"];
+    if (/^(hi|hey|hello|yo|sup|good (morning|evening|afternoon))\b/i.test(t)) return ["Hey! 👋", "Hi, how are you?", "What's up?"];
+    if (/(thank|thanks|thx)/i.test(t)) return ["You're welcome!", "Anytime 🙌", "No problem"];
+    if (/(where|when|what time)/i.test(t)) return ["On my way", "Give me a minute", "I'll let you know"];
+    return ["👍", "Okay!", "Talk later"];
+  };
+  if (!t || t.startsWith("📷") || t.startsWith("🎥") || t.startsWith("🎤")) return ["❤️", "Nice!", "Thanks!"];
+  try {
+    const key = Deno.env.get("AI_API_KEY");
+    const base = (Deno.env.get("AI_BASE_URL") ?? (key ? "https://api.openai.com/v1" : "https://text.pollinations.ai/openai")).replace(/\/$/, "");
+    const r = await fetch(`${base}/chat/completions`, {
+      method: "POST", signal: AbortSignal.timeout(2500),
+      headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
+      body: JSON.stringify({ model: Deno.env.get("AI_MODEL") ?? (key ? "gpt-4o-mini" : "openai-fast"), temperature: 0.7, max_tokens: 60,
+        messages: [
+          { role: "system", content: "You write quick-reply buttons for a chat app. Reply with ONLY a JSON array of exactly 3 short, natural, different replies (max 4 words each, casual tone, may use one emoji) that the receiver could send back to the message." },
+          { role: "user", content: t.slice(0, 300) },
+        ] }),
+    });
+    if (!r.ok) return fallback();
+    const out = (await r.json())?.choices?.[0]?.message?.content ?? "";
+    const arr = JSON.parse(out.slice(out.indexOf("["), out.lastIndexOf("]") + 1));
+    const clean = (Array.isArray(arr) ? arr : []).map((x) => String(x).trim().slice(0, 40)).filter(Boolean).slice(0, 3);
+    return clean.length >= 2 ? clean : fallback();
+  } catch { return fallback(); }
+}
+
 Deno.serve(async (req) => {
   const ok = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
   try {
@@ -47,7 +78,9 @@ Deno.serve(async (req) => {
       const name = await nameOf(msg.sender_id);
       const body = msg.media_type === "image" ? "📷 Photo" : msg.media_type === "video" ? "🎥 Video" : msg.media_type === "audio" ? "🎤 Voice message" : msg.media_type ? "Shared a post" : (msg.content || "").slice(0, 120);
       targets = [msg.receiver_id];
-      build = () => ({ notification: { title: name, body }, data: { type: "message", sender: msg.sender_id }, android: { priority: "HIGH", notification: { channel_id: "messages", tag: `dm-${msg.sender_id}`, sound: "default" } } });
+      const suggestions = JSON.stringify(await suggestReplies(msg.media_type ? "" : (msg.content || "")));
+      // Data-only so the app can draw the notification itself with a Reply box and the suggested replies.
+      build = () => ({ data: { type: "message", kind: "dm", title: name, body, sender: msg.sender_id, suggestions }, android: { priority: "HIGH" } });
     } else if (typeof input.group_msg === "string") {
       const { data: gm } = await db.from("group_messages").select("id,group_id,sender_id,content,media_type").eq("id", input.group_msg).maybeSingle();
       if (!gm) return ok({ skipped: "missing" });
@@ -58,7 +91,8 @@ Deno.serve(async (req) => {
       const sender = await nameOf(gm.sender_id);
       targets = (mem ?? []).map((m: { user_id: string }) => m.user_id).filter((u: string) => u !== gm.sender_id);
       const body = `${sender}: ${gm.media_type ? "📎 Media" : (gm.content || "").slice(0, 100)}`;
-      build = () => ({ notification: { title: g?.name ?? "Group", body }, data: { type: "message", group: gm.group_id }, android: { priority: "HIGH", notification: { channel_id: "messages", tag: `grp-${gm.group_id}`, sound: "default" } } });
+      const suggestions = JSON.stringify(await suggestReplies(gm.media_type ? "" : (gm.content || "")));
+      build = () => ({ data: { type: "message", kind: "group", title: g?.name ?? "Group", body, group: gm.group_id, sender: gm.sender_id, suggestions }, android: { priority: "HIGH" } });
     } else if (typeof input.call === "string") {
       const { data: c } = await db.from("call_invitations").select("id,caller_id,receiver_id,audio,status,created_at").eq("id", input.call).maybeSingle();
       if (!c || c.status !== "ringing") return ok({ skipped: "call not ringing" });

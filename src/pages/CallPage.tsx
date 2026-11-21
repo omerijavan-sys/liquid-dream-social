@@ -289,26 +289,46 @@ const CallPage = () => {
     setVideoOn(next);
   };
 
+  const flipping = useRef(false);
   const flipCamera = async () => {
+    if (flipping.current || !streamRef.current) return;
+    flipping.current = true;
     const next = facing === "user" ? "environment" : "user";
-    try {
-      const fresh = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: next },
-        audio: false,
-      });
-      const newTrack = fresh.getVideoTracks()[0];
-      const sender = pcRef.current?.getSenders().find((s) => s.track?.kind === "video");
-      if (sender && newTrack) await sender.replaceTrack(newTrack);
-      const old = streamRef.current?.getVideoTracks()[0];
-      if (old && streamRef.current) {
-        streamRef.current.removeTrack(old);
-        old.stop();
-        streamRef.current.addTrack(newTrack);
+    const old = streamRef.current.getVideoTracks()[0];
+    const wasEnabled = old ? old.enabled : true;
+    const grab = async (facingMode: "user" | "environment") => {
+      const attempts: MediaStreamConstraints["video"][] = [
+        { facingMode: { exact: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        { facingMode: { ideal: facingMode } },
+      ];
+      for (const video of attempts) {
+        try { return (await navigator.mediaDevices.getUserMedia({ video, audio: false })).getVideoTracks()[0]; } catch { /* try next */ }
       }
-      if (localVideoRef.current) localVideoRef.current.srcObject = streamRef.current;
-      setFacing(next);
+      // Last resort: pick another camera by device id.
+      const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+      const curId = old?.getSettings().deviceId;
+      const other = cams.find((c) => c.deviceId && c.deviceId !== curId);
+      if (other) return (await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: other.deviceId } }, audio: false })).getVideoTracks()[0];
+      throw new Error("no other camera");
+    };
+    try {
+      // Android can only open one camera at a time, so release the current one first.
+      old?.stop();
+      let newTrack: MediaStreamTrack;
+      try { newTrack = await grab(next); }
+      catch { newTrack = await grab(facing); toast.error("No other camera found"); }
+      newTrack.enabled = wasEnabled;
+      const sender = pcRef.current?.getSenders().find((s) => s.track?.kind === "video" || s.track === null);
+      if (sender) await sender.replaceTrack(newTrack);
+      if (old) streamRef.current.removeTrack(old);
+      streamRef.current.addTrack(newTrack);
+      if (localVideoRef.current) { localVideoRef.current.srcObject = null; localVideoRef.current.srcObject = streamRef.current; void localVideoRef.current.play().catch(() => {}); }
+      const nowFacing = newTrack.getSettings().facingMode;
+      setFacing(nowFacing === "environment" || nowFacing === "user" ? nowFacing : next);
     } catch {
-      /* single-camera device */
+      toast.error("Couldn't switch camera");
+    } finally {
+      flipping.current = false;
     }
   };
 

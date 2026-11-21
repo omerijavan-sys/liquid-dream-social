@@ -4,6 +4,7 @@ import TopNavBar from "@/components/TopNavBar";
 import GlassTabBar from "@/components/GlassTabBar";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
+import UploadStrip from "@/components/UploadStrip";
 import FeedPost from "@/components/FeedPost";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -136,6 +137,7 @@ const Index = () => {
               </div>
               <Compass className="h-5 w-5 text-primary" />
             </div>
+            <div className="-mx-1 mb-2"><UploadStrip /></div>
             <div className="relative z-10 grid grid-cols-4 gap-2">
               {[
                 { label: "Create", icon: Plus, path: "/create", color: "text-amber-300 bg-amber-300/15" },

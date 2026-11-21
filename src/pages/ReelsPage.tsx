@@ -1,3 +1,4 @@
+import { BLANK_POSTER } from "@/lib/blankPoster";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import MusicClipPicker from "@/components/MusicClipPicker";
 import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
@@ -308,7 +309,7 @@ const ReelsPage = () => {
                     playsInline
                     muted={muted}
                     autoPlay={i === 0}
-                    poster={reel.thumbnail_url || undefined}
+                    poster={reel.thumbnail_url || BLANK_POSTER}
                     preload={Math.abs(i - currentIndex) <= 1 ? "auto" : "none"}
                   />
                 )}

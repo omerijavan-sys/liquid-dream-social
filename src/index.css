@@ -420,3 +420,11 @@
 @media (prefers-reduced-motion: reduce) {
   .liquid-sheen::after { animation: none; }
 }
+
+
+/* Never show the browser/WebView's own play button or loading circle on videos. */
+video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
+video::-webkit-media-controls-overlay-play-button { display: none !important; }
+video::-webkit-media-controls-panel { display: none !important; }
+video[controls]::-webkit-media-controls-panel { display: flex !important; }
+@keyframes loadbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
