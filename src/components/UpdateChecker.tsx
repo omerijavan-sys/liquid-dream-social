@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
-import { X } from "lucide-react";
+import { ArrowUpCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { setAppUpdate } from "@/utils/updateStore";
 
@@ -86,9 +86,12 @@ const UpdateChecker = () => {
     return () => window.removeEventListener("prime:open-update", o);
   }, []);
 
-  if (!update || (hidden && !open)) return null;
+  if (!update) return null;
   return (
     <>
+      {!open && (
+        <button onClick={() => { setHidden(false); setOpen(true); }} aria-label="Upgrade available" className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[90] flex h-10 w-10 animate-pulse items-center justify-center rounded-full bg-emerald-400 text-black shadow-[0_0_18px_rgba(52,211,153,.8)]"><ArrowUpCircle className="h-6 w-6" /></button>
+      )}
       {open && (
         <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60" onClick={() => !busy && dismiss()}>
           <div onClick={e => e.stopPropagation()} className="w-full max-w-md space-y-3 rounded-t-3xl border border-white/15 bg-black/80 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white backdrop-blur-2xl">
