@@ -111,7 +111,25 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="primegram-startup" role="status" aria-label="Loading Primegram">
+        <img src="/favicon.png" alt="" width="72" height="72" />
+        <p>PRIMEGRAM <span>EXTREME</span></p>
+        <div class="primegram-startup__track"><span></span></div>
+        <small>Preparing your space</small>
+      </div>
+    </div>
+    <style>
+      .primegram-startup{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(ellipse at 50% 38%,rgba(65,105,225,.18),transparent 42%),#080b14;color:#f8fafc;font-family:Inter,system-ui,sans-serif}
+      .primegram-startup img{border-radius:22px;box-shadow:0 12px 40px rgba(59,130,246,.24)}
+      .primegram-startup p{margin:0;font-size:16px;font-weight:800;letter-spacing:.18em}
+      .primegram-startup p span{color:#93c5fd}
+      .primegram-startup__track{width:min(220px,60vw);height:3px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.12)}
+      .primegram-startup__track span{display:block;width:42%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#60a5fa,#c4b5fd);animation:primegram-load 1.25s ease-in-out infinite}
+      .primegram-startup small{color:rgba(255,255,255,.52);font-size:11px;letter-spacing:.04em}
+      @keyframes primegram-load{from{transform:translateX(-110%)}to{transform:translateX(350%)}}
+      @media(prefers-reduced-motion:reduce){.primegram-startup__track span{animation:none;width:100%}}
+    </style>
     <noscript>
       <main>
         <h1>Primegram Extreme</h1>

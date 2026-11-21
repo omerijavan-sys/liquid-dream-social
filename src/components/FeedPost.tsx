@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, MessageCircle, Send, Bookmark, Play, Pause, Loader2, Volume2, VolumeX, MoreHorizontal, Link2, Flag, EyeOff, UserMinus, User, X, Maximize2, Eye, Rocket } from "lucide-react";
+import { Heart, MessageCircle, Send, Bookmark, Loader2, Volume2, VolumeX, MoreHorizontal, Link2, Flag, EyeOff, UserMinus, User, X, Maximize2, Eye, Rocket } from "lucide-react";
 import { useMute } from "@/contexts/MuteContext";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,8 +59,6 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
   const [hidden, setHidden] = useState(() => !!postId && readSet(HIDDEN_KEY).has(postId));
   const [likeCount, setLikeCount] = useState(likes);
   const [showHeart, setShowHeart] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
   const [videoLoading, setVideoLoading] = useState(false);
   const lastTap = useRef(0);
   const tapTimer = useRef<number | null>(null);
@@ -181,9 +179,8 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
     if (!isVideo || !autoPlay || !videoRef.current) return;
     const el = videoRef.current;
     const obs = new IntersectionObserver(([entry]) => {
-      setIsVisible(entry.isIntersecting);
-      if (entry.isIntersecting) { el.play().then(() => setIsPlaying(true)).catch(() => {}); }
-      else { el.pause(); setIsPlaying(false); }
+      if (entry.isIntersecting) { el.play().catch(() => {}); }
+      else { el.pause(); }
     }, { threshold: 0.5 });
     obs.observe(el);
     return () => obs.disconnect();
@@ -191,8 +188,8 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
 
   const togglePlayPause = () => {
     const v = videoRef.current; if (!v) return;
-    if (v.paused) v.play().then(() => setIsPlaying(true)).catch(() => {});
-    else { v.pause(); setIsPlaying(false); }
+    if (v.paused) v.play().catch(() => {});
+    else v.pause();
   };
 
   // Double tap = like; single tap = open full screen (images) / play-pause (videos).
@@ -271,20 +268,16 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
                 playsInline
                 muted={muted}
                 loop
-                preload="metadata"
+                preload="auto"
                 onLoadStart={() => setVideoLoading(true)}
                 onCanPlay={() => setVideoLoading(false)}
                 onWaiting={() => setVideoLoading(true)}
                 onPlaying={() => setVideoLoading(false)}
+                onError={() => setVideoLoading(false)}
               />
               {videoLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/40 pointer-events-none">
                   <Loader2 className="w-10 h-10 text-foreground animate-spin" />
-                </div>
-              )}
-              {!isVisible && !videoLoading && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-16 h-16 rounded-full liquid-glass flex items-center justify-center"><Play className="w-8 h-8 text-foreground" /></div>
                 </div>
               )}
               <button
@@ -301,9 +294,6 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               >
                 <Maximize2 className="w-4 h-4 text-foreground" />
               </button>
-              <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full liquid-glass flex items-center justify-center pointer-events-none">
-                {isPlaying ? <Pause className="w-4 h-4 text-foreground" /> : <Play className="w-4 h-4 text-foreground" />}
-              </div>
             </div>
           ) : (
             // Natural aspect ratio: square, portrait, landscape and panoramas all show whole.

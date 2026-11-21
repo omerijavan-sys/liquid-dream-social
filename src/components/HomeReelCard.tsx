@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Film, Heart, MessageCircle, Play, Share2, Volume2, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Share2, Volume2, VolumeX } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,6 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [near, setNear] = useState(false);
-  const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState<number>(reel.likes_count ?? 0);
@@ -58,14 +57,19 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
           <p className="truncate text-sm font-semibold text-foreground">{reel.profile?.display_name || "User"}</p>
           <p className="text-[11px] text-muted-foreground">{timeAgo}</p>
         </div>
-        <span className="flex items-center gap-1 rounded-full bg-fuchsia-400/15 px-2 py-1 text-[10px] font-semibold text-fuchsia-300"><Film className="h-3 w-3" />Reel</span>
+        <span className="text-[11px] text-muted-foreground">Video post</span>
       </div>
-      <div ref={boxRef} className="relative aspect-[4/5] w-full bg-black" onClick={() => navigate(`/reels?r=${reel.id}`)}>
-        {reel.thumbnail_url && <img src={reel.thumbnail_url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
-        {near && (
-          <video ref={videoRef} src={reel.thumbnail_url ? reel.video_url : `${reel.video_url}#t=0.1`} poster={reel.thumbnail_url || undefined} className="absolute inset-0 h-full w-full object-cover" muted={muted} loop playsInline preload="metadata" onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)} />
+      <div ref={boxRef} className="relative flex w-full items-center justify-center bg-black/90" onClick={() => {
+        const video = videoRef.current;
+        if (!video) return;
+        if (video.paused) void video.play().catch(() => {});
+        else video.pause();
+      }}>
+        {near ? (
+          <video ref={videoRef} src={reel.thumbnail_url ? reel.video_url : `${reel.video_url}#t=0.1`} poster={reel.thumbnail_url || undefined} className="max-h-[75vh] w-full bg-black object-contain" muted={muted} loop playsInline preload="metadata" />
+        ) : (
+          <img src={reel.thumbnail_url || reel.video_url} alt="Video post" loading="lazy" decoding="async" className="max-h-[75vh] w-full object-contain" />
         )}
-        {!playing && <span className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 backdrop-blur"><Play className="h-6 w-6 fill-white text-white" /></span></span>}
         <button aria-label={muted ? "Unmute" : "Mute"} onClick={e => { e.stopPropagation(); setMuted(m => !m); }} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 backdrop-blur">{muted ? <VolumeX className="h-4 w-4 text-white" /> : <Volume2 className="h-4 w-4 text-white" />}</button>
       </div>
       <div className="relative z-10 flex items-center gap-4 p-4">
