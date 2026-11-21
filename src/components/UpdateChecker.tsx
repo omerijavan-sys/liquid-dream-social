@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
-import { ArrowUpCircle, X } from "lucide-react";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 
 type UpdatePlugin = {
@@ -17,7 +17,7 @@ const RELEASES = "https://api.github.com/repos/omerijavan-sys/liquid-dream-socia
 const INSTALLED = Number(import.meta.env.VITE_APP_BUILD || 0);
 const mb = (n: number) => (n / 1048576).toFixed(1);
 
-/** Android app only: shows an Upgrade button when a newer build exists, downloads it inside the app and opens Android's installer. */
+/** Android app only: pops up an Upgrade prompt by itself when a newer build exists, downloads it inside the app and opens Android's installer. */
 const UpdateChecker = () => {
   const [update, setUpdate] = useState<{ build: number; url: string } | null>(null);
   const [open, setOpen] = useState(false);
@@ -67,21 +67,25 @@ const UpdateChecker = () => {
     }
   };
 
+  // The update prompt pops up by itself when a newer build exists (once per build until the app is reopened).
+  useEffect(() => {
+    if (!update) return;
+    let seen = false;
+    try { seen = sessionStorage.getItem("primegram-update-seen") === String(update.build); } catch { /* ignore */ }
+    if (!seen) setOpen(true);
+  }, [update]);
+  const dismiss = () => {
+    try { if (update) sessionStorage.setItem("primegram-update-seen", String(update.build)); } catch { /* ignore */ }
+    setHidden(true); setOpen(false);
+  };
+
   if (!update || hidden) return null;
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Upgrade available"
-        className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[90] flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400 text-black shadow-[0_0_18px_rgba(52,211,153,.7)] active:scale-90"
-      >
-        <ArrowUpCircle className="h-5 w-5 animate-bounce" />
-        <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-black bg-red-500" />
-      </button>
       {open && (
-        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60" onClick={() => !busy && setOpen(false)}>
+        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60" onClick={() => !busy && dismiss()}>
           <div onClick={e => e.stopPropagation()} className="w-full max-w-md space-y-3 rounded-t-3xl border border-white/15 bg-black/80 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white backdrop-blur-2xl">
-            <div className="flex items-center justify-between"><p className="text-lg font-bold">New version available</p>{!busy && <button onClick={() => setOpen(false)} aria-label="Close"><X className="h-5 w-5" /></button>}</div>
+            <div className="flex items-center justify-between"><p className="text-lg font-bold">New version available</p>{!busy && <button onClick={dismiss} aria-label="Close"><X className="h-5 w-5" /></button>}</div>
             <p className="text-sm text-white/70">{busy ? "Downloading the new Primegram inside the app…" : "A newer Primegram is ready. Tap Upgrade — it downloads here in the app and your account and data stay as they are."}</p>
             {busy && (
               <div className="space-y-1.5">
@@ -91,7 +95,7 @@ const UpdateChecker = () => {
             )}
             <button disabled={busy} onClick={() => void upgrade()} className="w-full rounded-2xl bg-emerald-400 py-3 text-sm font-bold text-black disabled:opacity-60">{busy ? `Downloading ${prog.pct}%` : "Upgrade"}</button>
             {busy ? <button onClick={() => void AppUpdate.cancel()} className="w-full py-1 text-xs text-white/50">Cancel</button>
-              : <button onClick={() => { setHidden(true); setOpen(false); }} className="w-full py-1 text-xs text-white/50">Later</button>}
+              : <button onClick={dismiss} className="w-full py-1 text-xs text-white/50">Later</button>}
           </div>
         </div>
       )}
