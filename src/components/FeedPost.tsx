@@ -1,3 +1,4 @@
+import PostCarousel, { type CarouselItem } from "@/components/PostCarousel";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -40,6 +41,7 @@ interface FeedPostProps {
   bio?: string | null;
   music?: PostMusic | null;
   views?: number;
+  mediaItems?: CarouselItem[] | null;
 }
 
 const SAVED_KEY = "primegram:savedPosts";
@@ -54,7 +56,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
     <div className={`${size} rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold`}>{avatar}</div>
   );
 
-const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, badge, authorId, music, views = 0 }: FeedPostProps) => {
+const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, badge, authorId, music, views = 0, mediaItems }: FeedPostProps) => {
   const coverImg = useVideoPoster(mediaType === "video" ? image : null, poster);
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
@@ -287,6 +289,8 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
             <div className="w-full min-h-40 px-6 py-10 flex items-center justify-center">
               <p className="max-w-prose whitespace-pre-wrap text-center text-lg text-foreground">{caption}</p>
             </div>
+          ) : mediaItems && mediaItems.length > 1 ? (
+            <PostCarousel items={mediaItems} alt={`Post by ${username}`} />
           ) : isVideo ? (
             <div ref={wrapRef} className="relative w-full">
               {!near ? (

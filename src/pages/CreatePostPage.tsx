@@ -25,6 +25,7 @@ import { runInBackground } from "@/utils/backgroundUpload";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { toast } from "sonner";
 import { CAMERA_CONSTRAINTS, VIDEO_BITRATE } from "@/utils/media";
+import MediaEditor from "@/components/MediaEditor";
 import FilterStrip from "@/components/FilterStrip";
 import { bakeVideoFilter } from "@/utils/bakeVideo";
 import { captureVideoThumb } from "@/utils/videoThumb";
@@ -55,7 +56,7 @@ const CreatePostPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const [mode, setMode] = useState<Mode>("upload");
+  const [mode, setMode] = useState<Mode>(() => new URLSearchParams(window.location.search).get("camera") === "1" ? "camera" : "upload");
   const [textOnly, setTextOnly] = useState(false);
   const [caption, setCaption] = useState("");
   const [suggesting, setSuggesting] = useState(false);
@@ -67,6 +68,7 @@ const CreatePostPage = () => {
   const [uploading, setUploading] = useState(false);
   const [filterCss, setFilterCss] = useState("none");
   const [thumb, setThumb] = useState<string | null>(null);
+  const [fullEditor, setFullEditor] = useState(false);
   const [overlays, setOverlays] = useState<Overlay[]>([]);
   const [showStickers, setShowStickers] = useState(false);
   const [facing, setFacing] = useState<"user" | "environment">("user");
@@ -537,6 +539,7 @@ const CreatePostPage = () => {
 
       <canvas ref={canvasRef} className="hidden" />
       <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFile} />
+      {fullEditor && file && <MediaEditor files={[file]} mode="post" onClose={() => { setFullEditor(false); resetMedia(); }} />}
 
       <div className="p-5 space-y-4">
         {/* PREVIEW MODE */}
@@ -575,6 +578,11 @@ const CreatePostPage = () => {
               </button>
             </div>
 
+            {file && (
+              <button onClick={() => setFullEditor(true)} className="depth-press flex w-full items-center justify-center gap-2 rounded-xl bg-primary/15 py-2.5 text-sm font-semibold text-primary">
+                <Sparkles className="w-4 h-4" /> Open full editor (trim, auto-cut, music…)
+              </button>
+            )}
             {/* Filters scroller */}
             <div className="space-y-2">
               <p className="text-caption text-muted-foreground flex items-center gap-1.5">

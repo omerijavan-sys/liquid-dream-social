@@ -186,6 +186,7 @@ const Index = () => {
                 isVerified={post.profile?.is_verified}
                 isOfficial={post.profile?.is_official}
                 views={post.views_count || 0}
+                mediaItems={(post as any).media_items ?? null}
                 music={post.music_title ? {
                   title: post.music_title,
                   artist: post.music_artist,

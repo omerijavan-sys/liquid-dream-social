@@ -6,11 +6,13 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadRtcConfig } from "@/utils/iceConfig";
+import MediaEditor from "@/components/MediaEditor";
 
 type Stream = { id: string; host_id: string; title: string | null; status: "live" | "ended"; started_at: string };
 type Sig = { from: string; to: string; kind: "offer" | "answer" | "ice"; data: any };
 type Comment = { id: string; user_id: string; content: string; name?: string };
 
+const viewersPeakText = (n: number) => (n ? `${n} ${n === 1 ? "person" : "people"} watched.` : "No one joined this time.");
 const MAX_VIEWERS = 12; // each viewer is a direct peer connection to the host's phone
 
 /** Host (/live/new) and viewer (/live/:id) screen for Primegram Live. */
@@ -44,6 +46,10 @@ const LivePage = () => {
   const peakRef = useRef(0);
   const endedRef = useRef(false);
   const chatEnd = useRef<HTMLDivElement>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const recChunks = useRef<Blob[]>([]);
+  const [recording, setRecording] = useState<File | null>(null);
+  const [editing, setEditing] = useState(false);
 
   const nameOf = useCallback(async (uid: string) => {
     if (names.current.has(uid)) return names.current.get(uid)!;
@@ -196,12 +202,30 @@ const LivePage = () => {
     setStream(data as Stream);
     joinChannel(data.id, me);
     setPhase("live");
+    // Keep a copy of the broadcast on this phone so it can be posted afterwards.
+    try {
+      const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
+      recChunks.current = [];
+      const rec = new MediaRecorder(localRef.current, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 3_000_000 });
+      rec.ondataavailable = (e) => { if (e.data.size) recChunks.current.push(e.data); };
+      rec.start(1000);
+      recRef.current = rec;
+    } catch { /* recording isn't supported: the live still works */ }
   };
 
   const endLive = async () => {
     if (endedRef.current) return; endedRef.current = true;
     if (stream) await (supabase as any).from("live_streams").update({ status: "ended", ended_at: new Date().toISOString(), peak_viewers: peakRef.current }).eq("id", stream.id);
+    // Finish the local recording before the camera stops.
+    let file: File | null = null;
+    const rec = recRef.current;
+    if (rec && rec.state !== "inactive") {
+      await new Promise<void>((res) => { rec.onstop = () => res(); rec.stop(); });
+      const blob = new Blob(recChunks.current, { type: "video/webm" });
+      if (blob.size > 50_000) file = new File([blob], `live-${Date.now()}.webm`, { type: "video/webm" });
+    }
     cleanup();
+    if (file) { setRecording(file); return; }
     toast("Live ended");
     navigate("/", { replace: true });
   };
@@ -237,6 +261,18 @@ const LivePage = () => {
 
   const hostView = isHost;
   const live = phase === "live";
+
+  if (recording && editing) return <MediaEditor files={[recording]} mode="post" onClose={() => navigate("/", { replace: true })} />;
+  if (recording) return (
+    <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-5 bg-background p-6 text-center text-foreground">
+      <p className="text-xl font-bold">Your live has ended</p>
+      <p className="max-w-xs text-sm text-muted-foreground">{viewersPeakText(peakRef.current)} Do you want to post it, or delete it?</p>
+      <div className="flex w-full max-w-xs flex-col gap-2.5">
+        <button onClick={() => setEditing(true)} className="rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground">Post — edit first</button>
+        <button onClick={() => { setRecording(null); toast("Live deleted"); navigate("/", { replace: true }); }} className="rounded-2xl bg-secondary py-3.5 text-sm font-semibold text-red-400">Delete</button>
+      </div>
+    </div>
+  );
 
   if (phase === "ended") return (
     <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-background p-6 text-center">
