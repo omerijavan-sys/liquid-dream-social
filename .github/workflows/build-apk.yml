@@ -70,7 +70,11 @@ jobs:
       - name: Build APK
         run: |
           cd android
-          ./gradlew assembleRelease -PappBuild=${{ github.run_number }} --stacktrace --no-daemon
+          set -o pipefail
+          ./gradlew assembleRelease -PappBuild=${{ github.run_number }} --stacktrace --no-daemon 2>&1 | tee ../gradle-build.log || {
+            grep -E "error:|\.java:[0-9]+|What went wrong|Execution failed|AAPT|Caused by|not found|Duplicate" -A3 ../gradle-build.log | head -40 | while IFS= read -r l; do echo "::error::${l}"; done
+            exit 1
+          }
           cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/primegram.apk
 
       - name: Upload APK artifact
