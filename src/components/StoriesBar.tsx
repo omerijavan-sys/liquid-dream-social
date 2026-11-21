@@ -135,6 +135,25 @@ const StoriesBar = () => {
       }
     };
     fetchStories();
+    const again = () => { void fetchStories(); };
+    window.addEventListener("prime:stories-changed", again);
+    return () => window.removeEventListener("prime:stories-changed", again);
+  }, []);
+
+  // Who is live right now
+  const [lives, setLives] = useState<{ id: string; host_id: string; name: string; avatar: string | null }[]>([]);
+  useEffect(() => {
+    const load = async () => {
+      const since = new Date(Date.now() - 6 * 3600 * 1000).toISOString();
+      const { data } = await supabase.from("live_streams" as never).select("id,host_id").eq("status", "live").gte("started_at", since).order("started_at", { ascending: false }).limit(15) as { data: { id: string; host_id: string }[] | null };
+      if (!data?.length) { setLives([]); return; }
+      const { data: profs } = await supabase.from("profiles").select("user_id,display_name,username,avatar_url").in("user_id", data.map(d => d.host_id));
+      const pm = new Map((profs ?? []).map(p => [p.user_id, p]));
+      setLives(data.map(d => ({ id: d.id, host_id: d.host_id, name: pm.get(d.host_id)?.username || pm.get(d.host_id)?.display_name || "Live", avatar: pm.get(d.host_id)?.avatar_url ?? null })));
+    };
+    void load();
+    const ch = supabase.channel("live-now").on("postgres_changes", { event: "*", schema: "public", table: "live_streams" }, () => { void load(); }).subscribe();
+    return () => { void supabase.removeChannel(ch); };
   }, []);
 
   // Keep the remaining display time while a story is paused.
@@ -289,6 +308,15 @@ const StoriesBar = () => {
       <div className="px-4 py-3">
         <div className="flex gap-3 overflow-x-auto scrollbar-none">
           <StoryBubble name={uploading ? "Posting..." : "Your Story"} initial="+" gradient="linear-gradient(135deg, hsl(210, 100%, 60%), hsl(260, 80%, 60%))" hasNew={false} index={0} onClick={handleAddStory} isAdd />
+          {lives.map(l => (
+            <button key={l.id} onClick={() => navigate(`/live/${l.id}`)} className="flex shrink-0 flex-col items-center gap-1.5" aria-label={`Watch ${l.name} live`}>
+              <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-tr from-red-600 to-fuchsia-500 p-[3px]">
+                <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-background bg-secondary text-sm font-bold">{l.avatar ? <img src={l.avatar} alt="" className="h-full w-full object-cover" /> : l.name[0]?.toUpperCase()}</span>
+                <span className="absolute -bottom-1 rounded bg-red-600 px-1.5 text-[9px] font-bold uppercase tracking-wide text-white">Live</span>
+              </span>
+              <span className="w-16 truncate text-center text-[11px] text-foreground">{l.name}</span>
+            </button>
+          ))}
           {stories.map((story, i) => (
             <StoryBubble key={story.id} name={story.display_name} imageUrl={story.cover_url} initial={story.display_name[0]} gradient="linear-gradient(135deg, hsl(350, 80%, 58%), hsl(280, 70%, 55%))" hasNew index={i + 1} onClick={() => openStory(story)} />
           ))}

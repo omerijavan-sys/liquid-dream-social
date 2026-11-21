@@ -428,3 +428,5 @@ video::-webkit-media-controls-overlay-play-button { display: none !important; }
 video::-webkit-media-controls-panel { display: none !important; }
 video[controls]::-webkit-media-controls-panel { display: flex !important; }
 @keyframes loadbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
+@keyframes floatup { 0% { transform: translateY(0) scale(.6); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-260px) scale(1.2); opacity: 0; } }

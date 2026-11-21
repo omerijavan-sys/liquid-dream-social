@@ -142,7 +142,7 @@ const Index = () => {
                 { label: "Wallet", icon: WalletCards, path: "/wallet", color: "text-emerald-300 bg-emerald-300/15" },
                 { label: "Reels", icon: Film, path: "/reels", color: "text-fuchsia-300 bg-fuchsia-300/15" },
               ].map(({ label, icon: Icon, path, color }) => (
-                <button key={label} onClick={() => navigate(path)} className="depth-press flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-black/10 p-2.5 text-[10px] text-muted-foreground">
+                <button key={label} onClick={() => (path === "/create" ? window.dispatchEvent(new CustomEvent("prime:create-menu")) : navigate(path))} className="depth-press flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-black/10 p-2.5 text-[10px] text-muted-foreground">
                   <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${color}`}><Icon className="h-4 w-4" /></span>
                   {label}
                 </button>

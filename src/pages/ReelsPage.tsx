@@ -23,7 +23,7 @@ const REEL_BATCH_SIZE = 20;
 const ReelsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(() => new URLSearchParams(window.location.search).get("new") === "1");
   const [caption, setCaption] = useState("");
   const [musicTitle, setMusicTitle] = useState("");
   const [reelTrack, setReelTrack] = useState<PickedTrack | null>(null);

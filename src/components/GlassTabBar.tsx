@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { Home, Search, PlusSquare, User, Film } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import CreateSheet from "@/components/CreateSheet";
 
 const tabs = [
   { icon: Home, label: "Home", path: "/" },
@@ -13,6 +14,8 @@ const tabs = [
 
 const GlassTabBar = ({ goldStyle = false }: { goldStyle?: boolean }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  useEffect(() => { const o = () => setCreateOpen(true); window.addEventListener("prime:create-menu", o); return () => window.removeEventListener("prime:create-menu", o); }, []);
   const { scrollY } = useScroll();
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,7 +52,7 @@ const GlassTabBar = ({ goldStyle = false }: { goldStyle?: boolean }) => {
           return (
             <motion.button
               key={tab.label}
-              onClick={() => navigate(tab.path)}
+              onClick={() => (tab.path === "/create" ? setCreateOpen(true) : navigate(tab.path))}
               aria-label={tab.label}
               title={tab.label}
               className={`depth-press relative flex min-w-0 flex-1 items-center justify-center rounded-2xl transition-colors ${isActive ? goldStyle ? "text-amber-200" : "text-primary" : "text-muted-foreground"}`}
@@ -69,6 +72,7 @@ const GlassTabBar = ({ goldStyle = false }: { goldStyle?: boolean }) => {
           );
         })}
       </motion.nav>
+      <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
     </motion.div>
   );
 };

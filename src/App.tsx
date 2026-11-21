@@ -14,6 +14,7 @@ import InAppBrowser from "@/components/InAppBrowser";
 import NativeAuthBridge from "@/components/NativeAuthBridge";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import LivePage from "@/pages/LivePage";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -122,6 +123,8 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<ProtectedRoute><PublicProfilePage /></ProtectedRoute>} />
             <Route path="/call/:userId" element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
+            <Route path="/live/new" element={<ProtectedRoute><LivePage /></ProtectedRoute>} />
+            <Route path="/live/:id" element={<ProtectedRoute><LivePage /></ProtectedRoute>} />
             <Route path="/gcall/:callId" element={<ProtectedRoute><GroupCallPage /></ProtectedRoute>} />
             <Route path="/sports" element={<ProtectedRoute><SportsPage /></ProtectedRoute>} />
             <Route path="/movies" element={<ProtectedRoute><MoviesPage /></ProtectedRoute>} />
