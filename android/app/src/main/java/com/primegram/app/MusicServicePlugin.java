@@ -6,6 +6,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.JSArray;
+import java.util.ArrayList;
+import org.json.JSONObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -23,6 +26,11 @@ public class MusicServicePlugin extends Plugin {
                 o.put("action", i.getStringExtra("a"));
                 notifyListeners("action", o, true);
             }
+        };
+        MusicService.listener = (index, pos, dur, playing, ended, error) -> {
+            JSObject o = new JSObject();
+            o.put("index", index); o.put("pos", pos); o.put("dur", dur); o.put("playing", playing); o.put("ended", ended); o.put("error", error);
+            notifyListeners("native", o);
         };
         ContextCompat.registerReceiver(getContext(), receiver, new IntentFilter(MusicService.ACTION), ContextCompat.RECEIVER_NOT_EXPORTED);
     }
@@ -43,12 +51,47 @@ public class MusicServicePlugin extends Plugin {
         }
     }
 
+    private ArrayList<String[]> items(PluginCall call) throws Exception {
+        JSArray arr = call.getArray("items");
+        ArrayList<String[]> out = new ArrayList<>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.getJSONObject(i);
+            out.add(new String[] { o.getString("url"), o.optString("title", "Primegram"), o.optString("artist", "") });
+        }
+        return out;
+    }
+
+    /** Plays a list of songs inside the service so they keep going with the app closed. */
+    @PluginMethod public void playQueue(PluginCall call) {
+        try {
+            MusicService.pendingItems = items(call);
+            MusicService.pendingIndex = call.getInt("index", 0);
+            MusicService.pendingStart = call.getInt("start", 0);
+            ContextCompat.startForegroundService(getContext(), new Intent(getContext(), MusicService.class).setAction("PLAY"));
+            call.resolve();
+        } catch (Exception e) { call.reject("Could not start playback: " + e.getMessage()); }
+    }
+    @PluginMethod public void appendQueue(PluginCall call) {
+        try { if (MusicService.instance != null) MusicService.instance.append(items(call)); call.resolve(); }
+        catch (Exception e) { call.reject(e.getMessage()); }
+    }
+    @PluginMethod public void control(PluginCall call) {
+        if (MusicService.instance != null) MusicService.instance.control(call.getString("action", "toggle"));
+        call.resolve();
+    }
+    @PluginMethod public void seek(PluginCall call) {
+        if (MusicService.instance != null) MusicService.instance.seek(call.getInt("pos", 0), Boolean.TRUE.equals(call.getBoolean("play", false)));
+        call.resolve();
+    }
+
     @PluginMethod public void stop(PluginCall call) {
-        getContext().stopService(new Intent(getContext(), MusicService.class));
+        if (MusicService.instance != null) MusicService.instance.killPlayback();
+        else getContext().stopService(new Intent(getContext(), MusicService.class));
         call.resolve();
     }
 
     @Override protected void handleOnDestroy() {
+        MusicService.listener = null;
         try { if (receiver != null) getContext().unregisterReceiver(receiver); } catch (Exception ignored) { }
     }
 }

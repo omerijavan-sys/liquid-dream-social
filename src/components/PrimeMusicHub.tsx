@@ -217,8 +217,8 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
     return () => clearTimeout(t);
   }, [open, query, genre, kind]);
 
-  const SongRow = ({ it }: { it: Item }) => (
-    <div className={`flex w-full items-center gap-2 rounded-2xl p-2.5 ${glass} ${now?.id === it.id ? "ring-1 ring-emerald-400/70" : ""}`}>
+  const songRow = (it: Item) => (
+    <div key={it.id} className={`flex w-full items-center gap-2 rounded-2xl p-2.5 ${glass} ${now?.id === it.id ? "ring-1 ring-emerald-400/70" : ""}`}>
       <button onClick={() => playItem(it)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         {it.artwork ? <img src={it.artwork} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-xl object-cover" /> : <span className="h-12 w-12 shrink-0 rounded-xl bg-white/10" />}
         <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{it.title}</span><span className="block truncate text-xs text-white/60">{it.artist}</span></span>
@@ -281,7 +281,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
               <div className="space-y-2">
                 <p className="px-1 text-xs text-white/50">Songs saved inside Primegram. They play without internet and are only available in the app.</p>
                 {savedItems.length === 0 && <div className={`rounded-2xl p-4 text-center text-sm text-white/60 ${glass}`}>Nothing downloaded yet. Tap the <Download className="inline h-4 w-4" /> button on any song.</div>}
-                {savedItems.map(it => <SongRow key={it.id} it={it} />)}
+                {savedItems.map(it => songRow(it))}
               </div>
             ) : kind === "mine" ? (
               <div className="space-y-2">
@@ -298,7 +298,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
                   <>
                     <button onClick={() => setMineOpen(null)} className="text-xs text-emerald-300">← All playlists</button>
                     <p className="text-sm font-semibold">{lists[mineOpen]?.name}</p>
-                    {(lists[mineOpen]?.items ?? []).map(it => <SongRow key={it.id} it={it as Item} />)}
+                    {(lists[mineOpen]?.items ?? []).map(it => songRow(it as Item))}
                   </>
                 )}
               </div>
@@ -308,7 +308,7 @@ const PrimeMusicHub = ({ open, onClose }: { open: boolean; onClose: () => void }
             {!loading && !error && items.length === 0 && <div className={`rounded-2xl p-4 text-center text-sm text-white/60 ${glass}`}>Nothing found. Try another search.</div>}
             {!loading && !error && (
               <div className={kind === "track" ? "space-y-2" : "grid grid-cols-2 gap-3"}>
-                {items.map(it => kind === "track" ? <SongRow key={it.id} it={it} /> : (
+                {items.map(it => kind === "track" ? songRow(it) : (
                   <button key={it.id} onClick={() => setNow(it)} className={`overflow-hidden rounded-2xl text-left transition active:scale-[0.98] ${glass} ${now?.id === it.id ? "ring-1 ring-emerald-400/70" : ""}`}>
                     {it.artwork ? <img src={it.artwork} alt="" loading="lazy" className="aspect-square w-full object-cover" /> : <div className="aspect-square w-full bg-white/10" />}
                     <div className="p-2.5"><p className="truncate text-sm font-semibold">{it.title}</p><p className="truncate text-[11px] text-white/60">{it.artist}</p></div>

@@ -19,18 +19,20 @@ export async function findFullStream(title: string, artist: string): Promise<str
   try {
     const h = await getHost();
     const first = artist.split(",")[0];
-    const u = new URL(`${h}/v1/tracks/search`);
-    u.searchParams.set("query", `${norm(title)} ${norm(first)}`);
-    u.searchParams.set("app_name", "Primegram");
-    u.searchParams.set("limit", "8");
-    const r = await fetch(u);
-    const list = ((await r.json()).data ?? []) as Array<{ id: string; title: string; duration?: number; user?: { name?: string } }>;
     const t = norm(title), a = norm(first);
-    const hit = list.find(x => {
-      const xt = norm(x.title), xa = norm(x.user?.name ?? "");
-      return (xt === t || xt.includes(t) || t.includes(xt)) && (xa.includes(a) || a.includes(xa) || xt.includes(a));
-    });
-    if (hit && (hit.duration ?? 999) > 60) out = `${h}/v1/tracks/${encodeURIComponent(hit.id)}/stream?app_name=Primegram`;
+    for (const q of [`${norm(title)} ${norm(first)}`, norm(title)]) {
+      const u = new URL(`${h}/v1/tracks/search`);
+      u.searchParams.set("query", q);
+      u.searchParams.set("app_name", "Primegram");
+      u.searchParams.set("limit", "12");
+      const r = await fetch(u);
+      const list = ((await r.json()).data ?? []) as Array<{ id: string; title: string; duration?: number; user?: { name?: string } }>;
+      const hit = list.find(x => {
+        const xt = norm(x.title), xa = norm(x.user?.name ?? "");
+        return (xt === t || xt.includes(t) || t.includes(xt)) && (xa.includes(a) || a.includes(xa) || xt.includes(a));
+      });
+      if (hit && (hit.duration ?? 999) > 60) { out = `${h}/v1/tracks/${encodeURIComponent(hit.id)}/stream?app_name=Primegram`; break; }
+    }
   } catch { out = null; }
   cache.set(key, out);
   return out;
