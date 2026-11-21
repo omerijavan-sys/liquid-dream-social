@@ -63,6 +63,8 @@ interface StoryView {
   music_art_url?: string | null;
   music_url?: string | null;
   music_youtube_id?: string | null;
+  music_start?: number | null;
+  music_len?: number | null;
   progress?: number;
 }
 
@@ -84,6 +86,9 @@ const StoriesBar = () => {
   const storyProgressRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [storyDuration, setStoryDuration] = useState(5000);
+  // Portrait photos/videos fill the whole screen; wide ones stay whole over a blurred copy of themselves.
+  const [storyCover, setStoryCover] = useState(true);
+  const fit = storyCover ? "object-cover" : "object-contain";
   const advance = useCallback(() => {
     if (!viewingStory) return;
     const index = stories.findIndex(story => story.id === viewingStory.id);
@@ -106,7 +111,7 @@ const StoriesBar = () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from("posts")
-        .select("id, media_url, user_id, created_at, music_title, music_artist, music_art_url, music_url, music_youtube_id")
+        .select("id, media_url, user_id, created_at, music_title, music_artist, music_art_url, music_url, music_youtube_id, music_start, music_len")
         .eq("media_type", "story")
         .gte("created_at", twentyFourHoursAgo)
         .order("created_at", { ascending: false })
@@ -131,6 +136,8 @@ const StoriesBar = () => {
           music_art_url: s.music_art_url,
           music_url: s.music_url,
           music_youtube_id: s.music_youtube_id,
+          music_start: (s as any).music_start,
+          music_len: (s as any).music_len,
         })));
       }
     };
@@ -380,19 +387,22 @@ const StoriesBar = () => {
             </div>
             {viewingStory.music_title && (
               <div className="absolute left-3 right-3 top-24 z-20 rounded-2xl bg-background/85 p-2 backdrop-blur-xl">
-                <PostMusicPlayer music={{
+                <PostMusicPlayer autoStart music={{
                   title: viewingStory.music_title,
                   artist: viewingStory.music_artist,
                   art_url: viewingStory.music_art_url,
                   stream_url: viewingStory.music_url,
                   youtube_id: viewingStory.music_youtube_id,
+                  start: viewingStory.music_start,
+                  len: viewingStory.music_len,
                 }} />
               </div>
             )}
+            {!storyCover && !isVideoMedia(viewingStory.image_url) && <img src={viewingStory.image_url} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl" />}
             <div className="absolute inset-0 flex items-center justify-center">
               {isVideoMedia(viewingStory.image_url) ? (
                 <button type="button" aria-label={paused ? "Resume story" : "Pause story"} onClick={() => setPaused(value => !value)} className="relative h-full w-full">
-                  <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} poster={viewingStory.cover_url || BLANK_POSTER} autoPlay playsInline className="h-full w-full object-contain" onEnded={advance} onTimeUpdate={event => {
+                  <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} poster={viewingStory.cover_url || BLANK_POSTER} autoPlay playsInline className={`h-full w-full ${fit}`} onLoadedMetadata={e => setStoryCover(e.currentTarget.videoHeight / Math.max(1, e.currentTarget.videoWidth) >= 1.2)} onEnded={advance} onTimeUpdate={event => {
                     const video = event.currentTarget;
                     if (Number.isFinite(video.duration)) {
                       const progress = video.currentTime / video.duration;
@@ -404,7 +414,7 @@ const StoriesBar = () => {
                 </button>
               ) : (
                 <button type="button" aria-label={paused ? "Resume story" : "Pause story"} onClick={() => setPaused(value => !value)} className="relative h-full w-full">
-                  <img src={viewingStory.image_url} alt="Story" className="h-full w-full object-contain" />
+                  <img src={viewingStory.image_url} alt="Story" className={`h-full w-full ${fit}`} onLoad={e => setStoryCover(e.currentTarget.naturalHeight / Math.max(1, e.currentTarget.naturalWidth) >= 1.2)} />
                   {paused && <span className="absolute inset-0 flex items-center justify-center bg-black/20"><Play className="h-12 w-12 fill-white text-white" /></span>}
                 </button>
               )}

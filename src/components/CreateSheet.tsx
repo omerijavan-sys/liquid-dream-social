@@ -10,6 +10,8 @@ import { runInBackground } from "@/utils/backgroundUpload";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
 import MusicClipPicker from "@/components/MusicClipPicker";
+import FilterStrip from "@/components/FilterStrip";
+import { bakeImageFilter, bakeVideoFilter } from "@/utils/bakeVideo";
 
 /** The "what do you want to create?" menu that opens from the + button. */
 const CreateSheet = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
@@ -21,23 +23,28 @@ const CreateSheet = ({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [track, setTrack] = useState<PickedTrack | null>(null);
   const [clip, setClip] = useState({ start: 0, len: 15 });
   const [pickMusic, setPickMusic] = useState(false);
+  const [filter, setFilter] = useState("none");
 
   const go = (path: string) => { onClose(); navigate(path); };
 
   const onStoryPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; e.target.value = "";
     if (!f) return;
-    setStoryFile(f); setPreview(URL.createObjectURL(f)); setTrack(null); setClip({ start: 0, len: 15 });
+    setStoryFile(f); setPreview(URL.createObjectURL(f)); setFilter("none"); setTrack(null); setClip({ start: 0, len: 15 });
   };
   const closeStory = () => { if (preview) URL.revokeObjectURL(preview); setStoryFile(null); setPreview(null); setTrack(null); };
 
   const postStory = () => {
     if (!storyFile || !user) return;
-    const file = storyFile, uid = user.id, t = track, c = clip;
+    let file = storyFile; const uid = user.id, t = track, c = clip, fl = filter;
     const isVideo = file.type.startsWith("video/");
     closeStory(); onClose();
     navigate("/");
     runInBackground("Posting your story", async (progress) => {
+      if (fl !== "none") {
+        progress("Applying filter…");
+        file = isVideo ? await bakeVideoFilter(file, fl, (p) => progress(`Applying filter… ${p}%`)) : await bakeImageFilter(file, fl);
+      }
       let thumbnail_url: string | null = null;
       if (isVideo) { progress("Making cover…"); thumbnail_url = await uploadVideoCover(uid, file); }
       progress("Uploading story…");
@@ -82,10 +89,11 @@ const CreateSheet = ({ open, onClose }: { open: boolean; onClose: () => void }) 
         {storyFile && preview && (
           <motion.div className="fixed inset-0 z-[95] flex flex-col bg-black" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="relative min-h-0 flex-1">
-              {storyFile.type.startsWith("video/") ? <video src={preview} className="h-full w-full object-contain" autoPlay loop muted playsInline /> : <img src={preview} alt="" className="h-full w-full object-contain" />}
+              {storyFile.type.startsWith("video/") ? <video src={preview} style={{ filter }} className="h-full w-full object-contain" autoPlay loop muted playsInline /> : <img src={preview} alt="" style={{ filter }} className="h-full w-full object-contain" />}
               <button onClick={closeStory} aria-label="Cancel" className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-3 bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <FilterStrip value={filter} onChange={setFilter} thumb={storyFile.type.startsWith("image/") ? preview : null} />
               <button onClick={() => setPickMusic(true)} className="flex w-full items-center gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm font-medium text-foreground">
                 <Music2 className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1 truncate text-left">{track ? `${track.title} · ${track.artist}` : "Add music to your story"}</span>
                 {track && <span onClick={(e) => { e.stopPropagation(); setTrack(null); }} className="text-xs text-muted-foreground">Remove</span>}

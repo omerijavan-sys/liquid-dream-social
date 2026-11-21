@@ -25,24 +25,13 @@ import { runInBackground } from "@/utils/backgroundUpload";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { toast } from "sonner";
 import { CAMERA_CONSTRAINTS, VIDEO_BITRATE } from "@/utils/media";
+import FilterStrip from "@/components/FilterStrip";
+import { bakeVideoFilter } from "@/utils/bakeVideo";
+import { captureVideoThumb } from "@/utils/videoThumb";
 import MusicClipPicker from "@/components/MusicClipPicker";
 import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
 
 type Mode = "upload" | "camera";
-
-// CSS-filter based effects
-const FILTERS = [
-  { name: "Normal", css: "none" },
-  { name: "Mono", css: "grayscale(1) contrast(1.05)" },
-  { name: "Vivid", css: "saturate(1.5) contrast(1.1)" },
-  { name: "Warm", css: "sepia(0.3) saturate(1.2) hue-rotate(-10deg)" },
-  { name: "Cool", css: "hue-rotate(180deg) saturate(1.1)" },
-  { name: "Noir", css: "grayscale(1) contrast(1.4) brightness(0.9)" },
-  { name: "Dream", css: "blur(0.5px) brightness(1.1) saturate(1.3)" },
-  { name: "Retro", css: "sepia(0.6) contrast(0.95) saturate(1.2)" },
-  { name: "Neon", css: "hue-rotate(90deg) saturate(2) contrast(1.2)" },
-  { name: "Fade", css: "contrast(0.85) brightness(1.1) saturate(0.8)" },
-];
 
 // Quick visual templates (filter + sticker preset)
 const TEMPLATES = [
@@ -77,6 +66,7 @@ const CreatePostPage = () => {
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [uploading, setUploading] = useState(false);
   const [filterCss, setFilterCss] = useState("none");
+  const [thumb, setThumb] = useState<string | null>(null);
   const [overlays, setOverlays] = useState<Overlay[]>([]);
   const [showStickers, setShowStickers] = useState(false);
   const [facing, setFacing] = useState<"user" | "environment">("user");
@@ -116,6 +106,13 @@ const CreatePostPage = () => {
   const recordingFrameRef = useRef<number>();
   const zoomRef = useRef(1);
   const filterRef = useRef("none");
+  useEffect(() => {
+    if (!preview || !file) { setThumb(null); return; }
+    if (mediaType !== "video") { setThumb(preview); return; }
+    let dead = false, url: string | null = null;
+    void captureVideoThumb(file).then((b) => { if (b && !dead) { url = URL.createObjectURL(b); setThumb(url); } });
+    return () => { dead = true; if (url) URL.revokeObjectURL(url); };
+  }, [preview, file, mediaType]);
 
   // Start/stop camera
   useEffect(() => {
@@ -293,6 +290,7 @@ const CreatePostPage = () => {
         setFile(f);
         setPreview(URL.createObjectURL(blob));
         setMediaType("image");
+        setFilterCss("none");
       },
       "image/jpeg",
       0.92,
@@ -371,6 +369,7 @@ const CreatePostPage = () => {
       setFile(f);
       setPreview(URL.createObjectURL(blob));
       setMediaType("video");
+      if (captureStream !== streamRef.current) setFilterCss("none");
       setRecordSecs(0);
     };
     rec.start();
@@ -431,14 +430,18 @@ const CreatePostPage = () => {
       return;
     }
     // Snapshot everything, then upload in the background so the person can keep using the app.
-    const snap = { file, caption, track, clip, isAdult, mediaType, uid: user.id };
+    const snap = { file, caption, track, clip, isAdult, mediaType, uid: user.id, filter: filterCss };
     const hadMedia = Boolean(file);
     setUploading(true);
     runInBackground(snap.mediaType === "video" ? "Uploading your video" : "Sharing your post", async (progress) => {
       let publicUrl: string | null = null;
       let thumbnailUrl: string | null = null;
       if (snap.file) {
-        const finalFile = await bakeImage(snap.file);
+        let finalFile = await bakeImage(snap.file);
+        if (snap.mediaType === "video" && snap.filter !== "none") {
+          progress("Applying filter…");
+          finalFile = await bakeVideoFilter(finalFile, snap.filter, (p) => progress(`Applying filter… ${p}%`));
+        }
         const ext = finalFile.name.split(".").pop();
         const path = `${snap.uid}/${Date.now()}.${ext}`;
         if (snap.mediaType === "video") {
@@ -542,13 +545,13 @@ const CreatePostPage = () => {
             {preview && <>
             <div
               ref={previewRef}
-              className="relative liquid-glass rounded-2xl overflow-hidden aspect-square"
+              className="relative liquid-glass rounded-2xl overflow-hidden flex items-center justify-center bg-black"
               style={{ filter: filterCss }}
             >
               {mediaType === "video" ? (
-                <video src={preview} className="w-full h-full object-cover" controls playsInline />
+                <video src={preview} className="w-full max-h-[70vh] object-contain" controls playsInline />
               ) : (
-                <img src={preview} className="w-full h-full object-cover" alt="Preview" />
+                <img src={preview} className="w-full max-h-[70vh] object-contain" alt="Preview" />
               )}
               {/* Overlays (only on image) */}
               {mediaType === "image" &&
@@ -577,19 +580,7 @@ const CreatePostPage = () => {
               <p className="text-caption text-muted-foreground flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3" /> Effects
               </p>
-              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-                {FILTERS.map((f) => (
-                  <button
-                    key={f.name}
-                    onClick={() => setFilterCss(f.css)}
-                    className={`depth-press flex-shrink-0 px-3 py-2 rounded-xl text-xs font-medium ${
-                      filterCss === f.css ? "bg-primary text-primary-foreground" : "liquid-glass text-foreground"
-                    }`}
-                  >
-                    {f.name}
-                  </button>
-                ))}
-              </div>
+              <FilterStrip value={filterCss} onChange={setFilterCss} thumb={thumb} />
             </div>
 
             {/* Templates */}
@@ -853,20 +844,7 @@ const CreatePostPage = () => {
             </div>
 
 
-            {/* Filter row on camera too */}
-            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.name}
-                  onClick={() => setFilterCss(f.css)}
-                  className={`depth-press flex-shrink-0 px-3 py-2 rounded-xl text-xs font-medium ${
-                    filterCss === f.css ? "bg-primary text-primary-foreground" : "liquid-glass text-foreground"
-                  }`}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
+            <FilterStrip value={filterCss} onChange={setFilterCss} />
 
             {/* Capture controls */}
             <div className="flex items-center justify-center gap-6 pt-2">

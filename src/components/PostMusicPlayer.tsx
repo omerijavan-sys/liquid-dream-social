@@ -14,7 +14,7 @@ export interface PostMusic {
 }
 
 /** Instagram-style music line shown under the profile name, with a small play/pause button. */
-const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
+const PostMusicPlayer = ({ music, autoStart = false }: { music: PostMusic; autoStart?: boolean }) => {
   const m = useMusic();
   const key = `post|${music.title}|${music.artist ?? ""}`;
   const mine = m.track?.key === key;
@@ -63,6 +63,8 @@ const PostMusicPlayer = ({ music }: { music: PostMusic }) => {
     }, { threshold: 0.7 });
     obs.observe(el);
     alive.current = true;
+    // Stories: the viewer was opened by a tap, so start straight away instead of waiting on scroll visibility.
+    if (autoStart) { visible.current = true; window.setTimeout(() => { if (alive.current && !userPaused.current) void start(); }, 150); }
     const onVis = () => { if (document.hidden && getMusicState().track?.key === key) stopMusic(); };
     document.addEventListener("visibilitychange", onVis);
     const watchdog = window.setInterval(() => {

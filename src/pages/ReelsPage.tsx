@@ -14,6 +14,9 @@ import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import CreatorTipButton from "@/components/CreatorTipButton";
 import { runInBackground } from "@/utils/backgroundUpload";
+import FilterStrip from "@/components/FilterStrip";
+import { bakeVideoFilter } from "@/utils/bakeVideo";
+import { captureVideoThumb } from "@/utils/videoThumb";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { suggestCaptions } from "@/utils/aiCaption";
 import { readContentPrefs } from "@/components/SettingsExtras";
@@ -37,6 +40,14 @@ const ReelsPage = () => {
   const lastTap = useRef<{ t: number; id: string }>({ t: 0, id: "" });
   const prefs = readContentPrefs();
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [reelFilter, setReelFilter] = useState("none");
+  const [reelThumb, setReelThumb] = useState<string | null>(null);
+  useEffect(() => {
+    if (!videoFile) { setReelThumb(null); return; }
+    let dead = false, url: string | null = null;
+    void captureVideoThumb(videoFile).then((b) => { if (b && !dead) { url = URL.createObjectURL(b); setReelThumb(url); } });
+    return () => { dead = true; if (url) URL.revokeObjectURL(url); };
+  }, [videoFile]);
   const [uploading, setUploading] = useState(false);
   const [reels, setReels] = useState<any[]>([]);
   const [loadingReels, setLoadingReels] = useState(true);
@@ -143,9 +154,10 @@ const ReelsPage = () => {
 
   const handleCreateReel = () => {
     if (!user || !videoFile) { toast.error("Select a video"); return; }
-    const snap = { file: videoFile, caption, musicTitle: reelTrack?.title ?? musicTitle, track: reelTrack, clip: reelClip, opts, uid: user.id };
-    setCreating(false); setCaption(""); setMusicTitle(""); setReelTrack(null); setReelClip({ start: 0, len: 30 }); setVideoFile(null); setVideoPreview(null); setSuggestions([]);
+    const snap = { file: videoFile, filter: reelFilter, caption, musicTitle: reelTrack?.title ?? musicTitle, track: reelTrack, clip: reelClip, opts, uid: user.id };
+    setCreating(false); setCaption(""); setMusicTitle(""); setReelTrack(null); setReelClip({ start: 0, len: 30 }); setVideoFile(null); setVideoPreview(null); setSuggestions([]); setReelFilter("none");
     runInBackground("Uploading your reel", async (progress) => {
+      if (snap.filter !== "none") { progress("Applying filter…"); snap.file = await bakeVideoFilter(snap.file, snap.filter, (p) => progress(`Applying filter… ${p}%`)); }
       progress("Preparing cover…");
       const thumbnail_url = await uploadVideoCover(snap.uid, snap.file);
       progress("Uploading reel…");
@@ -415,7 +427,8 @@ const ReelsPage = () => {
                 <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={handleFileSelect} />
                 {videoPreview ? (
                   <div className="relative">
-                    <video src={videoPreview} className="w-full rounded-xl aspect-[9/16] object-cover" controls />
+                    <video src={videoPreview} style={{ filter: reelFilter }} className="w-full rounded-xl max-h-[65vh] bg-black object-contain" controls playsInline />
+                    <div className="mt-3"><FilterStrip value={reelFilter} onChange={setReelFilter} thumb={reelThumb} /></div>
                     <button onClick={() => { setVideoFile(null); setVideoPreview(null); }} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-background/80 flex items-center justify-center"><X className="w-4 h-4 text-foreground" /></button>
                   </div>
                 ) : (
