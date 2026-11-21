@@ -28,6 +28,7 @@ const MessagesPage = lazy(() => import("./pages/MessagesPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
+const AboutPage = lazy(() => import("./pages/AboutPage"));
 const WalletPage = lazy(() => import("./pages/WalletPage"));
 const ReelsPage = lazy(() => import("./pages/ReelsPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
@@ -117,6 +118,7 @@ const App = () => (
             <Route path="/terms" element={<LegalPage kind="terms" />} />
             <Route path="/privacy" element={<LegalPage kind="privacy" />} />
             <Route path="/help" element={<LegalPage kind="help" />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/reels" element={<ProtectedRoute><ReelsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<ProtectedRoute><PublicProfilePage /></ProtectedRoute>} />
