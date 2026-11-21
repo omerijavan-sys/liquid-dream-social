@@ -7,7 +7,7 @@ android {
         applicationId "com.primegram.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (project.findProperty("appBuild") ?: "1").toInteger()
+        versionCode Integer.parseInt((project.findProperty("appBuild") ?: "1").toString())
         versionName "1.0.${project.findProperty("appBuild") ?: "0"}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
