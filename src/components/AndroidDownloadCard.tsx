@@ -33,7 +33,7 @@ const AndroidDownloadCard = ({ compact = false }: { compact?: boolean }) => {
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15"><Smartphone className="h-5 w-5 text-emerald-200" /></div>
         <div className="min-w-0 flex-1"><p className="text-xs font-semibold text-foreground">{isNativeApp ? "Primegram Android app" : "Primegram Extreme for Android"}</p><p className="text-[10px] text-muted-foreground">{isNativeApp ? (update ? "A new version is ready — tap Upgrade." : "You have the latest version.") : "Get the latest Android app version."}</p></div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          <a href={PRIMEGRAM_ISA_DEV_URL} target="_blank" rel="noreferrer" className="depth-press inline-flex items-center gap-1.5 rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-[11px] font-semibold text-cyan-100 hover:bg-cyan-400/20"><ExternalLink className="h-3.5 w-3.5" /> Open web app</a>
+          <a href={PRIMEGRAM_ISA_DEV_URL} target="_blank" rel="noreferrer" className="depth-press inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-[11px] font-semibold text-white hover:bg-white/20"><ExternalLink className="h-3.5 w-3.5" /> Open web app</a>
           {isNativeApp ? (
             update ? (
               <button type="button" onClick={openUpdatePrompt} className="depth-press inline-flex animate-pulse items-center gap-1.5 rounded-xl bg-emerald-400 px-3 py-2 text-[11px] font-bold text-black shadow-[0_0_16px_rgba(52,211,153,.7)]"><ArrowUpCircle className="h-3.5 w-3.5" /> Upgrade</button>

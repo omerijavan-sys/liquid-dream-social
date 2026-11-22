@@ -1,7 +1,7 @@
 import { logSecurityEvent } from "@/utils/audit";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { PhoneOff, Mic, MicOff, Video, VideoOff, RefreshCw, SkipForward, Send, Flag } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Video, VideoOff, RefreshCw, SkipForward, Send, Flag, ScreenShare, ScreenShareOff } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +44,9 @@ const CallPage = () => {
   const [switchingCamera, setSwitchingCamera] = useState(false);
   const [callTime, setCallTime] = useState(0);
   const [peerName, setPeerName] = useState("User");
+  const [peerAvatar, setPeerAvatar] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const shareTrack = useRef<MediaStreamTrack | null>(null);
   const [status, setStatus] = useState<Status>("ringing");
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -104,11 +107,11 @@ const CallPage = () => {
 
     supabase
       .from("profiles")
-      .select("display_name, username")
+      .select("display_name, username, avatar_url")
       .eq("user_id", userId)
       .maybeSingle()
       .then(({ data }) => {
-        if (data && !cancelled) setPeerName(data.display_name || data.username || "User");
+        if (data && !cancelled) { setPeerName(data.display_name || data.username || "User"); setPeerAvatar((data as { avatar_url?: string | null }).avatar_url ?? null); }
       });
 
     const start = async () => {
@@ -290,6 +293,31 @@ const CallPage = () => {
     setVideoOn(next);
   };
 
+  const stopShare = async () => {
+    const t = shareTrack.current; shareTrack.current = null;
+    t?.stop();
+    const cam = streamRef.current?.getVideoTracks()[0];
+    const sender = pcRef.current?.getSenders().find((x) => x.track?.kind === "video" || x.track === null);
+    if (cam && sender) await sender.replaceTrack(cam).catch(() => undefined);
+    if (localVideoRef.current && streamRef.current) localVideoRef.current.srcObject = streamRef.current;
+    setSharing(false);
+  };
+  const toggleShare = async () => {
+    if (sharing) { await stopShare(); return; }
+    const md = navigator.mediaDevices as MediaDevices & { getDisplayMedia?: (c?: DisplayMediaStreamOptions) => Promise<MediaStream> };
+    if (!md?.getDisplayMedia) { toast.error("Screen sharing isn't supported in this phone app yet. It works when you use Primegram in a desktop browser."); return; }
+    const sender = pcRef.current?.getSenders().find((x) => x.track?.kind === "video" || x.track === null);
+    if (!sender) { toast.error("Start a video call to share your screen."); return; }
+    try {
+      const ds = await md.getDisplayMedia({ video: true });
+      const t = ds.getVideoTracks()[0];
+      await sender.replaceTrack(t);
+      shareTrack.current = t; t.onended = () => { void stopShare(); };
+      if (localVideoRef.current) localVideoRef.current.srcObject = ds;
+      setSharing(true);
+    } catch { /* cancelled */ }
+  };
+
   const flipping = useRef(false);
   const flipCamera = async () => {
     if (flipping.current || !streamRef.current || audioOnly) return;
@@ -362,7 +390,15 @@ const CallPage = () => {
         />
       </div>
 
-      <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+      {audioOnly && peerAvatar && <img src={peerAvatar} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl" />}
+      <video ref={remoteVideoRef} autoPlay playsInline className={audioOnly ? "pointer-events-none absolute h-px w-px opacity-0" : "absolute inset-0 w-full h-full object-cover"} />
+      {audioOnly && (
+        <div className="absolute inset-0 z-[5] flex items-center justify-center">
+          <div className={`h-44 w-44 overflow-hidden rounded-full border-4 border-white/30 bg-white/10 shadow-2xl ${status === "connected" ? "" : "animate-pulse"}`}>
+            {peerAvatar ? <img src={peerAvatar} alt={peerName} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-6xl font-bold text-white">{peerName[0]?.toUpperCase()}</div>}
+          </div>
+        </div>
+      )}
       {status !== "connected" && <div className="absolute inset-0 bg-background/40 backdrop-blur-md" />}
       {status === "connected" && <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 to-transparent" />}
       {status === "connected" && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 to-transparent" />}
@@ -381,7 +417,7 @@ const CallPage = () => {
       </div>
 
       <div className="relative z-10 flex-1 flex items-end justify-end p-4">
-        <motion.div
+        {!audioOnly && <motion.div
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.3, type: "spring" }}
@@ -389,8 +425,8 @@ const CallPage = () => {
           dragConstraints={{ left: -220, right: 0, top: -420, bottom: 0 }}
           className="w-24 h-36 rounded-2xl overflow-hidden border-2 border-white/40 bg-black shadow-2xl cursor-grab active:cursor-grabbing"
         >
-          <video ref={localVideoRef} autoPlay playsInline muted className={`w-full h-full object-cover relative z-10 ${facing === "user" ? "mirror" : ""}`} />
-        </motion.div>
+          <video ref={localVideoRef} autoPlay playsInline muted className={`w-full h-full object-cover relative z-10 ${facing === "user" && !sharing ? "mirror" : ""}`} />
+        </motion.div>}
       </div>
 
       <motion.div
@@ -433,6 +469,11 @@ const CallPage = () => {
             >
               <RefreshCw className="w-6 h-6 text-white" />
             </Button>
+            {!audioOnly && (
+              <Button variant="ghost" size="icon" onClick={() => void toggleShare()} aria-label={sharing ? "Stop sharing screen" : "Share screen"} className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${sharing ? "bg-emerald-500/60" : "bg-white/15"}`}>
+                {sharing ? <ScreenShareOff className="w-6 h-6 text-white" /> : <ScreenShare className="w-6 h-6 text-white" />}
+              </Button>
+            )}
             {randomMode && (
               <Button variant="ghost" size="icon" onClick={hangUp} aria-label="Next person" title="Next person" className="depth-press w-14 h-14 rounded-full bg-emerald-500/60 flex items-center justify-center">
                 <SkipForward className="w-6 h-6 text-white" />
