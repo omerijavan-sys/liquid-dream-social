@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Film, GalleryHorizontalEnd, Loader2, Music2, Scissors, SlidersHorizontal, Sparkles, Trash2, Wand2, X, Type } from "lucide-react";
+import { ChevronLeft, Film, GalleryHorizontalEnd, MapPin, Loader2, Music2, Scissors, SlidersHorizontal, Sparkles, Trash2, Wand2, X, Type } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,6 +58,8 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
   const [clip, setClip] = useState({ start: 0, len: 15 });
   const [pickMusic, setPickMusic] = useState(false);
   const [cutting, setCutting] = useState(false);
+  const [step, setStep] = useState<"edit" | "options">("edit");
+  const [opts, setOpts] = useState({ allow_comments: true, allow_download: true, hide_likes: false, visibility: "public" as "public" | "followers", location: "" });
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -108,7 +110,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
 
   const publish = () => {
     if (!user || !items.length) return;
-    const uid = user.id, list = items, m = mode, t = track, c = clip, cap = caption.trim();
+    const uid = user.id, list = items, m = mode, t = track, c = clip, cap = caption.trim(), o = opts, loc = opts.location.trim() || null;
     onClose();
     navigate("/");
     const label = m === "reel" ? "Posting your reel" : m === "story" ? "Posting your story" : "Sharing your post";
@@ -135,7 +137,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
         progress("Uploading reel…");
         const thumbnail_url = await uploadVideoCover(uid, video);
         const video_url = await upload(video, "reel");
-        const { error } = await supabase.from("reels").insert({ user_id: uid, caption: cap || null, video_url, thumbnail_url, music_title: t?.title ?? null, music_artist: t?.artist ?? null, music_art_url: t?.artUrl ?? null, music_url: t?.streamUrl ?? null, ...(t ? { music_start: c.start, music_len: c.len } : {}) } as never);
+        const { error } = await supabase.from("reels").insert({ user_id: uid, caption: cap || null, video_url, thumbnail_url, music_title: t?.title ?? null, music_artist: t?.artist ?? null, music_art_url: t?.artUrl ?? null, music_url: t?.streamUrl ?? null, ...(t ? { music_start: c.start, music_len: c.len } : {}), allow_comments: o.allow_comments, allow_download: o.allow_download, hide_likes: o.hide_likes, visibility: o.visibility, location: loc } as never);
         if (error) throw error;
         window.dispatchEvent(new Event("prime:posted"));
         return;
@@ -146,7 +148,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
           progress(`Uploading story ${n + 1} of ${list.length}…`);
           const thumbnail_url = list[n].kind === "video" ? await uploadVideoCover(uid, f) : null;
           const media_url = await upload(f, "story");
-          const { error } = await supabase.from("posts").insert({ user_id: uid, media_url, media_type: "story", caption: cap || "Story", thumbnail_url, ...music } as never);
+          const { error } = await supabase.from("posts").insert({ user_id: uid, media_url, media_type: "story", caption: cap || "Story", thumbnail_url, visibility: o.visibility, ...music } as never);
           if (error) throw error;
         }
         window.dispatchEvent(new CustomEvent("prime:stories-changed"));
@@ -160,7 +162,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
         const thumb = list[n].kind === "video" ? await uploadVideoCover(uid, f) : null;
         media.push({ url: await upload(f, "post"), type: list[n].kind, thumb });
       }
-      const { error } = await supabase.from("posts").insert({ user_id: uid, caption: cap || null, media_url: media[0].url, media_type: media[0].type, thumbnail_url: media[0].thumb, media_items: media.length > 1 ? media : null, ...music } as never);
+      const { error } = await supabase.from("posts").insert({ user_id: uid, caption: cap || null, media_url: media[0].url, media_type: media[0].type, thumbnail_url: media[0].thumb, media_items: media.length > 1 ? media : null, allow_comments: o.allow_comments, allow_download: o.allow_download, hide_likes: o.hide_likes, visibility: o.visibility, location: loc, ...music } as never);
       if (error) throw error;
       window.dispatchEvent(new Event("prime:posted"));
     });
@@ -187,7 +189,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
             <button key={x} onClick={() => setMode(x)} className={`rounded-full px-3.5 py-1.5 capitalize ${mode === x ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{x}</button>
           ))}
         </div>
-        <button onClick={publish} disabled={!items.length} className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50">Share</button>
+        <button onClick={() => setStep("options")} disabled={!items.length} className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50">Next</button>
       </div>
 
       <div className="relative min-h-0 flex-1 bg-black">
@@ -250,6 +252,36 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
         <div className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2"><Type className="h-4 w-4 text-muted-foreground" /><input value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={500} placeholder={mode === "story" ? "Add a caption…" : "Write a caption…"} className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></div>
         {mode === "reel" && items.length > 1 && <p className="text-[11px] text-muted-foreground">Your {items.length} clips will be joined into one reel{anyVideo ? "" : ", each photo shown for a few seconds"}.</p>}
       </div>
+      {step === "options" && (
+        <div className="absolute inset-0 z-10 flex flex-col overflow-y-auto bg-background">
+          <div className="flex items-center gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <button onClick={() => setStep("edit")} aria-label="Back to editing" className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary"><ChevronLeft className="h-5 w-5" /></button>
+            <p className="flex-1 text-center text-sm font-bold capitalize">New {mode}</p>
+            <button onClick={publish} className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground">Share</button>
+          </div>
+          <div className="space-y-3 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <div className="flex gap-3 rounded-2xl bg-secondary/60 p-3">
+              <div className="h-20 w-16 shrink-0 overflow-hidden rounded-xl bg-black">
+                {items[0] && (items[0].kind === "image" ? <img src={items[0].url} alt="" className="h-full w-full object-cover" style={{ filter: adjustCss(items[0]) }} /> : <video src={items[0].url} className="h-full w-full object-cover" muted preload="metadata" style={{ filter: adjustCss(items[0]) }} />)}
+              </div>
+              <textarea value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={2200} placeholder="Write a caption… use #hashtags and @mentions" className="min-h-[5rem] flex-1 resize-none bg-transparent text-sm outline-none" />
+            </div>
+            <p className="text-right text-[11px] text-muted-foreground">{caption.length}/2200</p>
+            <label className="flex items-center gap-2 rounded-2xl bg-secondary/60 px-4 py-3 text-sm"><MapPin className="h-4 w-4 text-muted-foreground" /><input value={opts.location} onChange={(e) => setOpts((o) => ({ ...o, location: e.target.value }))} maxLength={80} placeholder="Add location" className="min-w-0 flex-1 bg-transparent outline-none" /></label>
+            {track && <div className="flex items-center gap-2 rounded-2xl bg-secondary/60 px-4 py-3 text-sm"><Music2 className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1 truncate">{track.title} · {track.artist}</span></div>}
+            <div className="space-y-3.5 rounded-2xl bg-secondary/60 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Audience &amp; limits</p>
+              <label className="flex items-center justify-between text-sm">Who can see this
+                <select value={opts.visibility} onChange={(e) => setOpts((o) => ({ ...o, visibility: e.target.value as "public" | "followers" }))} className="rounded-lg bg-background px-2 py-1.5 text-sm"><option value="public">Everyone</option><option value="followers">Followers only</option></select>
+              </label>
+              {mode !== "story" && ([["allow_comments", "Allow comments"], ["allow_download", "Allow downloads"], ["hide_likes", "Hide like count"]] as const).map(([k, label]) => (
+                <label key={k} className="flex items-center justify-between text-sm">{label}<input type="checkbox" checked={opts[k]} onChange={(e) => setOpts((o) => ({ ...o, [k]: e.target.checked }))} className="h-5 w-5 accent-[hsl(var(--primary))]" /></label>
+              ))}
+            </div>
+            <p className="px-1 text-[11px] text-muted-foreground">By sharing you confirm you own or have permission to use this content and the music, and that it follows the <a href="/terms" className="underline">Terms</a>.</p>
+          </div>
+        </div>
+      )}
       <MusicPicker open={pickMusic} onClose={() => setPickMusic(false)} onPick={(x) => { setTrack(x); setPickMusic(false); }} />
     </div>,
     document.body,

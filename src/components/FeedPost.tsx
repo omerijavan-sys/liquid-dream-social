@@ -21,6 +21,9 @@ import { BOOSTS } from "@/lib/extreme";
 import CreatorTipButton from "@/components/CreatorTipButton";
 
 interface FeedPostProps {
+  allowComments?: boolean;
+  hideLikes?: boolean;
+  location?: string | null;
   image: string;
   poster?: string | null;
   mediaType?: string;
@@ -56,7 +59,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
     <div className={`${size} rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold`}>{avatar}</div>
   );
 
-const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, badge, authorId, music, views = 0, mediaItems }: FeedPostProps) => {
+const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, badge, authorId, music, views = 0, mediaItems, allowComments = true, hideLikes = false, location = null }: FeedPostProps) => {
   const coverImg = useVideoPoster(mediaType === "video" ? image : null, poster);
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
@@ -376,7 +379,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
                 <Heart className={`w-6 h-6 transition-colors ${liked ? "fill-like text-like" : "text-foreground"}`} />
               </motion.div>
             </button>
-            <button onClick={() => setShowComments((s) => !s)} className="depth-press" aria-label="Comments"><MessageCircle className="w-6 h-6 text-foreground" /></button>
+            <button onClick={() => { if (!allowComments) { toast.info("Comments are turned off for this post"); return; } setShowComments((s) => !s); }} className={`depth-press ${allowComments ? "" : "opacity-50"}`} aria-label="Comments"><MessageCircle className="w-6 h-6 text-foreground" /></button>
             <button onClick={sharePost} className="depth-press" aria-label="Share"><Send className="w-6 h-6 text-foreground" /></button>
             {authorId && <CreatorTipButton creatorId={authorId} creatorName={username} />}
             <div className="flex-1" />
@@ -384,17 +387,18 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               <Bookmark className={`w-6 h-6 transition-colors ${saved ? "fill-foreground text-foreground" : "text-foreground"}`} />
             </button>
           </div>
-          <p className="text-sm font-semibold text-foreground mb-1">{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</p>
+          {(!hideLikes || authorId === me) && <p className="text-sm font-semibold text-foreground mb-1">{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</p>}
+          {location && <p className="mb-0.5 text-[11px] text-muted-foreground">📍 {location}</p>}
           {caption && (
             <p className="text-sm text-foreground/90">
               <span className="font-semibold">{username}</span>{" "}
               <span className="text-foreground/70">{caption}</span>
             </p>
           )}
-          {!showComments && commentCount > 0 && (
+          {allowComments && !showComments && commentCount > 0 && (
             <button onClick={() => setShowComments(true)} className="text-sm text-muted-foreground mt-1">View all {commentCount} comments</button>
           )}
-          {showComments && postId && <CommentsSection postId={postId} onCountChange={setCommentCount} />}
+          {allowComments && showComments && postId && <CommentsSection postId={postId} onCountChange={setCommentCount} />}
           <p className="mt-2 flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
             <span>{timeAgo}</span>
             <span aria-label={`${viewCount.toLocaleString()} views`} className="flex items-center gap-1">

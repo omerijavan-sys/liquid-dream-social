@@ -187,6 +187,9 @@ const Index = () => {
                 isOfficial={post.profile?.is_official}
                 views={post.views_count || 0}
                 mediaItems={(post as any).media_items ?? null}
+                allowComments={(post as any).allow_comments !== false}
+                hideLikes={!!(post as any).hide_likes}
+                location={(post as any).location ?? null}
                 music={post.music_title ? {
                   title: post.music_title,
                   artist: post.music_artist,
