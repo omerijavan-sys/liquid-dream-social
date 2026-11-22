@@ -207,6 +207,9 @@ export async function playSong(title: string, artist: string, artwork?: string |
 }
 
 const toggleIfPaused = () => { if (state.paused) toggleMusic(); };
+/** Exact playback position right now (the shared state only refreshes about once a second). */
+export const livePos = () => (mode === "audio" && audio ? audio.currentTime : mode === "yt" && yt ? (yt.getCurrentTime?.() ?? state.pos) : state.pos);
+
 export const toggleMusic = () => {
   if (mode === "native") { void Native.control({ action: "toggle" }); return; }
   if (mode === "yt") { if (state.paused) yt?.playVideo(); else yt?.pauseVideo(); return; }

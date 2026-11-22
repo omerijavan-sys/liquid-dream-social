@@ -271,7 +271,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
                 <VerifiedBadge isVerified={isVerified} isOfficial={isOfficial} badge={badge} />
               </p>
             </button>
-            {music?.title ? <PostMusicPlayer music={music} /> : <p className="text-caption text-muted-foreground">{timeAgo}</p>}
+            {music?.title ? <PostMusicPlayer music={music} videoRef={isVideo ? videoRef : undefined} /> : <p className="text-caption text-muted-foreground">{timeAgo}</p>}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
