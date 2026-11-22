@@ -6,6 +6,7 @@ import android.app.NotificationChannel;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.widget.RemoteViews;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.RemoteInput;
@@ -39,6 +40,15 @@ public class NotifyService extends MessagingService {
         }
     }
 
+    /** Frosted "liquid glass" card shown in place of the stock notification body. */
+    static RemoteViews glass(Context c, String label, String title, String body) {
+        RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.notif_glass);
+        rv.setTextViewText(R.id.n_label, label);
+        rv.setTextViewText(R.id.n_title, title == null ? "Primegram" : title);
+        rv.setTextViewText(R.id.n_body, body == null ? "" : body);
+        return rv;
+    }
+
     static int idFor(Map<String, String> d) { return (d.get("tag") != null ? d.get("tag") : d.get("title")).hashCode(); }
 
     /** Incoming call: loud heads-up notification on the calls channel; tapping opens the app where the call rings. */
@@ -58,7 +68,14 @@ public class NotifyService extends MessagingService {
             .setSmallIcon(R.drawable.ic_stat_primegram).setContentTitle(d.get("title")).setContentText(d.get("body"))
             .setCategory(NotificationCompat.CATEGORY_CALL).setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setContentIntent(pi).setFullScreenIntent(pi, true).setTimeoutAfter(45000).setAutoCancel(true);
+            .setContentIntent(pi).setTimeoutAfter(45000).setAutoCancel(true)
+            .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(glass(c, "INCOMING CALL", d.get("title"), d.get("body")))
+            .setCustomBigContentView(glass(c, "INCOMING CALL", d.get("title"), d.get("body")));
+        Intent answer = new Intent(c, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra("call_action", "answer");
+        b.addAction(new NotificationCompat.Action.Builder(R.drawable.ic_call_answer, "Answer", PendingIntent.getActivity(c, nid + 7, answer, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)).build());
+        Intent decline = new Intent(c, ReplyReceiver.class).setAction("com.primegram.app.DECLINE." + nid).putExtra("nid", nid).putExtra("decline", true);
+        b.addAction(new NotificationCompat.Action.Builder(R.drawable.ic_call_decline, "Decline", PendingIntent.getBroadcast(c, nid + 8, decline, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)).build());
         ((NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE)).notify(nid, b.build());
     }
 
@@ -83,7 +100,9 @@ public class NotifyService extends MessagingService {
             .setSmallIcon(R.drawable.ic_stat_primegram)
             .setContentTitle(d.get("title"))
             .setContentText(d.get("body"))
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(d.get("body")))
+            .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(glass(c, "PRIMEGRAM", d.get("title"), d.get("body")))
+            .setCustomBigContentView(glass(c, "PRIMEGRAM", d.get("title"), d.get("body")))
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setDefaults(NotificationCompat.DEFAULT_ALL)

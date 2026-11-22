@@ -16,6 +16,10 @@ import org.json.JSONObject;
 public class ReplyReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(final Context ctx, final Intent in) {
+        if (in.getBooleanExtra("decline", false)) {
+            ((NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE)).cancel(in.getIntExtra("nid", 0));
+            return;
+        }
         String text = in.getStringExtra("text");
         Bundle r = RemoteInput.getResultsFromIntent(in);
         if (r != null && r.getCharSequence("reply_text") != null) text = r.getCharSequence("reply_text").toString();

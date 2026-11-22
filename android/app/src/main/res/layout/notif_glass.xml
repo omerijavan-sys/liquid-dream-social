@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:background="@drawable/notif_glass"
+    android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="12dp" android:paddingBottom="12dp">
+    <TextView android:id="@+id/n_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textColor="#B3FFFFFF" android:textSize="11sp" android:letterSpacing="0.08" android:text="PRIMEGRAM" />
+    <TextView android:id="@+id/n_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" android:textColor="#FFFFFFFF" android:textSize="15sp" android:textStyle="bold"
+        android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/n_body" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" android:textColor="#D9FFFFFF" android:textSize="13sp" android:maxLines="4" android:ellipsize="end" />
+</LinearLayout>

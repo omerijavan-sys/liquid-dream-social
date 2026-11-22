@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Liquid-glass card: translucent frosted gradient, bright rim, soft highlight -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="315" android:startColor="#E61B1B26" android:centerColor="#D92A2A3A" android:endColor="#CC14141C" android:type="linear" />
+            <corners android:radius="20dp" />
+            <stroke android:width="1dp" android:color="#59FFFFFF" />
+        </shape>
+    </item>
+    <item android:bottom="40dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#2BFFFFFF" android:endColor="#00FFFFFF" android:type="linear" />
+            <corners android:topLeftRadius="20dp" android:topRightRadius="20dp" />
+        </shape>
+    </item>
+</layer-list>
