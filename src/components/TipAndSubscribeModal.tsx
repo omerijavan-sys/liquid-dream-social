@@ -1,3 +1,4 @@
+import { requestPin } from "@/components/WalletPin";
 import { useEffect, useState } from "react";
 import { Loader2, Smartphone, CreditCard, Wallet, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -65,6 +66,7 @@ const TipAndSubscribeModal = ({ open, onOpenChange, mode, creatorId, creatorName
     if (!creatorId) return;
     if (balance !== null && balance < value) { toast.error("Not enough wallet balance — top up first."); return; }
     if (mode === "tip") {
+      if (!(await requestPin())) return;
       const { error } = await supabase.rpc("prime_tip", { _recipient: creatorId, _amount: value });
       if (error) throw error;
       finish(`${value.toLocaleString()} KES sent to ${creatorName ?? "creator"}`);

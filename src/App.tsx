@@ -1,3 +1,4 @@
+import { PinHost } from "@/components/WalletPin";
 import BackgroundAudio from "./components/BackgroundAudio";
 import PostMusicGuard from "./components/PostMusicGuard";
 import ConsentGate from "./components/ConsentGate";
@@ -87,6 +88,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
+      <PinHost />
       <Sonner />
       <BrowserRouter>
         <NativeAuthBridge />

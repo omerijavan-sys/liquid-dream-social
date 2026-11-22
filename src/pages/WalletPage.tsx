@@ -1,3 +1,4 @@
+import { requestPin, WalletPinSetup } from "@/components/WalletPin";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, Plus, X, CreditCard, History, Smartphone, Loader2, CheckCircle2, XCircle, Banknote } from "lucide-react";
@@ -212,6 +213,7 @@ const WalletPage = () => {
       if (amt > balance) { toast.error("That is more than your wallet balance"); return; }
       const digits = phone.replace(/\D/g, "").replace(/^254/, "").replace(/^0/, "");
       if (!/^(7|1)\d{8}$/.test(digits)) { toast.error("Enter your Safaricom number, e.g. 0712 345 678"); return; }
+      if (!(await requestPin())) return;
       setPaying(true);
       const { error } = await supabase.rpc("wallet_request_withdrawal" as any, { _amount: amt, _phone: phone });
       setPaying(false);
@@ -234,6 +236,7 @@ const WalletPage = () => {
 
     // Balance check, recipient lookup and the paired debit/credit all happen
     // atomically server-side.
+    if (!(await requestPin())) return;
     const { data, error } = await supabase.rpc("wallet_send", {
       _recipient: recipient.trim(),
       _amount: amt,
@@ -284,6 +287,8 @@ const WalletPage = () => {
             ))}
           </div>
         </motion.div>
+
+        <WalletPinSetup />
 
         {earnings && (earnings.tips_all > 0 || earnings.subs_all > 0 || earnings.withdrawn_all > 0 || earnings.subscribers_active > 0) && (
           <div className="liquid-glass rounded-2xl relative z-10 p-4">

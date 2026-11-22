@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Heart, Loader2, Mic, MicOff, RefreshCw, Send, Users, Video, VideoOff, X } from "lucide-react";
+import { requestPin } from "@/components/WalletPin";
+import { ArrowLeft, Gift, Heart, Loader2, Mic, MicOff, RefreshCw, Send, Users, Video, VideoOff, X } from "lucide-react";
 import { toast } from "sonner";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,8 @@ const LivePage = () => {
   const [viewers, setViewers] = useState(0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [giftBusy, setGiftBusy] = useState(false);
   const [hearts, setHearts] = useState<{ k: number; x: number }[]>([]);
   const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(true);
@@ -244,6 +247,18 @@ const LivePage = () => {
     const { error } = await (supabase as any).from("live_comments").insert({ stream_id: sid, user_id: me, content: t });
     if (error) toast.error("Couldn't send");
   };
+  const GIFTS: [string, string, number][] = [["🌹", "Rose", 10], ["☕", "Coffee", 20], ["💎", "Diamond", 50], ["🔥", "Fire", 100], ["👑", "Crown", 200], ["🚀", "Rocket", 500], ["🏆", "Trophy", 1000], ["🦁", "Lion", 5000]];
+  const sendGift = async (name: string, amount: number) => {
+    const sid = streamRef.current?.id ?? id;
+    if (!sid || giftBusy) return;
+    if (!(await requestPin())) return;
+    setGiftBusy(true);
+    const { error } = await (supabase as any).rpc("live_send_gift", { _stream: sid, _amount: amount, _gift: name });
+    setGiftBusy(false);
+    if (error) { toast.error(error.message || "Couldn't send the gift"); return; }
+    toast.success(`${name} sent · KES ${amount.toLocaleString()}`);
+    setGiftOpen(false); floatHeart(); window.dispatchEvent(new Event("wallet:refresh"));
+  };
   const sendHeart = () => { floatHeart(); void chRef.current?.send({ type: "broadcast", event: "heart", payload: {} }); };
 
   const flip = async () => {
@@ -328,14 +343,28 @@ const LivePage = () => {
       {live && (
         <div className="relative z-10 mt-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mb-2 max-h-48 space-y-1 overflow-y-auto pr-16 [mask-image:linear-gradient(to_bottom,transparent,black_25%)]">
-            {comments.map((c) => <p key={c.id} className="w-fit max-w-full rounded-2xl bg-black/40 px-3 py-1 text-sm backdrop-blur"><b className="mr-1.5 text-white/80">{c.name ?? "user"}</b>{c.content}</p>)}
+            {comments.map((c) => <p key={c.id} className={`w-fit max-w-full rounded-2xl px-3 py-1 text-sm backdrop-blur ${c.content.startsWith("🎁") ? "border border-amber-300/50 bg-amber-400/25 font-semibold text-amber-100" : "bg-black/40"}`}><b className="mr-1.5 text-white/80">{c.name ?? "user"}</b>{c.content}</p>)}
             <div ref={chatEnd} />
           </div>
           <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); void sendComment(); }}>
             <input value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder="Say something…" className="min-w-0 flex-1 rounded-full border border-white/25 bg-black/40 px-4 py-2.5 text-sm outline-none backdrop-blur placeholder:text-white/50" />
             <button type="submit" aria-label="Send" className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur"><Send className="h-5 w-5" /></button>
+            {!isHost && <button type="button" onClick={() => setGiftOpen(true)} aria-label="Send a gift" className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400/80 text-black"><Gift className="h-5 w-5" /></button>}
             <button type="button" onClick={sendHeart} aria-label="Like" className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur"><Heart className="h-5 w-5" /></button>
           </form>
+        </div>
+      )}
+      {giftOpen && (
+        <div className="absolute inset-0 z-30 flex items-end bg-black/50" onClick={() => setGiftOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full rounded-t-3xl border border-white/20 bg-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-3xl">
+            <p className="mb-1 text-center text-sm font-bold">Send a gift</p>
+            <p className="mb-3 text-center text-[11px] text-white/65">Paid from your Prime Wallet · the host receives 95%</p>
+            <div className="grid grid-cols-4 gap-2">
+              {GIFTS.map(([emoji, name, amt]) => (
+                <button key={name} disabled={giftBusy} onClick={() => void sendGift(name, amt)} className="flex flex-col items-center gap-0.5 rounded-2xl bg-white/10 py-2.5 active:scale-95 disabled:opacity-50"><span className="text-2xl">{emoji}</span><span className="text-[11px] font-semibold">{name}</span><span className="text-[10px] text-amber-200">KES {amt.toLocaleString()}</span></button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
       {!hostView && live && <button onClick={() => navigate(-1)} aria-label="Leave" className="absolute right-3 top-3 z-20 hidden"><X /></button>}

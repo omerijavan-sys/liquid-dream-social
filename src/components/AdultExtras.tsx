@@ -64,6 +64,9 @@ export const AliasSetup = ({ onDone }: { onDone: () => void }) => {
 
 type Thread = { peer: string; alias: string; last: string; at: string; unread: number };
 
+import TipAndSubscribeModal from "@/components/TipAndSubscribeModal";
+import { HandCoins } from "lucide-react";
+
 export const AdultMessagesTab = ({ openWith, onClearOpen }: { openWith?: string | null; onClearOpen?: () => void }) => {
   const { user } = useAuth();
   const { alias, reload } = useMyAlias();
@@ -72,6 +75,7 @@ export const AdultMessagesTab = ({ openWith, onClearOpen }: { openWith?: string 
   const [msgs, setMsgs] = useState<{ id: string; sender_id: string; content: string; created_at: string }[]>([]);
   const [text, setText] = useState("");
   const [find, setFind] = useState("");
+  const [tipOpen, setTipOpen] = useState(false);
   const [results, setResults] = useState<Alias[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -136,7 +140,7 @@ export const AdultMessagesTab = ({ openWith, onClearOpen }: { openWith?: string 
 
   if (active) return (
     <div className={`${panel} flex h-[60dvh] flex-col p-0`}>
-      <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3"><button onClick={() => { setActive(null); void loadThreads(); }} aria-label="Back"><ArrowLeft className="h-5 w-5" /></button><UserRound className="h-5 w-5 text-rose-300" /><p className="font-semibold">@{active.alias}</p></div>
+      <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3"><button onClick={() => { setActive(null); void loadThreads(); }} aria-label="Back"><ArrowLeft className="h-5 w-5" /></button><UserRound className="h-5 w-5 text-rose-300" /><p className="flex-1 font-semibold">@{active.alias}</p><button onClick={() => setTipOpen(true)} className="flex items-center gap-1 rounded-full bg-rose-500/20 px-3 py-1.5 text-xs font-semibold text-rose-100" aria-label="Send a tip"><HandCoins className="h-4 w-4" />Tip</button></div>
       <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
         {msgs.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Say hi 👋</p>}
         {msgs.map(m => <p key={m.id} className={`w-fit max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.sender_id === user?.id ? "ml-auto bg-rose-600 text-white" : "bg-white/10 text-foreground"}`}>{m.content}</p>)}
@@ -146,6 +150,7 @@ export const AdultMessagesTab = ({ openWith, onClearOpen }: { openWith?: string 
         <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && void send()} placeholder="Message…" maxLength={2000} className={field} />
         <Button size="icon" onClick={() => void send()} aria-label="Send" className="bg-rose-600 text-white hover:bg-rose-500"><Send className="h-4 w-4" /></Button>
       </div>
+      <TipAndSubscribeModal open={tipOpen} onOpenChange={setTipOpen} mode="tip" creatorId={active.id} creatorName={`@${active.alias}`} onSuccess={() => { void supabase.from("adult_messages" as any).insert({ sender_id: user!.id, receiver_id: active.id, content: "💸 Sent you a tip" } as any); }} />
     </div>
   );
 

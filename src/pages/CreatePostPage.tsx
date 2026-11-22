@@ -89,7 +89,7 @@ const CreatePostPage = () => {
   const [showTools, setShowTools] = useState(false);
   const [timerSecs, setTimerSecs] = useState<0 | 3 | 10>(0);
   const [countdown, setCountdown] = useState(0);
-  const [isAdult, setIsAdult] = useState(false);
+  const [isAdult, setIsAdult] = useState(() => new URLSearchParams(window.location.search).get("adult") === "1");
 
   useEffect(() => {
     const state = location.state as { track?: PickedTrack } | null;
