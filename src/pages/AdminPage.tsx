@@ -78,6 +78,16 @@ const AdminPage = () => {
       return (data ?? []) as any[];
     },
   });
+  const { data: events } = useQuery({
+    queryKey: ["admin", "events"],
+    enabled,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 7 * 864e5).toISOString();
+      const { data, error } = await supabase.from("client_events" as never).select("kind,name,message,path,platform,app_version,created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(3000);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
   const { data: bans } = useQuery({
     queryKey: ["admin", "bans"],
     enabled,
@@ -330,6 +340,7 @@ const AdminPage = () => {
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="chat">Chat reports ({(chatReports ?? []).filter((r: any) => r.status === "open").length})</TabsTrigger>
               <TabsTrigger value="bans">Bans ({(bans ?? []).length})</TabsTrigger>
+              <TabsTrigger value="health">Health &amp; usage</TabsTrigger>
               <TabsTrigger value="revenue">Revenue</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
               <TabsTrigger value="tickets">Support ({(tickets ?? []).filter((t: any) => t.status === "open").length})</TabsTrigger>
@@ -494,6 +505,35 @@ const AdminPage = () => {
                 </Card>
               ))}
               <p className="text-xs text-muted-foreground">To ban someone from anywhere, find them in the Users tab. Banned accounts are locked out on their next app load.</p>
+            </TabsContent>
+
+            <TabsContent value="health" className="mt-4 space-y-3">
+              {(() => {
+                const ev = events ?? [];
+                const errs = ev.filter((e) => e.kind === "error");
+                const pages = ev.filter((e) => e.kind === "page");
+                const top = (rows: any[], f: (r: any) => string) => Object.entries(rows.reduce((m: Record<string, number>, r) => { const k = f(r); m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
+                const day = new Date(Date.now() - 864e5).toISOString();
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[["Page views (7d)", pages.length], ["Errors (7d)", errs.length], ["Errors (24h)", errs.filter((e) => e.created_at > day).length]].map(([l, v]) => (
+                        <Card key={String(l)} className={glass}><CardContent className="p-3"><p className="text-xs text-muted-foreground">{l}</p><p className="text-xl font-bold">{v}</p></CardContent></Card>
+                      ))}
+                    </div>
+                    <Card className={glass}><CardHeader className="pb-1"><CardTitle className="text-sm">Top errors</CardTitle></CardHeader><CardContent className="space-y-1.5">
+                      {top(errs, (e) => `${e.name}: ${(e.message || "").slice(0, 110)}`).map(([k, n]) => <p key={k} className="text-xs break-words"><b>{n}×</b> {k}</p>)}
+                      {errs.length === 0 && <p className="text-xs text-muted-foreground">No errors logged. Good.</p>}
+                    </CardContent></Card>
+                    <Card className={glass}><CardHeader className="pb-1"><CardTitle className="text-sm">Most visited screens</CardTitle></CardHeader><CardContent className="space-y-1">
+                      {top(pages, (e) => e.name).map(([k, n]) => <p key={k} className="flex justify-between text-xs"><span>{k}</span><b>{n}</b></p>)}
+                    </CardContent></Card>
+                    <Card className={glass}><CardHeader className="pb-1"><CardTitle className="text-sm">Where users are</CardTitle></CardHeader><CardContent className="space-y-1">
+                      {top(pages, (e) => e.platform || "unknown").map(([k, n]) => <p key={k} className="flex justify-between text-xs"><span>{k}</span><b>{n}</b></p>)}
+                    </CardContent></Card>
+                  </>
+                );
+              })()}
             </TabsContent>
 
             <TabsContent value="revenue" className="mt-4 space-y-3">

@@ -20,10 +20,12 @@ android {
     // is signed with the same key as the installed one, so builds must never use a random debug key.
     signingConfigs {
         primegram {
-            storeFile file("primegram.keystore")
-            storePassword "primegram-keystore"
-            keyAlias "primegram"
-            keyPassword "primegram-keystore"
+            // Secrets win when set (GitHub Actions: PRIMEGRAM_KEYSTORE_PASSWORD / PRIMEGRAM_KEY_PASSWORD / PRIMEGRAM_KEYSTORE_FILE).
+            // The fallback keeps today's builds working until the real key is moved into secrets.
+            storeFile file(System.getenv("PRIMEGRAM_KEYSTORE_FILE") ?: "primegram.keystore")
+            storePassword System.getenv("PRIMEGRAM_KEYSTORE_PASSWORD") ?: "primegram-keystore"
+            keyAlias System.getenv("PRIMEGRAM_KEY_ALIAS") ?: "primegram"
+            keyPassword System.getenv("PRIMEGRAM_KEY_PASSWORD") ?: "primegram-keystore"
         }
     }
     buildTypes {

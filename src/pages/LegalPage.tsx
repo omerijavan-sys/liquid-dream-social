@@ -24,7 +24,7 @@ const content: Record<Kind, { title: string; sections: Array<[string, string]> }
   privacy: {
     title: "Privacy Policy",
     sections: [
-      ["What we collect", "Account details (email or phone number), profile information, content you post, messages, wallet and payment records, and basic device information needed to run the app."],
+      ["What we collect", "Account details (email or phone number), profile information, content you post, messages, wallet and payment records, and basic device information needed to run the app. We also keep simple crash and usage logs (which screen was opened, error messages, and whether you use the website or Android app) to fix bugs and improve the app; these do not include your messages or content."],
       ["How we use it", "To provide the service, secure accounts, process payments and withdrawals, show you relevant content, and handle reports and support requests."],
       ["Photos, camera and microphone", "Photos and videos are read from your device only when you choose them to post or send. Camera and microphone are used only during calls, video recording and similar features, and are never used in the background."],
       ["Sharing", "We do not sell your personal data. Data is processed by infrastructure providers (hosting, database, SMS and email delivery, and payment processing) strictly to run Primegram."],

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { trackPage } from "@/utils/telemetry";
 
 const BASE = "https://primegramx.co.ke";
 const PAGES: Record<string, { title: string; desc: string }> = {
@@ -22,6 +23,8 @@ const RouteSeo = () => {
     const path = pathname.replace(/\/+$/, "") || "/";
     const p = PAGES[path];
     const url = BASE + (path === "/" ? "/" : path);
+    // usage count by screen type only (profile/user ids are collapsed so no one is tracked by name)
+    trackPage(path.replace(/^\/(u|user|profile|post|reel|chat)\/.+$/, "/$1/:id"));
     if (p) {
       document.title = p.title;
       set('meta[name="description"]', () => Object.assign(document.createElement("meta"), { name: "description" }), "content", p.desc);

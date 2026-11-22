@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { logError } from "@/utils/telemetry";
 
 interface State { error: Error | null }
 
@@ -6,7 +7,7 @@ interface State { error: Error | null }
 export default class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { error: null };
   static getDerivedStateFromError(error: Error): State { return { error }; }
-  componentDidCatch(error: Error, info: ErrorInfo) { console.error("App crashed:", error, info.componentStack); }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error("App crashed:", error, info.componentStack); logError("react.render", error, info.componentStack?.split("\n").slice(0, 4).join(" ").trim()); }
   render() {
     const { error } = this.state;
     if (!error) return this.props.children;
