@@ -16,6 +16,11 @@ import {
   Music2,
   Wand2,
   Music,
+  Zap,
+  ZapOff,
+  Grid3x3,
+  Timer,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -88,6 +93,11 @@ const CreatePostPage = () => {
   const [musicOpen, setMusicOpen] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [timerSecs, setTimerSecs] = useState<0 | 3 | 10>(0);
+  const [flash, setFlash] = useState(false);
+  const [torchOk, setTorchOk] = useState(false);
+  const [grid, setGrid] = useState(false);
+  const [beauty, setBeauty] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [isAdult, setIsAdult] = useState(() => new URLSearchParams(window.location.search).get("adult") === "1");
 
@@ -142,6 +152,8 @@ const CreatePostPage = () => {
         const track = stream.getVideoTracks()[0];
         const caps: any = track.getCapabilities?.() ?? {};
         setNativeZoomMax(caps.zoom?.max ?? 1);
+        setTorchOk(!!caps.torch);
+        setFlash(false);
         setZoom(1);
       } catch (err) {
         toast.error("Camera access denied");
@@ -164,7 +176,16 @@ const CreatePostPage = () => {
   const nativeZoom = Math.min(zoom, nativeZoomMax || 1);
   const digitalZoom = zoom / nativeZoom;
   zoomRef.current = digitalZoom;
-  filterRef.current = filterCss;
+  // Beauty = soft skin look layered over whichever filter is picked
+  const camFilter = beauty ? `${filterCss === "none" ? "" : filterCss + " "}brightness(1.07) contrast(0.93) saturate(1.08) blur(0.4px)` : filterCss;
+  filterRef.current = camFilter;
+
+  // Flash = the phone's torch (back camera only)
+  useEffect(() => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !torchOk) return;
+    track.applyConstraints({ advanced: [{ torch: flash }] } as any).catch(() => {});
+  }, [flash, torchOk]);
 
   // Push hardware zoom to the camera track when supported
   useEffect(() => {
@@ -288,7 +309,7 @@ const CreatePostPage = () => {
     c.height = v.videoHeight;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    ctx.filter = filterCss;
+    ctx.filter = camFilter;
     ctx.drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
     c.toBlob(
       (blob) => {
@@ -724,20 +745,20 @@ const CreatePostPage = () => {
           </>
         ) : mode === "camera" ? (
           <div className="fixed inset-0 z-50 overflow-hidden bg-black">
-            <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-2 bg-gradient-to-b from-black/60 to-transparent p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-2 bg-gradient-to-b from-black/35 to-transparent p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
               <button
                 onClick={() => navigate(-1)}
-                className="depth-press w-9 h-9 rounded-full bg-foreground/10 backdrop-blur-md flex items-center justify-center"
+                className="depth-press w-9 h-9 flex items-center justify-center drop-shadow-[0_1px_3px_rgba(0,0,0,.8)]"
                 aria-label="Close camera"
               >
-                <X className="w-4 h-4 text-foreground" />
+                <X className="w-6 h-6 text-white" />
               </button>
-              <button onClick={() => setMusicOpen(true)} disabled={recording} className="flex min-w-0 max-w-[55%] items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md disabled:opacity-60" aria-label="Add music">
+              <button onClick={() => setMusicOpen(true)} disabled={recording} className="flex min-w-0 max-w-[55%] items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,.9)] disabled:opacity-60" aria-label="Add music">
                 <Music2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{track ? `${track.title} · ${track.artist}` : "Add music"}</span>
               </button>
               <button
                 onClick={() => setMode("upload")}
-                className="depth-press px-3 py-1.5 rounded-full bg-foreground/10 backdrop-blur-md text-foreground text-xs font-semibold"
+                className="depth-press px-3 py-1.5 text-white text-xs font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,.9)]"
               >
                 Library
               </button>
@@ -758,7 +779,7 @@ const CreatePostPage = () => {
                 muted
                 className={`w-full h-full object-cover ${facing === "user" ? "mirror" : ""}`}
                 style={{
-                  filter: filterCss,
+                  filter: camFilter,
                   transform: `scale(${digitalZoom})`,
                   transformOrigin: "center",
                 }}
@@ -786,7 +807,7 @@ const CreatePostPage = () => {
                 </div>
               )}
               {zoom > 1 && (
-                <div className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 backdrop-blur-md text-xs font-semibold text-foreground">
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 text-xs font-semibold text-white">
                   {zoom < 10 ? zoom.toFixed(1) : Math.round(zoom)}x
                   {zoom >= 6 && aiLive && (
                     <span className="flex items-center gap-1 text-primary">
@@ -804,26 +825,37 @@ const CreatePostPage = () => {
                   <button
                     key={z}
                     onClick={() => setZoom(z)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md ${
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
                       Math.round(zoom) === z
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background/60 text-foreground"
+                        ? "bg-white text-black"
+                        : "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,.9)]"
                     }`}
                   >
                     {z}x
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
-                className="absolute top-16 right-3 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-md"
-                aria-label="Flip camera"
-              >
-                <RotateCcw className="w-4 h-4 text-foreground" />
-              </button>
+              {grid && <div className="pointer-events-none absolute inset-0 z-10"><div className="absolute inset-y-0 left-1/3 w-px bg-white/35" /><div className="absolute inset-y-0 left-2/3 w-px bg-white/35" /><div className="absolute inset-x-0 top-1/3 h-px bg-white/35" /><div className="absolute inset-x-0 top-2/3 h-px bg-white/35" /></div>}
+              {/* Right sidebar: tools */}
+              <div className="absolute right-2 top-16 z-20 flex flex-col items-center gap-4 drop-shadow-[0_1px_3px_rgba(0,0,0,.9)]">
+                {([
+                  { key: "flip", label: "Flip", icon: RotateCcw, on: false, onClick: () => setFacing((f) => (f === "user" ? "environment" : "user")), show: true },
+                  { key: "flash", label: "Flash", icon: flash ? Zap : ZapOff, on: flash, onClick: () => setFlash((v) => !v), show: torchOk },
+                  { key: "timer", label: timerSecs ? `${timerSecs}s` : "Timer", icon: Timer, on: timerSecs > 0, onClick: () => setTimerSecs((t) => (t === 0 ? 3 : t === 3 ? 10 : 0)), show: !recording },
+                  { key: "filters", label: "Filters", icon: Sparkles, on: showFilters, onClick: () => setShowFilters((v) => !v), show: true },
+                  { key: "beauty", label: "Beauty", icon: Wand2, on: beauty, onClick: () => setBeauty((v) => !v), show: true },
+                  { key: "grid", label: "Grid", icon: Grid3x3, on: grid, onClick: () => setGrid((v) => !v), show: true },
+                  { key: "zoom", label: "Zoom", icon: ZoomIn, on: showTools, onClick: () => setShowTools((v) => !v), show: true },
+                ]).filter((t) => t.show).map((t) => (
+                  <button key={t.key} onClick={t.onClick} aria-label={t.label} aria-pressed={t.on} className="flex flex-col items-center gap-0.5 active:scale-90">
+                    <t.icon className={`h-6 w-6 ${t.on ? "text-amber-300" : "text-white"}`} />
+                    <span className={`text-[10px] font-semibold ${t.on ? "text-amber-300" : "text-white"}`}>{t.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 z-20 max-h-[70vh] space-y-2 overflow-y-auto bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="absolute inset-x-0 bottom-0 z-20 max-h-[70vh] space-y-2 overflow-y-auto bg-gradient-to-t from-black/60 to-transparent p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {showTools && <div className="liquid-glass rounded-2xl p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <ZoomIn className="w-4 h-4 text-primary" />
@@ -869,24 +901,18 @@ const CreatePostPage = () => {
             </div>}
 
 
-            <FilterStrip value={filterCss} onChange={setFilterCss} />
+            {showFilters && <FilterStrip value={filterCss} onChange={setFilterCss} />}
 
             {/* Capture controls */}
             <div className="flex items-center justify-center gap-6 pt-2">
               <button
                 onClick={snapPhoto}
                 disabled={recording}
-                className="depth-press w-14 h-14 rounded-2xl liquid-glass-elevated flex items-center justify-center disabled:opacity-40"
+                className="depth-press flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/90 disabled:opacity-40"
                 aria-label="Take photo"
               >
-                <Square className="w-6 h-6 text-foreground" />
+                <span className="h-8 w-8 rounded-full bg-white/90" />
               </button>
-              <button
-                onClick={() => setTimerSecs((t) => (t === 0 ? 3 : t === 3 ? 10 : 0))}
-                disabled={recording}
-                className="depth-press w-11 h-11 rounded-full bg-white/15 text-xs font-bold text-white disabled:opacity-40"
-                aria-label="Self-timer"
-              >{timerSecs ? `${timerSecs}s` : "⏱"}</button>
               <button
                 onClick={() => { if (recording || !timerSecs) toggleRecord(); else startCountdown(); }}
                 className={`depth-press w-20 h-20 rounded-full flex items-center justify-center border-4 ${
@@ -902,12 +928,11 @@ const CreatePostPage = () => {
               </button>
               <button
                 onClick={() => fileRef.current?.click()}
-                className="depth-press w-14 h-14 rounded-2xl liquid-glass-elevated flex items-center justify-center"
+                className="depth-press flex h-12 w-12 items-center justify-center drop-shadow-[0_1px_3px_rgba(0,0,0,.9)]"
                 aria-label="Pick from library"
               >
-                <ImageIcon className="w-6 h-6 text-foreground" />
+                <ImageIcon className="h-7 w-7 text-white" />
               </button>
-              <button onClick={() => setShowTools((v) => !v)} className={`depth-press w-11 h-11 rounded-full flex items-center justify-center ${showTools ? "bg-primary text-primary-foreground" : "bg-white/15 text-white"}`} aria-label="Camera tools"><ZoomIn className="w-5 h-5" /></button>
             </div>
             </div>
             {countdown > 0 && <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 text-8xl font-black text-white">{countdown}</div>}
