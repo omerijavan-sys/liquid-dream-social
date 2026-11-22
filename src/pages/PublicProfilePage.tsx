@@ -3,7 +3,7 @@ import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2, X } from "lucide-react";
+import { ArrowLeft, Film, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import ProfileCover from "@/components/ProfileCover";
 import { FollowButton } from "@/components/FollowListDialog";
@@ -53,6 +53,16 @@ const PublicProfilePage = () => {
   const aura = useAuraRank(userId);
   const glow = auraGlowStyle(aura?.aura ?? 0);
   const [reelTotal, setReelTotal] = useState(0);
+  const [postTotal, setPostTotal] = useState<number | null>(null);
+  useEffect(() => { if (!userId) return; void supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", userId).neq("media_type", "story").then(({ count }) => setPostTotal(count)); }, [userId]);
+  const [ptab, setPtab] = useState<"posts" | "reels">("posts");
+  const [reels, setReels] = useState<{ id: string; video_url: string; caption: string | null; thumbnail_url: string | null; views_count: number | null; likes_count: number | null }[]>([]);
+  useEffect(() => {
+    if (!userId) return;
+    void supabase.from("reels").select("id, video_url, caption, thumbnail_url, views_count, likes_count").eq("user_id", userId).order("created_at", { ascending: false }).then(({ data }) => setReels((data ?? []) as never));
+  }, [userId]);
+  const reelViews = reels.reduce((n, r) => n + (r.views_count ?? 0), 0);
+  const reelLikes = reels.reduce((n, r) => n + (r.likes_count ?? 0), 0);
   useEffect(() => { if (!userId) return; void supabase.from("reels").select("id", { count: "exact", head: true }).eq("user_id", userId).is("source_post_id", null).then(({ count }) => setReelTotal(count ?? 0)); }, [userId]);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [posts, setPosts] = useState<ProfilePost[]>([]);
@@ -246,7 +256,7 @@ const PublicProfilePage = () => {
                   </div>
                 </div>
                 <div className="grid flex-1 grid-cols-3 text-center">
-                  <div><p className="text-lg font-bold text-foreground">{posts.length + reelTotal}</p><p className="text-caption text-muted-foreground">Posts</p></div>
+                  <div><p className="text-lg font-bold text-foreground">{(postTotal ?? posts.length) + reelTotal}</p><p className="text-caption text-muted-foreground">Posts</p></div>
                   <div><p className="text-lg font-bold text-foreground">{followers.toLocaleString()}</p><p className="text-caption text-muted-foreground">Followers</p></div>
                   <div><p className="text-lg font-bold text-foreground">{followingCount.toLocaleString()}</p><p className="text-caption text-muted-foreground">Following</p></div>
                 </div>
@@ -313,10 +323,31 @@ const PublicProfilePage = () => {
               )}
             </section>
 
-            <div className="flex items-center justify-center border-y border-border py-3 text-foreground">
-              <Grid3X3 className="h-5 w-5" />
+            <div className="flex border-y border-border text-foreground">
+              {([["posts", Grid3X3, "Posts"], ["reels", Film, "Reels"]] as const).map(([id, Icon, label]) => (
+                <button key={id} onClick={() => setPtab(id)} className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-semibold ${ptab === id ? "border-b-2 border-primary text-foreground" : "text-muted-foreground"}`}><Icon className="h-4 w-4" />{label}{id === "reels" ? ` · ${reels.length}` : ""}</button>
+              ))}
             </div>
-            {posts.length ? (
+            {ptab === "reels" && (
+              <>
+                <div className="grid grid-cols-3 gap-2 p-3 text-center">
+                  <div className="rounded-xl bg-secondary/60 py-2"><p className="text-base font-bold">{reels.length.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">Reels</p></div>
+                  <div className="rounded-xl bg-secondary/60 py-2"><p className="text-base font-bold">{reelViews.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">Total views</p></div>
+                  <div className="rounded-xl bg-secondary/60 py-2"><p className="text-base font-bold">{reelLikes.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">Total likes</p></div>
+                </div>
+                {reels.length ? (
+                  <div className="grid grid-cols-3 gap-0.5 p-0.5">
+                    {reels.map((r) => (
+                      <button key={r.id} onClick={() => navigate(`/reels?r=${r.id}`)} aria-label="Open reel" className="relative aspect-[3/4] overflow-hidden bg-secondary">
+                        <VideoThumb src={r.video_url} poster={r.thumbnail_url} />
+                        <span className="absolute bottom-1 left-1.5 text-[10px] font-semibold text-white drop-shadow">▶ {(r.views_count ?? 0).toLocaleString()}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : <div className="py-16 text-center text-sm text-muted-foreground">No reels yet.</div>}
+              </>
+            )}
+            {ptab === "reels" ? null : posts.length ? (
               <div className="grid grid-cols-3 gap-0.5 p-0.5">
                 {posts.map((post, index) => (
                   <motion.button

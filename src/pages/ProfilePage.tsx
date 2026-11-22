@@ -107,6 +107,9 @@ const ProfilePage = () => {
       setReelTotal(count ?? 0);
     };
     fetchData();
+    const again = () => { void fetchData(); };
+    window.addEventListener("prime:posted", again);
+    return () => window.removeEventListener("prime:posted", again);
   }, [user]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
