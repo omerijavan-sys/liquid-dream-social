@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import CreatorTipButton from "@/components/CreatorTipButton";
 import { Button } from "@/components/ui/button";
 import { AdultMeetTab, AdultMessagesTab, AdultMeTab } from "@/components/AdultExtras";
-import { MessageCircle, PlusSquare } from "lucide-react";
+import { MessageCircle, PlusSquare, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 type AdultPost = {
@@ -118,6 +118,7 @@ const AdultHubVerified = () => {
       <div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/15"><Sparkles className="h-5 w-5 text-rose-300" /></div><div className="min-w-0 flex-1"><p className="font-bold text-white">Verified Creator Hub</p><p className="text-xs text-white/55">Wallet-powered tips and creator memberships.</p></div><button onClick={() => setBlurSensitive(value => !value)} className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/75" aria-label={blurSensitive ? "Show sensitive previews" : "Blur sensitive previews"}>{blurSensitive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
       <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] text-white/55"><div className="rounded-2xl bg-white/5 p-3"><Heart className="mx-auto mb-1 h-4 w-4 text-rose-300" />Tips from wallet</div><div className="rounded-2xl bg-white/5 p-3"><Users className="mx-auto mb-1 h-4 w-4 text-rose-300" />Fan clubs</div><div className="rounded-2xl bg-white/5 p-3"><Lock className="mx-auto mb-1 h-4 w-4 text-rose-300" />Private access</div></div>
     </section>
+    <Button onClick={() => navigate("/adult/video")} className="w-full gap-2 bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 font-bold text-black shadow-[0_8px_30px_rgba(244,63,94,.4)] hover:opacity-90"><Video className="h-4 w-4" />Random Video Chat · meet someone now</Button>
     <Button onClick={() => navigate("/create?adult=1")} className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-500"><PlusSquare className="h-4 w-4" />Post to 18+</Button>
     <div className="flex gap-2">{(["all", "photo", "video"] as const).map(value => <Button key={value} size="sm" variant={filter === value ? "default" : "secondary"} onClick={() => setFilter(value)}>{value === "all" ? "All" : value === "photo" ? "Photos" : "Videos"}</Button>)}</div>
     {visiblePosts.length === 0 ? <div className="rounded-2xl border border-white/10 bg-black/30 p-8 text-center text-sm text-white/50">No verified creator posts yet.</div> : <div className="grid grid-cols-2 gap-2">{visiblePosts.map((post, index) => <motion.article key={post.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .03 }} className="overflow-hidden rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl">
