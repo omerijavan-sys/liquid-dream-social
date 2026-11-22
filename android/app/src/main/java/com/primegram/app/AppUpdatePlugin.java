@@ -1,5 +1,8 @@
 package com.primegram.app;
 
+import android.app.DownloadManager;
+import android.database.Cursor;
+import android.os.Environment;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -123,5 +126,60 @@ public class AppUpdatePlugin extends Plugin {
         ctx.startActivity(i);
         r.put("needsPermission", false);
         call.resolve(r);
+    }
+
+    // ---- System download: Android's own downloader fetches the APK (no install permission needed in Primegram) ----
+    @PluginMethod
+    public void enqueue(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null) { call.reject("Missing url"); return; }
+        try {
+            DownloadManager dm = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+            String name = "primegram-update-" + System.currentTimeMillis() + ".apk";
+            DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
+            r.setTitle("Primegram update");
+            r.setDescription("Tap when finished to install");
+            r.setMimeType("application/vnd.android.package-archive");
+            r.addRequestHeader("User-Agent", "Primegram-Updater");
+            r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            r.setAllowedOverMetered(true); r.setAllowedOverRoaming(true);
+            r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
+            long id = dm.enqueue(r);
+            JSObject res = new JSObject(); res.put("id", id);
+            call.resolve(res);
+        } catch (Exception e) { call.reject("Couldn't start the download: " + e.getMessage()); }
+    }
+
+    @PluginMethod
+    public void status(PluginCall call) {
+        Long id = call.getLong("id");
+        DownloadManager dm = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+        JSObject res = new JSObject(); res.put("state", "unknown");
+        if (id != null) {
+            try (Cursor c = dm.query(new DownloadManager.Query().setFilterById(id))) {
+                if (c != null && c.moveToFirst()) {
+                    int st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                    long got = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                    long total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                    res.put("received", got); res.put("total", total);
+                    res.put("state", st == DownloadManager.STATUS_SUCCESSFUL ? "done" : st == DownloadManager.STATUS_FAILED ? "failed" : st == DownloadManager.STATUS_PAUSED ? "paused" : "running");
+                } else res.put("state", "gone");
+            } catch (Exception ignored) { }
+        }
+        call.resolve(res);
+    }
+
+    @PluginMethod
+    public void cancelDownload(PluginCall call) {
+        Long id = call.getLong("id");
+        if (id != null) ((DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE)).remove(id);
+        call.resolve();
+    }
+
+    /** Opens the Downloads list where tapping the finished APK starts Android's installer. */
+    @PluginMethod
+    public void openDownloads(PluginCall call) {
+        try { getContext().startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); } catch (Exception ignored) { }
+        call.resolve();
     }
 }

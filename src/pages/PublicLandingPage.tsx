@@ -42,7 +42,7 @@ const PublicLandingPage = () => (
           <a
             href={ANDROID_APK_URL}
             download
-            aria-label="Download Primegram Extreme for Android"
+            aria-label="Download Primegram X for Android"
             title="Download APK"
             className="inline-flex size-10 items-center justify-center rounded-full border border-emerald-300/30 text-emerald-200 transition-colors hover:bg-emerald-400/10 hover:text-emerald-100"
           >
@@ -107,7 +107,8 @@ const PublicLandingPage = () => (
     </section>
 
     <footer className="relative z-10 border-t border-white/10 px-5 py-6 text-center text-xs text-muted-foreground">
-      © {new Date().getFullYear()} Primegram Extreme
+      <nav aria-label="Company links" className="mb-3 flex flex-wrap justify-center gap-5"><a className="hover:text-foreground" href="/about">About</a><a className="hover:text-foreground" href="/privacy">Privacy</a><a className="hover:text-foreground" href="/terms">Terms</a><a className="hover:text-foreground" href="/help">Help</a></nav>
+      © {new Date().getFullYear()} Primegram X · created by Java Prime, Kenya
     </footer>
   </main>
 );

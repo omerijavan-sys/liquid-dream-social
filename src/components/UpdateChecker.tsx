@@ -7,6 +7,10 @@ import { toast } from "sonner";
 import { setAppUpdate } from "@/utils/updateStore";
 
 type UpdatePlugin = {
+  enqueue(o: { url: string }): Promise<{ id: number }>;
+  status(o: { id: number }): Promise<{ state: "running" | "paused" | "done" | "failed" | "gone" | "unknown"; received?: number; total?: number }>;
+  cancelDownload(o: { id: number }): Promise<void>;
+  openDownloads(): Promise<void>;
   download(o: { url: string }): Promise<{ size: number }>;
   cancel(): Promise<void>;
   hasDownload(): Promise<{ exists: boolean }>;
@@ -48,13 +52,42 @@ const UpdateChecker = () => {
     return () => { void h.then(x => x.remove()); };
   }, [check]);
 
-  // No self-installer permission in the app (Play Protect treats those as risky), so Upgrade opens the
-  // signed APK download in the browser and Android's normal installer takes over.
+  // Android's own downloader fetches the signed APK (progress shown here); when it finishes the user taps the
+  // notification (or Open) and Android's installer takes over. Primegram itself needs no install permission.
+  const dlId = useRef<number | null>(null);
+  const poll = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopPoll = () => { if (poll.current) clearInterval(poll.current); poll.current = null; };
+  useEffect(() => stopPoll, []);
   const upgrade = async () => {
-    if (!update) return;
-    try { await Browser.open({ url: update.url }); }
-    catch { toast.error("Couldn't open the download. Try again."); }
+    if (!update || busyRef.current) return;
+    if (downloaded) { void AppUpdate.openDownloads(); return; }
+    busyRef.current = true; setBusy(true); setProg({ pct: 0, received: 0, total: 0 });
+    try {
+      const { id } = await AppUpdate.enqueue({ url: update.url });
+      dlId.current = id;
+      let stall = 0;
+      stopPoll();
+      poll.current = setInterval(async () => {
+        const s = await AppUpdate.status({ id }).catch(() => null);
+        if (!s) return;
+        const total = s.total && s.total > 0 ? s.total : 0, received = s.received ?? 0;
+        setProg({ pct: total ? Math.min(99, Math.floor(received * 100 / total)) : 0, received, total });
+        if (s.state === "done") {
+          stopPoll(); busyRef.current = false; setBusy(false); setDownloaded(true); setProg(p => ({ ...p, pct: 100 }));
+          toast.success("Downloaded — tap the notification (or Open) to install");
+          void AppUpdate.openDownloads();
+        } else if (s.state === "failed" || s.state === "gone") {
+          stopPoll(); busyRef.current = false; setBusy(false); toast.error("Download failed. Check your connection and try again.");
+        } else if (s.state === "paused" && ++stall > 40) {
+          stopPoll(); busyRef.current = false; setBusy(false); toast.error("Download is waiting for a network. Try again.");
+        }
+      }, 500);
+    } catch (e) {
+      busyRef.current = false; setBusy(false);
+      try { await Browser.open({ url: update.url }); } catch { toast.error("Couldn't start the download. Try again."); }
+    }
   };
+  const cancelDl = () => { stopPoll(); if (dlId.current != null) void AppUpdate.cancelDownload({ id: dlId.current }); busyRef.current = false; setBusy(false); };
 
   // The update prompt pops up by itself when a newer build exists (once per build until the app is reopened).
   useEffect(() => {
@@ -84,15 +117,15 @@ const UpdateChecker = () => {
         <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60" onClick={() => !busy && dismiss()}>
           <div onClick={e => e.stopPropagation()} className="w-full max-w-md space-y-3 rounded-t-3xl border border-white/15 bg-black/80 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white backdrop-blur-2xl">
             <div className="flex items-center justify-between"><p className="text-lg font-bold">New version available</p>{!busy && <button onClick={dismiss} aria-label="Close"><X className="h-5 w-5" /></button>}</div>
-            <p className="text-sm text-white/70">{busy ? "Downloading the new Primegram inside the app…" : "A newer Primegram is ready. Tap Upgrade — it downloads here in the app and your account and data stay as they are."}</p>
+            <p className="text-sm text-white/70">{busy ? "Downloading the new Primegram…" : "A newer Primegram is ready. Tap Upgrade to download it — your account and data stay as they are."}</p>
             {busy && (
               <div className="space-y-1.5">
                 <div className="h-2 w-full overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-gradient-to-r from-emerald-300 to-sky-400 transition-all duration-200" style={{ width: `${prog.pct}%` }} /></div>
                 <p className="text-xs tabular-nums text-white/60">{prog.pct}%{prog.total > 0 ? ` · ${mb(prog.received)} of ${mb(prog.total)} MB` : ""}</p>
               </div>
             )}
-            <button disabled={busy} onClick={() => void upgrade()} className="w-full rounded-2xl bg-emerald-400 py-3 text-sm font-bold text-black disabled:opacity-60">{busy ? `Downloading ${prog.pct}%` : "Upgrade"}</button>
-            {busy ? <button onClick={() => void AppUpdate.cancel()} className="w-full py-1 text-xs text-white/50">Cancel</button>
+            <button disabled={busy} onClick={() => void upgrade()} className="w-full rounded-2xl bg-emerald-400 py-3 text-sm font-bold text-black disabled:opacity-60">{busy ? `Downloading ${prog.pct}%` : downloaded ? "Open to install" : "Upgrade"}</button>
+            {busy ? <button onClick={cancelDl} className="w-full py-1 text-xs text-white/50">Cancel</button>
               : <button onClick={dismiss} className="w-full py-1 text-xs text-white/50">Later</button>}
           </div>
         </div>

@@ -26,7 +26,7 @@ const pillars = [
   {
     icon: Sparkles,
     number: "04",
-    title: "Primegram Extreme Hub",
+    title: "Primegram X Hub",
     description: "Explore interactive social features, AI-powered matching and assistants, and creator badges designed for a dynamic Gen Z experience.",
   },
 ];
@@ -34,16 +34,16 @@ const pillars = [
 const AboutPage = () => {
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = "About Primegram Extreme (Primegram X) | Primegram X";
+    document.title = "About Primegram X | Primegram X";
 
     const metadata = [
-      { selector: 'meta[name="description"]', attribute: "content", value: "Welcome to Primegram Extreme (Primegram X), a next-generation social platform for creators, music lovers, and communities. Share Reels, discover music, message, call, and connect at primegramx.co.ke." },
+      { selector: 'meta[name="description"]', attribute: "content", value: "Welcome to Primegram X, a next-generation social platform for creators, music lovers, and communities. Share Reels, discover music, message, call, and connect at primegramx.co.ke." },
       { selector: 'link[rel="canonical"]', attribute: "href", value: "https://primegramx.co.ke/about" },
-      { selector: 'meta[property="og:title"]', attribute: "content", value: "About Primegram Extreme (Primegram X) | Primegram X" },
-      { selector: 'meta[property="og:description"]', attribute: "content", value: "Welcome to Primegram Extreme (Primegram X), a next-generation social platform for creators, music lovers, and communities." },
+      { selector: 'meta[property="og:title"]', attribute: "content", value: "About Primegram X | Primegram X" },
+      { selector: 'meta[property="og:description"]', attribute: "content", value: "Welcome to Primegram X, a next-generation social platform for creators, music lovers, and communities." },
       { selector: 'meta[property="og:url"]', attribute: "content", value: "https://primegramx.co.ke/about" },
-      { selector: 'meta[name="twitter:title"]', attribute: "content", value: "About Primegram Extreme (Primegram X) | Primegram X" },
-      { selector: 'meta[name="twitter:description"]', attribute: "content", value: "Welcome to Primegram Extreme (Primegram X), a next-generation social platform for creators, music lovers, and communities." },
+      { selector: 'meta[name="twitter:title"]', attribute: "content", value: "About Primegram X | Primegram X" },
+      { selector: 'meta[name="twitter:description"]', attribute: "content", value: "Welcome to Primegram X, a next-generation social platform for creators, music lovers, and communities." },
     ].map((item) => ({ ...item, element: document.querySelector(item.selector) }));
     const previousMetadata = metadata.map(({ element, attribute }) => element?.getAttribute(attribute) ?? null);
     metadata.forEach(({ element, attribute, value }) => element?.setAttribute(attribute, value));
@@ -67,7 +67,7 @@ const AboutPage = () => {
       <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
         <a href="/" className="flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Primegram home">
           <PrimeLogo size={40} glow={false} className="border-white/10" />
-          <span className="text-sm font-extrabold tracking-[0.14em]">PRIMEGRAM<span className="text-primary">.</span></span>
+          <span className="text-sm font-extrabold tracking-[0.14em]">PRIMEGRAM X</span>
         </a>
         <nav aria-label="Main navigation" className="flex items-center gap-2 sm:gap-5">
           <a href="/help" className="hidden rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline-flex">Help</a>
@@ -75,7 +75,7 @@ const AboutPage = () => {
             <a
               href={ANDROID_APK_URL}
               download
-              aria-label="Download Primegram Extreme for Android"
+              aria-label="Download Primegram X for Android"
               title="Download APK"
               className="inline-flex size-10 items-center justify-center rounded-full border border-emerald-300/30 text-emerald-200 transition-colors hover:bg-emerald-400/10 hover:text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
             >
@@ -91,13 +91,13 @@ const AboutPage = () => {
       <section className="relative z-10 mx-auto grid min-h-[78vh] w-full max-w-7xl items-center gap-14 px-5 pb-20 pt-12 sm:px-8 md:grid-cols-[1.05fr_.95fr] md:pb-28 md:pt-16">
         <div className="max-w-2xl">
           <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.07] px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.13em] text-primary">
-            <Sparkles className="size-4" aria-hidden="true" /> Welcome to Primegram Extreme (Primegram X)
+            <Sparkles className="size-4" aria-hidden="true" /> Welcome to Primegram X
           </p>
           <h1 className="text-5xl font-black leading-[1.02] tracking-[-0.055em] sm:text-6xl md:text-7xl">
             Social, in<br /><span className="bg-gradient-to-r from-primary via-amber-200 to-sky-300 bg-clip-text text-transparent">full colour.</span>
           </h1>
           <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            Primegram Extreme is a next-generation social networking platform built for creators, music lovers, and communities who want fast, expressive connections in one place. Accessible directly at primegramx.co.ke, Primegram brings together short-form videos, Reels, photo feeds, music discovery, real-time messaging, and interactive social hubs inside a sleek, modern interface.
+            Primegram X is a next-generation social networking platform built for creators, music lovers, and communities who want fast, expressive connections in one place. Accessible directly at primegramx.co.ke, Primegram brings together short-form videos, Reels, photo feeds, music discovery, real-time messaging, and interactive social hubs inside a sleek, modern interface.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <a href="/auth" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-[0_8px_30px_hsla(var(--primary)/.2)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
@@ -161,8 +161,20 @@ const AboutPage = () => {
           <h2 className="mt-4 max-w-sm text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Make social feel more alive.</h2>
         </div>
         <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
-          Built in Kenya for a global generation, Primegram Extreme was created to make social media feel more alive, visual, and personal—combining entertainment, music, and real-time communication without the clutter of legacy platforms.
+          Built in Kenya for a global generation, Primegram X (also known as Primegram Extreme) was created to make social media feel more alive, visual, and personal—combining entertainment, music, and real-time communication without the clutter of legacy platforms.
         </p>
+      </section>
+
+      <section aria-labelledby="who-runs" className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-6 sm:px-8">
+        <div className="liquid-glass rounded-[2rem] p-6 sm:p-10">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Who we are</p>
+          <h2 id="who-runs" className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">A Kenyan-built platform, run in the open.</h2>
+          <div className="mt-5 grid gap-6 text-sm leading-7 text-muted-foreground sm:grid-cols-3">
+            <div><h3 className="font-semibold text-foreground">Operator</h3><p>Primegram X (Primegram Extreme) is created and operated by Java Prime, Kenya, at primegramx.co.ke.</p></div>
+            <div><h3 className="font-semibold text-foreground">Safety</h3><p>Adults only (18+). Content and people can be reported in the app, and we remove illegal content and act on copyright takedown requests. See our <a className="underline" href="/terms">Terms</a>.</p></div>
+            <div><h3 className="font-semibold text-foreground">Your data and money</h3><p>We follow our <a className="underline" href="/privacy">Privacy Policy</a> and Kenya's Data Protection Act. Wallet payments and withdrawals use M-Pesa and Paystack. Contact us through Help &amp; Support: <a className="underline" href="/help">Help centre</a>.</p></div>
+          </div>
+        </div>
       </section>
 
       <section className="relative z-10 mx-auto w-full max-w-7xl px-5 py-20 sm:px-8 md:py-28">
@@ -177,7 +189,7 @@ const AboutPage = () => {
 
       <footer className="relative z-10 border-t border-white/[0.08] px-5 py-7 sm:px-8">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <a href="/" className="font-bold tracking-[0.12em] text-foreground">PRIMEGRAM<span className="text-primary">.</span></a>
+          <a href="/" className="font-bold tracking-[0.12em] text-foreground">PRIMEGRAM X</a>
           <p>Connect, create, and discover.</p>
           <nav aria-label="Legal links" className="flex gap-5"><a className="transition-colors hover:text-foreground" href="/privacy">Privacy</a><a className="transition-colors hover:text-foreground" href="/terms">Terms</a><a className="transition-colors hover:text-foreground" href="/help">Help</a></nav>
         </div>
