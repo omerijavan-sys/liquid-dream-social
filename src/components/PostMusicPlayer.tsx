@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useId, useRef, type RefObject } from "react";
 import { Music2, Volume2, VolumeX } from "lucide-react";
 import { searchGlobalMusic } from "@/services/GlobalMusicService";
 import { getMusicState, livePos, setMusicVolume, playSong, playUrl, seekMusic, stopMusic, toggleMusic, useMusic } from "@/services/MusicEngine";
@@ -17,7 +17,9 @@ export interface PostMusic {
 /** Instagram-style music line shown under the profile name, with a small play/pause button. */
 const PostMusicPlayer = ({ music, autoStart = false, videoRef, paused = false }: { music: PostMusic; autoStart?: boolean; videoRef?: RefObject<HTMLVideoElement | null>; paused?: boolean }) => {
   const m = useMusic();
-  const key = `post|${music.title}|${music.artist ?? ""}`;
+  // Unique per player: the same song in a story and a feed post must not share one key, or one player's off-screen check silences the other.
+  const uid = useId();
+  const key = `post|${music.title}|${music.artist ?? ""}|${uid}`;
   const mine = m.track?.key === key;
   const on = mine && !m.paused;
   const rootRef = useRef<HTMLDivElement>(null);
