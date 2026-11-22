@@ -317,7 +317,7 @@ const ReelsPage = () => {
               >
                 {reel.video_url && (
                   <video
-                    ref={el => { if (el) videoRefs.current.set(i, el); }}
+                    ref={el => { if (el) { videoRefs.current.set(i, el); el.volume = Math.max(0, Math.min(1, (reel as { video_volume?: number }).video_volume ?? 1)); } }}
                     src={reel.video_url}
                     className="h-full w-full object-contain bg-black"
                     loop
@@ -397,7 +397,7 @@ const ReelsPage = () => {
                   {(reel.caption || reel.music_title) && (
                     <>
                     {reel.caption && <p className="truncate text-xs text-white/65">{reel.caption}</p>}
-                    {reel.music_title && <div className="text-white/80"><PostMusicPlayer music={{ title: reel.music_title, artist: reel.music_artist, art_url: reel.music_art_url, stream_url: reel.music_url, start: reel.music_start, len: reel.music_len }} /></div>}
+                    {reel.music_title && <div className="text-white/80"><PostMusicPlayer music={{ title: reel.music_title, artist: reel.music_artist, art_url: reel.music_art_url, stream_url: reel.music_url, start: reel.music_start, len: reel.music_len, volume: (reel as { music_volume?: number }).music_volume }} /></div>}
                     </>
                   )}
                 </div>

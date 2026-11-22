@@ -171,7 +171,11 @@ async function playNative(t: EngineTrack) {
   return true;
 }
 
+/** Software volume (0–1) for the web player; post/story/reel songs use it, everything else plays at full volume. */
+export const setMusicVolume = (v: number) => { const x = Math.max(0, Math.min(1, v)); if (audio) audio.volume = x; try { (yt as unknown as { setVolume?: (n: number) => void } | null)?.setVolume?.(x * 100); } catch { /* ignore */ } };
+
 export async function playUrl(t: EngineTrack) {
+  if (!t.key.startsWith("post|")) setMusicVolume(1);
   spotifyStop();
   if (yt) try { yt.pauseVideo(); } catch { /* ignore */ }
   if (canNative() && t.url && /^(https?|file):/.test(t.url) && !t.key.startsWith("post|") && !t.key.startsWith("clip|")) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { Music2, Volume2, VolumeX } from "lucide-react";
 import { searchGlobalMusic } from "@/services/GlobalMusicService";
-import { getMusicState, livePos, playSong, playUrl, seekMusic, stopMusic, toggleMusic, useMusic } from "@/services/MusicEngine";
+import { getMusicState, livePos, setMusicVolume, playSong, playUrl, seekMusic, stopMusic, toggleMusic, useMusic } from "@/services/MusicEngine";
 
 export interface PostMusic {
   title: string;
@@ -11,10 +11,11 @@ export interface PostMusic {
   youtube_id?: string | null;
   start?: number | null;
   len?: number | null;
+  volume?: number | null;
 }
 
 /** Instagram-style music line shown under the profile name, with a small play/pause button. */
-const PostMusicPlayer = ({ music, autoStart = false, videoRef }: { music: PostMusic; autoStart?: boolean; videoRef?: RefObject<HTMLVideoElement | null> }) => {
+const PostMusicPlayer = ({ music, autoStart = false, videoRef, paused = false }: { music: PostMusic; autoStart?: boolean; videoRef?: RefObject<HTMLVideoElement | null>; paused?: boolean }) => {
   const m = useMusic();
   const key = `post|${music.title}|${music.artist ?? ""}`;
   const mine = m.track?.key === key;
@@ -55,6 +56,15 @@ const PostMusicPlayer = ({ music, autoStart = false, videoRef }: { music: PostMu
     return () => window.clearInterval(id);
   }, [videoRef, mine, start0, len0]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { if (mine) setMusicVolume(music.volume ?? 1); }, [mine, music.volume]);
+  // Story viewer: holding/pausing the picture pauses the song too.
+  useEffect(() => {
+    if (!mine) return;
+    const st = getMusicState();
+    if (paused && !st.paused) { toggleMusic(); autoPaused.current = true; }
+    else if (!paused && st.paused && autoPaused.current && !userPaused.current) { autoPaused.current = false; toggleMusic(); }
+  }, [paused]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const start = async () => {
     if (!alive.current) return;
     if (videoRef) {
@@ -66,6 +76,7 @@ const PostMusicPlayer = ({ music, autoStart = false, videoRef }: { music: PostMu
       if (!alive.current || !visible.current) return;
     }
     try {
+      setMusicVolume(music.volume ?? 1);
       const artist = music.artist ?? "";
       if (music.stream_url) { await playUrl({ key, title: music.title, artist, artwork: music.art_url, url: music.stream_url }); return; }
       if (await playSong(music.title, artist, music.art_url, key)) return;
@@ -80,6 +91,7 @@ const PostMusicPlayer = ({ music, autoStart = false, videoRef }: { music: PostMu
     const el = rootRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(([entry]) => {
+      if (autoStart) return; // story viewer is always on screen; don't let a first "not visible" report silence it
       visible.current = entry.isIntersecting;
       const state = getMusicState();
       if (entry.isIntersecting) {

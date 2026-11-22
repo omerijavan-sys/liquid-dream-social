@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, Film, GalleryHorizontalEnd, MapPin, Loader2, Music2, Scissors, SlidersHorizontal, Sparkles, Trash2, Wand2, X, Type } from "lucide-react";
+import { ChevronLeft, Film, GalleryHorizontalEnd, MapPin, Loader2, Music2, Scissors, SlidersHorizontal, Sparkles, Trash2, Wand2, X, Type, LayoutTemplate, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,7 @@ import { uploadVideoCover } from "@/utils/videoThumb";
 import FilterStrip from "@/components/FilterStrip";
 import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
 import MusicClipPicker from "@/components/MusicClipPicker";
+import { REEL_TEMPLATES, type ReelTemplate } from "@/utils/reelTemplates";
 
 export type EditorMode = "post" | "reel" | "story";
 type Item = {
@@ -19,7 +20,7 @@ type Item = {
   filter: string; bright: number; contrast: number; sat: number;
   trim: [number, number]; cut: [number, number][] | null; cutOn: boolean; secs: number;
 };
-type Tab = "filters" | "adjust" | "trim" | "cut" | "music";
+type Tab = "templates" | "filters" | "adjust" | "trim" | "cut" | "sound" | "music";
 
 const adjustCss = (it: Item) => `${it.filter === "none" ? "" : it.filter + " "}brightness(${it.bright}) contrast(${it.contrast}) saturate(${it.sat})`.trim();
 const needsBake = (it: Item) => adjustCss(it) !== "brightness(1) contrast(1) saturate(1)" || it.trim[0] > 0.05 || (it.duration && it.trim[1] < it.duration - 0.05) || (it.cutOn && it.cut);
@@ -52,11 +53,13 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
   const [items, setItems] = useState<Item[]>([]);
   const [cur, setCur] = useState(0);
   const [mode, setMode] = useState<EditorMode>(initialMode);
-  const [tab, setTab] = useState<Tab>("filters");
+  const [tab, setTab] = useState<Tab>(initialMode === "reel" ? "templates" : "filters");
   const [caption, setCaption] = useState("");
   const [track, setTrack] = useState<PickedTrack | null>(null);
   const [clip, setClip] = useState({ start: 0, len: 15 });
   const [pickMusic, setPickMusic] = useState(false);
+  const [vol, setVol] = useState({ video: 1, music: 1 });
+  const [tplId, setTplId] = useState<string | null>(null);
   const [cutting, setCutting] = useState(false);
   const [step, setStep] = useState<"edit" | "options">("edit");
   const [opts, setOpts] = useState({ allow_comments: true, allow_download: true, hide_likes: false, visibility: "public" as "public" | "followers", location: "" });
@@ -81,6 +84,15 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
   const patch = (p: Partial<Item>) => setItems((a) => a.map((x, i) => (i === cur ? { ...x, ...p } : x)));
   const css = it ? adjustCss(it) : "none";
   const anyVideo = items.some((i) => i.kind === "video");
+
+  useEffect(() => { if (videoRef.current) videoRef.current.volume = vol.video; }, [vol.video, it]);
+  const applyTemplate = (t: ReelTemplate) => {
+    setItems((a) => a.map((x) => ({ ...x, filter: t.filter, bright: t.bright, contrast: t.contrast, sat: t.sat, secs: t.secs })));
+    setVol({ video: t.videoVol, music: t.musicVol });
+    setClip((c) => ({ ...c, len: t.clipLen }));
+    setTplId(t.id);
+    toast.success(`${t.name} template applied`);
+  };
 
   // preview loop respects trim / cuts
   useEffect(() => {
@@ -110,7 +122,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
 
   const publish = () => {
     if (!user || !items.length) return;
-    const uid = user.id, list = items, m = mode, t = track, c = clip, cap = caption.trim(), o = opts, loc = opts.location.trim() || null;
+    const uid = user.id, vl = vol, list = items, m = mode, t = track, c = clip, cap = caption.trim(), o = opts, loc = opts.location.trim() || null;
     onClose();
     navigate("/");
     const label = m === "reel" ? "Posting your reel" : m === "story" ? "Posting your story" : "Sharing your post";
@@ -128,7 +140,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
         if (x.kind === "image") return bakeImageFilter(x.file, adjustCss(x));
         return composeVideo([{ file: x.file, kind: "video", css: adjustCss(x), ranges: rangesOf(x) }], { width: 720, height: 1280, onProgress: (p) => progress(`Editing ${n + 1} of ${list.length}… ${p}%`) }).catch(() => x.file);
       };
-      const music = t ? { music_title: t.title, music_artist: t.artist, music_art_url: t.artUrl, music_url: t.streamUrl, music_youtube_id: t.youtubeId, music_start: c.start, music_len: c.len } : {};
+      const music = t ? { music_title: t.title, music_artist: t.artist, music_art_url: t.artUrl, music_url: t.streamUrl, music_youtube_id: t.youtubeId, music_start: c.start, music_len: c.len, music_volume: vl.music } : {};
 
       if (m === "reel") {
         const segs: Seg[] = list.map((x) => ({ file: x.file, kind: x.kind, css: adjustCss(x), ranges: x.kind === "video" ? rangesOf(x) : undefined, secs: x.secs }));
@@ -137,7 +149,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
         progress("Uploading reel…");
         const thumbnail_url = await uploadVideoCover(uid, video);
         const video_url = await upload(video, "reel");
-        const { error } = await supabase.from("reels").insert({ user_id: uid, caption: cap || null, video_url, thumbnail_url, music_title: t?.title ?? null, music_artist: t?.artist ?? null, music_art_url: t?.artUrl ?? null, music_url: t?.streamUrl ?? null, ...(t ? { music_start: c.start, music_len: c.len } : {}), allow_comments: o.allow_comments, allow_download: o.allow_download, hide_likes: o.hide_likes, visibility: o.visibility, location: loc } as never);
+        const { error } = await supabase.from("reels").insert({ user_id: uid, caption: cap || null, video_url, thumbnail_url, music_title: t?.title ?? null, music_artist: t?.artist ?? null, music_art_url: t?.artUrl ?? null, music_url: t?.streamUrl ?? null, ...(t ? { music_start: c.start, music_len: c.len } : {}), music_volume: vl.music, video_volume: vl.video, allow_comments: o.allow_comments, allow_download: o.allow_download, hide_likes: o.hide_likes, visibility: o.visibility, location: loc } as never);
         if (error) throw error;
         window.dispatchEvent(new Event("prime:posted"));
         return;
@@ -169,15 +181,21 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
   };
 
   const tabs: { id: Tab; icon: typeof Sparkles; label: string; show: boolean }[] = useMemo(() => [
+    { id: "templates", icon: LayoutTemplate, label: "Templates", show: true },
     { id: "filters", icon: Sparkles, label: "Filters", show: true },
     { id: "adjust", icon: SlidersHorizontal, label: "Adjust", show: true },
     { id: "trim", icon: Scissors, label: "Trim", show: !!it && it.kind === "video" },
     { id: "cut", icon: Wand2, label: "Auto-cut", show: !!it && it.kind === "video" },
     { id: "music", icon: Music2, label: "Music", show: true },
+    { id: "sound", icon: Volume2, label: "Volume", show: true },
   ], [it]);
 
   const Slider = ({ label, v, min, max, step, on }: { label: string; v: number; min: number; max: number; step: number; on: (n: number) => void }) => (
     <label className="flex items-center gap-3 text-xs text-muted-foreground"><span className="w-16">{label}</span><input type="range" min={min} max={max} step={step} value={v} onChange={(e) => on(Number(e.target.value))} className="flex-1 accent-[hsl(var(--primary))]" /><span className="w-8 text-right tabular-nums">{v.toFixed(2)}</span></label>
+  );
+
+  const PctSlider = ({ label, v, on }: { label: string; v: number; on: (n: number) => void }) => (
+    <label className="flex items-center gap-3 text-xs text-muted-foreground"><span className="w-20">{label}</span><input type="range" min={0} max={1} step={0.05} value={v} onChange={(e) => on(Number(e.target.value))} className="flex-1 accent-[hsl(var(--primary))]" /><span className="w-10 text-right tabular-nums">{Math.round(v * 100)}%</span></label>
   );
 
   return createPortal(
@@ -217,6 +235,25 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
           ))}
         </div>
 
+        {tab === "templates" && (
+          <div className="space-y-1.5">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {REEL_TEMPLATES.map((t) => (
+                <button key={t.id} onClick={() => applyTemplate(t)} className={`flex w-24 shrink-0 flex-col items-center gap-1 rounded-2xl p-2 text-center ring-2 ${tplId === t.id ? "ring-primary" : "ring-transparent"} bg-gradient-to-br ${t.gradient}`}>
+                  <span className="text-2xl">{t.emoji}</span><span className="text-[11px] font-bold text-white">{t.name}</span><span className="text-[9px] leading-3 text-white/80">{t.blurb}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">A template sets the look, photo pace and sound mix in one tap. You can still fine-tune everything.</p>
+          </div>
+        )}
+        {tab === "sound" && (
+          <div className="space-y-2">
+            {anyVideo ? <PctSlider label="Reel sound" v={vol.video} on={(n) => setVol((x) => ({ ...x, video: n }))} /> : <p className="text-[11px] text-muted-foreground">Photos have no original sound.</p>}
+            {track ? <PctSlider label="Music" v={vol.music} on={(n) => setVol((x) => ({ ...x, music: n }))} /> : <p className="text-[11px] text-muted-foreground">Add a song in the Music tab to set its volume.</p>}
+            <p className="text-[11px] text-muted-foreground">Viewers hear your mix at these levels. Drag to 0% to silence either one.</p>
+          </div>
+        )}
         {it && tab === "filters" && <FilterStrip value={it.filter} onChange={(f) => patch({ filter: f })} thumb={it.kind === "image" ? it.url : null} />}
         {it && tab === "adjust" && (
           <div className="space-y-2">

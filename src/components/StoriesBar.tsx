@@ -1,7 +1,7 @@
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, ChevronRight, Play, MessageCircle, Send, Music2, Search } from "lucide-react";
+import { Plus, X, ChevronLeft, ChevronRight, Play, MessageCircle, Send, Music2, Search } from "lucide-react";
 import { runInBackground } from "@/utils/backgroundUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +65,7 @@ interface StoryView {
   music_youtube_id?: string | null;
   music_start?: number | null;
   music_len?: number | null;
+  music_volume?: number | null;
   progress?: number;
 }
 
@@ -98,6 +99,27 @@ const StoriesBar = () => {
     setPaused(false);
     setViewingStory(stories[index + 1] || null);
   }, [stories, viewingStory]);
+  const back = useCallback(() => {
+    if (!viewingStory) return;
+    const index = stories.findIndex(story => story.id === viewingStory.id);
+    setStoryDuration(5000);
+    storyProgressRef.current = 0;
+    setStoryProgress(0);
+    setPaused(false);
+    if (videoRef.current) videoRef.current.currentTime = 0;
+    // first story: just restart it
+    if (index > 0) setViewingStory(stories[index - 1]);
+  }, [stories, viewingStory]);
+  // Tap left third = previous, the rest = next; press and hold = pause.
+  const holdTimer = useRef<number>();
+  const held = useRef(false);
+  const zoneDown = () => { held.current = false; holdTimer.current = window.setTimeout(() => { held.current = true; setPaused(true); }, 220); };
+  const zoneUp = (e: React.PointerEvent<HTMLElement>) => {
+    window.clearTimeout(holdTimer.current);
+    if (held.current) { setPaused(false); held.current = false; return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    if (e.clientX - r.left < r.width * 0.35) back(); else advance();
+  };
   const openStory = (story: StoryView) => {
     storyProgressRef.current = 0;
     setStoryProgress(0);
@@ -111,7 +133,7 @@ const StoriesBar = () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from("posts")
-        .select("id, media_url, user_id, created_at, music_title, music_artist, music_art_url, music_url, music_youtube_id, music_start, music_len")
+        .select("id, media_url, user_id, created_at, music_title, music_artist, music_art_url, music_url, music_youtube_id, music_start, music_len, music_volume")
         .eq("media_type", "story")
         .gte("created_at", twentyFourHoursAgo)
         .order("created_at", { ascending: false })
@@ -138,6 +160,7 @@ const StoriesBar = () => {
           music_youtube_id: s.music_youtube_id,
           music_start: (s as any).music_start,
           music_len: (s as any).music_len,
+          music_volume: (s as any).music_volume,
         })));
       }
     };
@@ -387,7 +410,7 @@ const StoriesBar = () => {
             </div>
             {viewingStory.music_title && (
               <div className="absolute left-3 right-3 top-24 z-20 rounded-2xl bg-background/85 p-2 backdrop-blur-xl">
-                <PostMusicPlayer autoStart music={{
+                <PostMusicPlayer autoStart paused={paused || commentsOpen} music={{
                   title: viewingStory.music_title,
                   artist: viewingStory.music_artist,
                   art_url: viewingStory.music_art_url,
@@ -395,31 +418,29 @@ const StoriesBar = () => {
                   youtube_id: viewingStory.music_youtube_id,
                   start: viewingStory.music_start,
                   len: viewingStory.music_len,
+                  volume: viewingStory.music_volume,
                 }} />
               </div>
             )}
             {!storyCover && !isVideoMedia(viewingStory.image_url) && <img src={viewingStory.image_url} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl" />}
             <div className="absolute inset-0 flex items-center justify-center">
               {isVideoMedia(viewingStory.image_url) ? (
-                <button type="button" aria-label={paused ? "Resume story" : "Pause story"} onClick={() => setPaused(value => !value)} className="relative h-full w-full">
-                  <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} poster={viewingStory.cover_url || BLANK_POSTER} autoPlay playsInline className={`h-full w-full ${fit}`} onLoadedMetadata={e => setStoryCover(e.currentTarget.videoHeight / Math.max(1, e.currentTarget.videoWidth) >= 1.2)} onEnded={advance} onTimeUpdate={event => {
-                    const video = event.currentTarget;
-                    if (Number.isFinite(video.duration)) {
-                      const progress = video.currentTime / video.duration;
-                      storyProgressRef.current = progress;
-                      setStoryProgress(progress);
-                    }
-                  }} />
-                  {paused && <span className="absolute inset-0 flex items-center justify-center bg-black/20"><Play className="h-12 w-12 fill-white text-white" /></span>}
-                </button>
+                <video ref={videoRef} key={viewingStory.id} src={viewingStory.image_url} poster={viewingStory.cover_url || BLANK_POSTER} autoPlay playsInline className={`h-full w-full ${fit}`} onLoadedMetadata={e => setStoryCover(e.currentTarget.videoHeight / Math.max(1, e.currentTarget.videoWidth) >= 1.2)} onEnded={advance} onTimeUpdate={event => {
+                  const video = event.currentTarget;
+                  if (Number.isFinite(video.duration)) {
+                    const progress = video.currentTime / video.duration;
+                    storyProgressRef.current = progress;
+                    setStoryProgress(progress);
+                  }
+                }} />
               ) : (
-                <button type="button" aria-label={paused ? "Resume story" : "Pause story"} onClick={() => setPaused(value => !value)} className="relative h-full w-full">
-                  <img src={viewingStory.image_url} alt="Story" className={`h-full w-full ${fit}`} onLoad={e => setStoryCover(e.currentTarget.naturalHeight / Math.max(1, e.currentTarget.naturalWidth) >= 1.2)} />
-                  {paused && <span className="absolute inset-0 flex items-center justify-center bg-black/20"><Play className="h-12 w-12 fill-white text-white" /></span>}
-                </button>
+                <img src={viewingStory.image_url} alt="Story" className={`h-full w-full ${fit}`} onLoad={e => setStoryCover(e.currentTarget.naturalHeight / Math.max(1, e.currentTarget.naturalWidth) >= 1.2)} />
               )}
+              <div role="presentation" onPointerDown={zoneDown} onPointerUp={zoneUp} onPointerLeave={() => { window.clearTimeout(holdTimer.current); if (held.current) { setPaused(false); held.current = false; } }} className="absolute inset-0 z-10 touch-manipulation select-none">
+                {paused && <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20"><Play className="h-12 w-12 fill-white text-white" /></span>}
+              </div>
             </div>
-            <div className="absolute bottom-4 left-4 right-16 z-20 flex flex-col gap-2">
+            <div className="absolute bottom-4 left-4 right-28 z-20 flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 {["❤️", "😂", "😮", "🔥", "👏"].map((emoji) => (
                   <button key={emoji} type="button" aria-label={`React ${emoji}`} disabled={viewingStory.user_id === user?.id} onClick={() => void handleReaction(emoji)} className="rounded-full bg-background/70 px-2.5 py-1.5 text-lg backdrop-blur-md disabled:opacity-50">
@@ -443,6 +464,7 @@ const StoriesBar = () => {
                 ))}
               </div>
             )}
+            <Button variant="secondary" size="icon" aria-label="Previous story" onClick={back} className="absolute right-16 bottom-5 z-20"><ChevronLeft /></Button>
             <Button variant="secondary" size="icon" aria-label="Next story" onClick={advance} className="absolute right-4 bottom-5 z-20"><ChevronRight /></Button>
           </motion.div>
         )}
