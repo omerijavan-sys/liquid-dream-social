@@ -1,3 +1,4 @@
+import RouteSeo from "./components/RouteSeo";
 import { PinHost } from "@/components/WalletPin";
 import BackgroundAudio from "./components/BackgroundAudio";
 import PostMusicGuard from "./components/PostMusicGuard";
@@ -91,6 +92,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <PinHost />
+      <RouteSeo />
       <Sonner />
       <BrowserRouter>
         <NativeAuthBridge />
