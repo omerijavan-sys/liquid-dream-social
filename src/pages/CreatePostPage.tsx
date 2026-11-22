@@ -13,6 +13,7 @@ import {
   Square,
   Circle,
   ZoomIn,
+  Music2,
   Wand2,
   Music,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import FilterStrip from "@/components/FilterStrip";
 import { bakeVideoFilter } from "@/utils/bakeVideo";
 import { captureVideoThumb } from "@/utils/videoThumb";
 import MusicClipPicker from "@/components/MusicClipPicker";
+import { playSong, seekMusic, stopMusic } from "@/services/MusicEngine";
 import MusicPicker, { type PickedTrack } from "@/components/MusicPicker";
 
 type Mode = "upload" | "camera";
@@ -84,6 +86,9 @@ const CreatePostPage = () => {
   const [track, setTrack] = useState<PickedTrack | null>(null);
   const [clip, setClip] = useState({ start: 0, len: 30 });
   const [musicOpen, setMusicOpen] = useState(false);
+  const [showTools, setShowTools] = useState(false);
+  const [timerSecs, setTimerSecs] = useState<0 | 3 | 10>(0);
+  const [countdown, setCountdown] = useState(0);
   const [isAdult, setIsAdult] = useState(false);
 
   useEffect(() => {
@@ -357,12 +362,16 @@ const CreatePostPage = () => {
         };
         paint();
         captureStream = canvas.captureStream(30);
-        streamRef.current.getAudioTracks().forEach(track => captureStream.addTrack(track));
+        // with a song selected the mic is left out (the song plays from the speaker and is attached to the post instead)
+        if (!track) streamRef.current.getAudioTracks().forEach(t => captureStream.addTrack(t));
       }
     }
+    if (track && captureStream.getAudioTracks().length) captureStream = new MediaStream(captureStream.getVideoTracks());
+    if (track) { void playSong(track.title, track.artist, track.artUrl ?? null, `cam|${track.title}`).then(() => { if (clip.start > 0) seekMusic(clip.start); }); }
     const rec = new MediaRecorder(captureStream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: VIDEO_BITRATE, audioBitsPerSecond: 128000 });
     rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
     rec.onstop = () => {
+      if (track) stopMusic();
       if (recordingFrameRef.current) cancelAnimationFrame(recordingFrameRef.current);
       if (captureStream !== streamRef.current) captureStream.getVideoTracks().forEach(track => track.stop());
       const type = rec.mimeType || mime || "video/webm";
@@ -379,6 +388,11 @@ const CreatePostPage = () => {
     setRecording(true);
     setRecordSecs(0);
     recordTimerRef.current = setInterval(() => setRecordSecs((s) => s + 1), 1000);
+  };
+
+  const startCountdown = () => {
+    let n = timerSecs; setCountdown(n);
+    const id = window.setInterval(() => { n -= 1; setCountdown(n); if (n <= 0) { window.clearInterval(id); toggleRecord(); } }, 1000);
   };
 
   const addSticker = (emoji: string) => {
@@ -709,8 +723,8 @@ const CreatePostPage = () => {
             {track && <MusicClipPicker track={track} start={clip.start} len={clip.len} onChange={(start, len) => setClip({ start, len })} />}
           </>
         ) : mode === "camera" ? (
-          <div className="fixed inset-0 z-50 bg-black flex flex-col gap-3 p-3 safe-area-top overflow-y-auto">
-            <div className="flex items-center justify-between">
+          <div className="fixed inset-0 z-50 overflow-hidden bg-black">
+            <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-2 bg-gradient-to-b from-black/60 to-transparent p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
               <button
                 onClick={() => navigate(-1)}
                 className="depth-press w-9 h-9 rounded-full bg-foreground/10 backdrop-blur-md flex items-center justify-center"
@@ -718,7 +732,9 @@ const CreatePostPage = () => {
               >
                 <X className="w-4 h-4 text-foreground" />
               </button>
-              <span className="text-xs font-semibold text-muted-foreground">Camera</span>
+              <button onClick={() => setMusicOpen(true)} disabled={recording} className="flex min-w-0 max-w-[55%] items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md disabled:opacity-60" aria-label="Add music">
+                <Music2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{track ? `${track.title} · ${track.artist}` : "Add music"}</span>
+              </button>
               <button
                 onClick={() => setMode("upload")}
                 className="depth-press px-3 py-1.5 rounded-full bg-foreground/10 backdrop-blur-md text-foreground text-xs font-semibold"
@@ -729,7 +745,7 @@ const CreatePostPage = () => {
 
             {/* Capture controls */}
             <div
-              className="relative flex-1 min-h-[45vh] liquid-glass rounded-3xl overflow-hidden bg-black touch-none"
+              className="absolute inset-0 overflow-hidden bg-black touch-none"
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
               onTouchEnd={onTouchEnd}
@@ -764,13 +780,13 @@ const CreatePostPage = () => {
                 )}
               </AnimatePresence>
               {recording && (
-                <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-destructive/90 text-white text-xs font-semibold px-2 py-1 rounded-full">
+                <div className="absolute top-16 left-3 flex items-center gap-1.5 bg-destructive/90 text-white text-xs font-semibold px-2 py-1 rounded-full">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                   REC {Math.floor(recordSecs / 60)}:{(recordSecs % 60).toString().padStart(2, "0")}
                 </div>
               )}
               {zoom > 1 && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 backdrop-blur-md text-xs font-semibold text-foreground">
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/70 backdrop-blur-md text-xs font-semibold text-foreground">
                   {zoom < 10 ? zoom.toFixed(1) : Math.round(zoom)}x
                   {zoom >= 6 && aiLive && (
                     <span className="flex items-center gap-1 text-primary">
@@ -783,7 +799,7 @@ const CreatePostPage = () => {
                 </div>
               )}
               {/* Quick zoom stops */}
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+              <div className="absolute bottom-[15rem] left-1/2 -translate-x-1/2 flex items-center gap-1.5">
                 {[1, 5, 25, 100, 500].map((z) => (
                   <button
                     key={z}
@@ -800,14 +816,15 @@ const CreatePostPage = () => {
               </div>
               <button
                 onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
-                className="absolute top-3 right-3 w-9 h-9 rounded-full bg-background/60 flex items-center justify-center backdrop-blur-md"
+                className="absolute top-16 right-3 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-md"
+                aria-label="Flip camera"
               >
                 <RotateCcw className="w-4 h-4 text-foreground" />
               </button>
             </div>
 
-            {/* Infinite zoom slider + live AI toggle */}
-            <div className="liquid-glass rounded-2xl p-3 space-y-2">
+            <div className="absolute inset-x-0 bottom-0 z-20 max-h-[70vh] space-y-2 overflow-y-auto bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {showTools && <div className="liquid-glass rounded-2xl p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <ZoomIn className="w-4 h-4 text-primary" />
                 <span className="text-caption text-muted-foreground flex-1">
@@ -849,7 +866,7 @@ const CreatePostPage = () => {
               >
                 {aiZooming ? "Enhancing…" : "Capture max-detail AI shot"}
               </button>
-            </div>
+            </div>}
 
 
             <FilterStrip value={filterCss} onChange={setFilterCss} />
@@ -865,7 +882,13 @@ const CreatePostPage = () => {
                 <Square className="w-6 h-6 text-foreground" />
               </button>
               <button
-                onClick={toggleRecord}
+                onClick={() => setTimerSecs((t) => (t === 0 ? 3 : t === 3 ? 10 : 0))}
+                disabled={recording}
+                className="depth-press w-11 h-11 rounded-full bg-white/15 text-xs font-bold text-white disabled:opacity-40"
+                aria-label="Self-timer"
+              >{timerSecs ? `${timerSecs}s` : "⏱"}</button>
+              <button
+                onClick={() => { if (recording || !timerSecs) toggleRecord(); else startCountdown(); }}
                 className={`depth-press w-20 h-20 rounded-full flex items-center justify-center border-4 ${
                   recording ? "border-destructive bg-destructive" : "border-white bg-white/20"
                 }`}
@@ -884,7 +907,10 @@ const CreatePostPage = () => {
               >
                 <ImageIcon className="w-6 h-6 text-foreground" />
               </button>
+              <button onClick={() => setShowTools((v) => !v)} className={`depth-press w-11 h-11 rounded-full flex items-center justify-center ${showTools ? "bg-primary text-primary-foreground" : "bg-white/15 text-white"}`} aria-label="Camera tools"><ZoomIn className="w-5 h-5" /></button>
             </div>
+            </div>
+            {countdown > 0 && <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 text-8xl font-black text-white">{countdown}</div>}
           </div>
         ) : (
           // UPLOAD MODE
