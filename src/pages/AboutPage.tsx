@@ -33,13 +33,25 @@ const AboutPage = () => {
   useEffect(() => {
     const previousTitle = document.title;
     document.title = "About Primegram Extreme (Primegram X) | Primegram X";
-    const description = document.querySelector('meta[name="description"]');
-    const previousDescription = description?.getAttribute("content");
-    description?.setAttribute("content", "Welcome to Primegram Extreme (Primegram X), a next-generation social platform for creators, music lovers, and communities. Share Reels, discover music, message, call, and connect at primegramx.co.ke.");
+
+    const metadata = [
+      { selector: 'meta[name="description"]', attribute: "content", value: "Welcome to Primegram Extreme (Primegram X), a next-generation social platform for creators, music lovers, and communities. Share Reels, discover music, message, call, and connect at primegramx.co.ke." },
+      { selector: 'link[rel="canonical"]', attribute: "href", value: "https://primegramx.co.ke/about" },
+      { selector: 'meta[property="og:title"]', attribute: "content", value: "About Primegram Extreme (Primegram X) | Primegram X" },
+      { selector: 'meta[property="og:description"]', attribute: "content", value: "Welcome to Primegram Extreme (Primegram X), a next-generation social platform for creators, music lovers, and communities." },
+      { selector: 'meta[property="og:url"]', attribute: "content", value: "https://primegramx.co.ke/about" },
+      { selector: 'meta[name="twitter:title"]', attribute: "content", value: "About Primegram Extreme (Primegram X) | Primegram X" },
+      { selector: 'meta[name="twitter:description"]', attribute: "content", value: "Welcome to Primegram Extreme (Primegram X), a next-generation social platform for creators, music lovers, and communities." },
+    ].map((item) => ({ ...item, element: document.querySelector(item.selector) }));
+    const previousMetadata = metadata.map(({ element, attribute }) => element?.getAttribute(attribute) ?? null);
+    metadata.forEach(({ element, attribute, value }) => element?.setAttribute(attribute, value));
 
     return () => {
       document.title = previousTitle;
-      if (previousDescription) description?.setAttribute("content", previousDescription);
+      metadata.forEach(({ element, attribute }, index) => {
+        const previousValue = previousMetadata[index];
+        if (previousValue !== null) element?.setAttribute(attribute, previousValue);
+      });
     };
   }, []);
 
