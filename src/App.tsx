@@ -1,4 +1,5 @@
 import RouteSeo from "./components/RouteSeo";
+import BanGate from "./components/BanGate";
 import { PinHost } from "@/components/WalletPin";
 import BackgroundAudio from "./components/BackgroundAudio";
 import PostMusicGuard from "./components/PostMusicGuard";
@@ -95,6 +96,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <RouteSeo />
+        <BanGate />
         <NativeAuthBridge />
         <BackButtonHandler />
         <NativeMediaPicker />
