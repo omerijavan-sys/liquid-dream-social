@@ -172,7 +172,7 @@ const AboutPage = () => {
           <div className="mt-5 grid gap-6 text-sm leading-7 text-muted-foreground sm:grid-cols-3">
             <div><h3 className="font-semibold text-foreground">Operator</h3><p>Primegram X (Primegram Extreme) is created and operated by Java Prime, Kenya, at primegramx.co.ke.</p></div>
             <div><h3 className="font-semibold text-foreground">Safety</h3><p>Adults only (18+). Content and people can be reported in the app, and we remove illegal content and act on copyright takedown requests. See our <a className="underline" href="/terms">Terms</a>.</p></div>
-            <div><h3 className="font-semibold text-foreground">Your data and money</h3><p>We follow our <a className="underline" href="/privacy">Privacy Policy</a> and Kenya's Data Protection Act. Wallet payments and withdrawals use M-Pesa and Paystack. Contact us through Help &amp; Support: <a className="underline" href="/help">Help centre</a>.</p></div>
+            <div><h3 className="font-semibold text-foreground">Your data and money</h3><p>We follow our <a className="underline" href="/privacy">Privacy Policy</a> and Kenya's Data Protection Act. Wallet payments and withdrawals use M-Pesa and Paystack. Contact us at <a className="underline" href="mailto:primegram.app@gmail.com">primegram.app@gmail.com</a> or through the <a className="underline" href="/help">Help centre</a>.</p></div>
           </div>
         </div>
       </section>

@@ -107,7 +107,7 @@ const PublicLandingPage = () => (
     </section>
 
     <footer className="relative z-10 border-t border-white/10 px-5 py-6 text-center text-xs text-muted-foreground">
-      <nav aria-label="Company links" className="mb-3 flex flex-wrap justify-center gap-5"><a className="hover:text-foreground" href="/about">About</a><a className="hover:text-foreground" href="/privacy">Privacy</a><a className="hover:text-foreground" href="/terms">Terms</a><a className="hover:text-foreground" href="/help">Help</a></nav>
+      <nav aria-label="Company links" className="mb-3 flex flex-wrap justify-center gap-5"><a className="hover:text-foreground" href="/about">About</a><a className="hover:text-foreground" href="/privacy">Privacy</a><a className="hover:text-foreground" href="/terms">Terms</a><a className="hover:text-foreground" href="/help">Help</a><a className="hover:text-foreground" href="mailto:primegram.app@gmail.com">Contact</a></nav>
       © {new Date().getFullYear()} Primegram X · created by Java Prime, Kenya
     </footer>
   </main>
