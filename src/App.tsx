@@ -92,9 +92,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <PinHost />
-      <RouteSeo />
       <Sonner />
       <BrowserRouter>
+        <RouteSeo />
         <NativeAuthBridge />
         <BackButtonHandler />
         <NativeMediaPicker />

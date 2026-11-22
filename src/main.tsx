@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import ErrorBoundary from "./components/ErrorBoundary";
 import "./index.css";
 import { applyAppearance } from "./utils/preferences";
 
@@ -21,4 +22,4 @@ if ('serviceWorker' in navigator) {
 }
 
 const root = document.getElementById("root");
-if (root) createRoot(root).render(<App />);
+if (root) createRoot(root).render(<ErrorBoundary><App /></ErrorBoundary>);
