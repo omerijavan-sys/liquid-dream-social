@@ -1,35 +1,41 @@
 import { useEffect } from "react";
-import { ArrowDown, ArrowRight, Heart, LockKeyhole, MessageCircle, Music2, Play, Sparkles, Users, Wallet } from "lucide-react";
+import { ArrowDown, ArrowRight, Heart, LockKeyhole, MessageCircle, Music2, Play, Sparkles, Wallet } from "lucide-react";
 import PrimeLogo from "@/components/PrimeLogo";
 
 const pillars = [
   {
     icon: Play,
     number: "01",
-    title: "Make it yours",
-    description: "Share photos, videos, and Reels that feel like you. Your perspective is the point.",
-  },
-  {
-    icon: Users,
-    number: "02",
-    title: "Find your people",
-    description: "Follow creators, meet communities, and build real connections around what you love.",
+    title: "Short Videos, Reels & Stories",
+    description: "Share high-energy clips, daily moments, and creative edits with live view counters and instant feed discovery.",
   },
   {
     icon: Music2,
+    number: "02",
+    title: "In-Feed Music & Audio",
+    description: "Attach background tracks to your posts and discover trending sounds directly inside the feed.",
+  },
+  {
+    icon: MessageCircle,
     number: "03",
-    title: "Follow the feeling",
-    description: "Bring music into the mix and discover new sounds while you explore the feed.",
+    title: "Instant Messaging & Live Calls",
+    description: "Stay connected with friends and communities through fast chat and real-time audio and video calling.",
+  },
+  {
+    icon: Sparkles,
+    number: "04",
+    title: "Primegram Extreme Hub",
+    description: "Explore interactive social features, AI-powered matching and assistants, and creator badges designed for a dynamic Gen Z experience.",
   },
 ];
 
 const AboutPage = () => {
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = "About Primegram | Connect, create, and discover";
+    document.title = "About Primegram Extreme (Primegram X) | Primegram X";
     const description = document.querySelector('meta[name="description"]');
     const previousDescription = description?.getAttribute("content");
-    description?.setAttribute("content", "Get to know Primegram: a social space to share Reels and photos, discover music, connect with people, and support creators.");
+    description?.setAttribute("content", "Welcome to Primegram Extreme (Primegram X), a next-generation social platform for creators, music lovers, and communities. Share Reels, discover music, message, call, and connect at primegramx.co.ke.");
 
     return () => {
       document.title = previousTitle;
@@ -60,13 +66,13 @@ const AboutPage = () => {
       <section className="relative z-10 mx-auto grid min-h-[78vh] w-full max-w-7xl items-center gap-14 px-5 pb-20 pt-12 sm:px-8 md:grid-cols-[1.05fr_.95fr] md:pb-28 md:pt-16">
         <div className="max-w-2xl">
           <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.07] px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.13em] text-primary">
-            <Sparkles className="size-4" aria-hidden="true" /> A social space for every side of you
+            <Sparkles className="size-4" aria-hidden="true" /> Welcome to Primegram Extreme (Primegram X)
           </p>
           <h1 className="text-5xl font-black leading-[1.02] tracking-[-0.055em] sm:text-6xl md:text-7xl">
-            Your world.<br />Your people.<br /><span className="bg-gradient-to-r from-primary via-amber-200 to-sky-300 bg-clip-text text-transparent">Your Primegram.</span>
+            Social, in<br /><span className="bg-gradient-to-r from-primary via-amber-200 to-sky-300 bg-clip-text text-transparent">full colour.</span>
           </h1>
           <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            Primegram brings the things you love about being social into one place: sharing moments, discovering new sounds, and finding people who get you.
+            Primegram Extreme is a next-generation social networking platform built for creators, music lovers, and communities who want fast, expressive connections in one place. Accessible directly at primegramx.co.ke, Primegram brings together short-form videos, Reels, photo feeds, music discovery, real-time messaging, and interactive social hubs inside a sleek, modern interface.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <a href="/auth" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-[0_8px_30px_hsla(var(--primary)/.2)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
@@ -109,9 +115,9 @@ const AboutPage = () => {
       <section id="what-matters" className="relative z-10 border-y border-white/[0.08] bg-white/[0.02]">
         <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-20 sm:px-8 md:grid-cols-[.8fr_1.2fr] md:gap-20 md:py-28">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">What matters here</p>
-            <h2 className="mt-4 max-w-md text-3xl font-bold leading-tight tracking-tight sm:text-4xl">A little more connection. A lot more you.</h2>
-            <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground">Social should feel social. Primegram is a place to express yourself, stay close to your people, and make room for the creators who make your day.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">What you can do on Primegram</p>
+            <h2 className="mt-4 max-w-md text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Everything you need to connect, create, and discover.</h2>
+            <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground">From short-form video and music to live conversations and interactive hubs, Primegram brings your social world together in one place.</p>
           </div>
           <div className="flex flex-col divide-y divide-white/[0.09]">
             {pillars.map(({ icon: Icon, number, title, description }) => (
@@ -122,6 +128,16 @@ const AboutPage = () => {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-8 px-5 py-20 sm:px-8 md:grid-cols-[.7fr_1.3fr] md:gap-20 md:py-24">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Our mission</p>
+          <h2 className="mt-4 max-w-sm text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Make social feel more alive.</h2>
+        </div>
+        <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
+          Built in Kenya for a global generation, Primegram Extreme was created to make social media feel more alive, visual, and personal—combining entertainment, music, and real-time communication without the clutter of legacy platforms.
+        </p>
       </section>
 
       <section className="relative z-10 mx-auto w-full max-w-7xl px-5 py-20 sm:px-8 md:py-28">
