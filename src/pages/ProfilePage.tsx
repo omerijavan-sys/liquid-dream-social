@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import ProfileCover from "@/components/ProfileCover";
 import FollowListDialog, { FollowButton } from "@/components/FollowListDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AuraDialog, AnalyticsDialog, CreatorPlanDialog, auraGlowStyle, useAuraRank } from "@/components/ProfileDashboards";
@@ -18,6 +19,7 @@ interface Profile {
   username: string | null;
   bio: string | null;
   avatar_url: string | null;
+  cover_url?: string | null;
   is_verified?: boolean | null;
   is_official?: boolean | null;
 }
@@ -75,7 +77,7 @@ const ProfilePage = () => {
     const fetchData = async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("display_name, username, bio, avatar_url, is_verified, is_official, badge")
+        .select("display_name, username, bio, avatar_url, cover_url, is_verified, is_official, badge")
         .eq("user_id", user.id)
         .single();
       if (data) setProfile(data);
@@ -125,6 +127,21 @@ const ProfilePage = () => {
     }
   };
 
+  const uploadCover = async (file: File) => {
+    if (!user) return;
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user.id}/cover_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("media").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const { error } = await supabase.from("profiles").update({ cover_url: publicUrl } as never).eq("user_id", user.id);
+      if (error) throw error;
+      setProfile(prev => prev ? { ...prev, cover_url: publicUrl } : prev);
+      toast.success("Cover photo updated!");
+    } catch (err: any) { toast.error(err.message || "Failed to upload cover"); }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -149,7 +166,9 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      <div className="prime-profile-header px-3 pb-3 pt-4 md:px-5">
+      <div className="prime-profile-header relative px-3 pb-3 pt-4 md:px-5" style={profile?.cover_url ? { paddingTop: 120 } : undefined}>
+        <ProfileCover url={profile?.cover_url} onPick={uploadCover} />
+        <div className="relative z-10">
         <div className="mb-3 flex items-center gap-4">
           <div className="relative">
             <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
@@ -204,6 +223,7 @@ const ProfilePage = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
       <CreatorPlanDialog open={planOpen} onOpenChange={setPlanOpen} />
       <AuraDialog userId={user.id} open={auraOpen} onOpenChange={setAuraOpen} />

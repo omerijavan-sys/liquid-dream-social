@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import ProfileCover from "@/components/ProfileCover";
 import { FollowButton } from "@/components/FollowListDialog";
 import CommentsSection from "@/components/CommentsSection";
 import { AuraDialog, AnalyticsDialog, auraGlowStyle, useAuraRank } from "@/components/ProfileDashboards";
@@ -22,6 +23,7 @@ type Profile = {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  cover_url?: string | null;
   is_verified: boolean | null;
   is_official: boolean | null;
 };
@@ -143,7 +145,7 @@ const PublicProfilePage = () => {
       const [profileRes, postsRes, followersRes, followingRes, followRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("user_id,username,display_name,bio,avatar_url,is_verified,is_official,badge")
+          .select("user_id,username,display_name,bio,avatar_url,cover_url,is_verified,is_official,badge")
           .eq("user_id", userId)
           .maybeSingle(),
         supabase
@@ -231,8 +233,9 @@ const PublicProfilePage = () => {
           <p className="py-16 text-center text-sm text-muted-foreground">This profile is unavailable.</p>
         ) : (
           <>
-            <section className="p-5">
-              <div className="flex items-center gap-5">
+            <section className="relative p-5" style={profile.cover_url ? { paddingTop: 130 } : undefined}>
+              <ProfileCover url={profile.cover_url} />
+              <div className="relative z-10 flex items-center gap-5">
                 <div style={glow} className={`h-20 w-20 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-primary to-accent p-0.5 ${Object.keys(glow).length ? "aura-glow" : ""}`}>
                   <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-background text-2xl font-bold text-primary">
                     {profile.avatar_url ? (
@@ -248,7 +251,7 @@ const PublicProfilePage = () => {
                   <div><p className="text-lg font-bold text-foreground">{followingCount.toLocaleString()}</p><p className="text-caption text-muted-foreground">Following</p></div>
                 </div>
               </div>
-              <div className="mt-4">
+              <div className="relative z-10 mt-4">
                 <h2 className="flex items-center gap-1 font-semibold text-foreground">
                   {profile.display_name || profile.username || "User"}
                   <VerifiedBadge isVerified={profile.is_verified} isOfficial={profile.is_official} badge={(profile as any).badge} />
@@ -257,7 +260,7 @@ const PublicProfilePage = () => {
                 {profile.bio && <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/80">{profile.bio}</p>}
               </div>
               {user && user.id !== userId && (
-                <div className="mt-4 flex gap-2">
+                <div className="relative z-10 mt-4 flex gap-2">
                   <div className="flex-1 [&>button]:w-full">
                     <FollowButton targetId={userId!} following={following} onChange={setFollowing} />
                   </div>
