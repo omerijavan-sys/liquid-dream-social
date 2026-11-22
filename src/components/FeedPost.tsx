@@ -211,12 +211,18 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
   // If a visible video is still empty after 6s (a stalled request), reload it once instead of spinning forever.
   useEffect(() => {
     if (!isVideo || !near || !isVisible) return;
-    const t = window.setTimeout(() => {
+    let tries = 0;
+    const t = window.setInterval(() => {
       const v = videoRef.current;
-      if (v && v.readyState < 2) { v.load(); void v.play().catch(() => {}); }
-    }, 6000);
-    return () => window.clearTimeout(t);
-  }, [isVideo, near, isVisible]);
+      if (!v || v.readyState >= 3) { if (v) setVideoLoading(false); return; }
+      tries += 1;
+      if (tries > 3) { window.clearInterval(t); return; }
+      // still empty: ask again (second try bypasses a bad cached/partial response)
+      if (tries >= 2) v.src = `${image}${image.includes("?") ? "&" : "?"}r=${Date.now()}`;
+      v.load(); void v.play().catch(() => {});
+    }, 4000);
+    return () => window.clearInterval(t);
+  }, [isVideo, near, isVisible, image]);
 
   const togglePlayPause = () => {
     const v = videoRef.current; if (!v) return;
@@ -303,13 +309,14 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               ) : (
               <video
                 ref={videoRef}
-                src={coverImg ? image : `${image}#t=0.1`}
+                src={image}
                 poster={coverImg || BLANK_POSTER}
                 className="w-full h-auto max-h-[75vh] object-contain bg-background"
                 playsInline
                 muted={muted}
                 loop
-                preload="auto"
+                preload={isVisible ? "auto" : "metadata"}
+                onStalled={() => { const v = videoRef.current; if (v && isVisible) window.setTimeout(() => { if (v.readyState < 3 && !v.paused) { const t = v.currentTime; v.load(); v.currentTime = t; void v.play().catch(() => {}); } }, 2500); }}
                 onCanPlay={() => setVideoLoading(false)}
                 onLoadedData={() => setVideoLoading(false)}
                 onWaiting={() => setVideoLoading(true)}
