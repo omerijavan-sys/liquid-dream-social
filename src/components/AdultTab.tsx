@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import VideoThumb from "@/components/VideoThumb";
 import { motion } from "framer-motion";
-import { Check, Eye, Loader2, Play, ShieldAlert, X } from "lucide-react";
+import { Check, Eye, Loader2, MessageCircle, Mic, Play, PlusSquare, ShieldAlert, Video, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ interface AdultPost {
 
 const AdultTab = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [verified, setVerified] = useState<boolean | null>(null);
   const [dob, setDob] = useState({ d: "", m: "", y: "" });
   const [consent, setConsent] = useState(false);
@@ -209,6 +211,12 @@ const AdultTab = () => {
     <div>
       <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
         <Check className="w-3.5 h-3.5 text-primary" /> Verified 18+ · access stays active on your account
+      </div>
+      <button onClick={() => navigate("/adult/video")} className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 py-3.5 text-sm font-extrabold text-black shadow-[0_8px_30px_rgba(244,63,94,.4)] active:scale-[0.98]"><Video className="h-5 w-5" />Random Video Chat · meet someone online now</button>
+      <div className="mb-4 grid grid-cols-3 gap-2">
+        <Button variant="secondary" className="gap-1.5" onClick={() => navigate("/create?adult=1")}><PlusSquare className="h-4 w-4" />Post</Button>
+        <Button variant="secondary" className="gap-1.5" onClick={() => navigate("/adult")}><MessageCircle className="h-4 w-4" />Chat & tips</Button>
+        <Button variant="secondary" className="gap-1.5" onClick={() => navigate("/meet?mode=adult&audio=1")}><Mic className="h-4 w-4" />Voice</Button>
       </div>
       <div className="mb-4 flex gap-2" role="group" aria-label="Filter mature posts">
         {(["all", "photo", "video"] as const).map((value) => (
