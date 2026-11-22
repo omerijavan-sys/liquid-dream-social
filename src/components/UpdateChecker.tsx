@@ -65,13 +65,22 @@ const UpdateChecker = () => {
     try {
       const { id } = await AppUpdate.enqueue({ url: update.url });
       dlId.current = id;
-      let stall = 0;
+      let stall = 0, idle = 0;
       stopPoll();
       poll.current = setInterval(async () => {
         const s = await AppUpdate.status({ id }).catch(() => null);
         if (!s) return;
         const total = s.total && s.total > 0 ? s.total : 0, received = s.received ?? 0;
         setProg({ pct: total ? Math.min(99, Math.floor(received * 100 / total)) : 0, received, total });
+        // Android's downloader can sit at 0% forever (queued behind another download, slow redirect, restricted
+        // network). If nothing has arrived after ~20s, hand the same file to the browser, which downloads reliably.
+        if (s.state !== "done" && received === 0 && ++idle > 40) {
+          stopPoll(); void AppUpdate.cancelDownload({ id }); busyRef.current = false; setBusy(false);
+          toast.message("Switching to a browser download…");
+          try { await Browser.open({ url: update.url }); } catch { toast.error("Couldn't start the download. Try again."); }
+          return;
+        }
+        if (received > 0) idle = 0;
         if (s.state === "done") {
           stopPoll(); busyRef.current = false; setBusy(false); setDownloaded(true); setProg(p => ({ ...p, pct: 100 }));
           toast.success("Downloaded — tap the notification (or Open) to install");
@@ -124,7 +133,7 @@ const UpdateChecker = () => {
                 <p className="text-xs tabular-nums text-white/60">{prog.pct}%{prog.total > 0 ? ` · ${mb(prog.received)} of ${mb(prog.total)} MB` : ""}</p>
               </div>
             )}
-            <button disabled={busy} onClick={() => void upgrade()} className="w-full rounded-2xl bg-emerald-400 py-3 text-sm font-bold text-black disabled:opacity-60">{busy ? `Downloading ${prog.pct}%` : downloaded ? "Open to install" : "Upgrade"}</button>
+            <button disabled={busy} onClick={() => void upgrade()} className="w-full rounded-2xl bg-emerald-400 py-3 text-sm font-bold text-black disabled:opacity-60">{busy ? (prog.received ? `Downloading ${prog.pct}%` : "Starting download…") : downloaded ? "Open to install" : "Upgrade"}</button>
             {busy ? <button onClick={cancelDl} className="w-full py-1 text-xs text-white/50">Cancel</button>
               : <button onClick={dismiss} className="w-full py-1 text-xs text-white/50">Later</button>}
           </div>

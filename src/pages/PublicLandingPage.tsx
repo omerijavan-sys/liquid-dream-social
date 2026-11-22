@@ -61,10 +61,10 @@ const PublicLandingPage = () => (
           <Globe2 className="h-4 w-4" /> A social world for what you love
         </p>
         <h1 className="max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-5xl md:text-6xl">
-          Connect, create, and discover on <span className="text-primary">Primegram</span>
+          Connect, create, and discover on <span className="text-primary">Primegram Extreme</span>
         </h1>
         <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-          Share photos and Reels, message friends, explore music, and find new creators and communities — all in one social app.
+          Primegram Extreme (also called Primegram X) lets you share photos and Reels, message friends, explore music, and find new creators and communities — all in one social app.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <a href="/auth" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-transform hover:scale-[1.02]">
