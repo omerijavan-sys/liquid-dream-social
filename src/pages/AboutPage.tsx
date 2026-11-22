@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import { ArrowDown, ArrowRight, Heart, LockKeyhole, MessageCircle, Music2, Play, Sparkles, Wallet } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { ArrowDown, ArrowRight, Download, Heart, LockKeyhole, MessageCircle, Music2, Play, Sparkles, Wallet } from "lucide-react";
+import { ANDROID_APK_URL } from "@/components/AndroidDownloadCard";
 import PrimeLogo from "@/components/PrimeLogo";
 
 const pillars = [
@@ -69,6 +71,17 @@ const AboutPage = () => {
         </a>
         <nav aria-label="Main navigation" className="flex items-center gap-2 sm:gap-5">
           <a href="/help" className="hidden rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline-flex">Help</a>
+          {!Capacitor.isNativePlatform() && (
+            <a
+              href={ANDROID_APK_URL}
+              download
+              aria-label="Download Primegram Extreme for Android"
+              title="Download APK"
+              className="inline-flex size-10 items-center justify-center rounded-full border border-emerald-300/30 text-emerald-200 transition-colors hover:bg-emerald-400/10 hover:text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            >
+              <Download className="size-4" aria-hidden="true" />
+            </a>
+          )}
           <a href="/auth" className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             Join Primegram <ArrowRight className="size-4" aria-hidden="true" />
           </a>
