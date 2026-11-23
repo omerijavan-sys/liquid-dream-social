@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { ArrowRight, Bot, Download, Film, Globe2, MessageCircle, Music2, ShieldCheck, Sparkles } from "lucide-react";
 import { ANDROID_APK_URL } from "@/components/AndroidDownloadCard";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const features = [
   {
@@ -25,7 +26,14 @@ const features = [
   },
 ];
 
-const PublicLandingPage = () => (
+const PublicLandingPage = () => {
+  usePageMeta({
+    title: "Primegram Extreme (Primegram X) – Social Network for Reels, Music & Chat",
+    description: "Primegram Extreme, also written Primegram X, is a social network for Reels, photos, messaging, music discovery and creator communities. Join free on web and Android.",
+    path: "/",
+  });
+
+  return (
   <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-primary/10 blur-[120px]" />
@@ -117,6 +125,7 @@ const PublicLandingPage = () => (
       </div>
     </footer>
   </main>
-);
+  );
+};
 
 export default PublicLandingPage;

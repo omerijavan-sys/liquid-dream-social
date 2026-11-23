@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import TrustPageLayout from "@/components/TrustPageLayout";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 type Kind = "terms" | "privacy" | "help";
 
@@ -44,32 +44,7 @@ const content: Record<Kind, { title: string; description: string; sections: Arra
 
 const LegalPage = ({ kind }: { kind: Kind }) => {
   const page = content[kind];
-
-  useEffect(() => {
-    const previousTitle = document.title;
-    const targets = [
-      ["meta[name=\"description\"]", "content", page.description],
-      ["link[rel=\"canonical\"]", "href", `https://primegramx.co.ke/${kind}`],
-      ["meta[property=\"og:title\"]", "content", `${page.title} | Primegram X`],
-      ["meta[property=\"og:description\"]", "content", page.description],
-      ["meta[property=\"og:url\"]", "content", `https://primegramx.co.ke/${kind}`],
-      ["meta[name=\"twitter:title\"]", "content", `${page.title} | Primegram X`],
-      ["meta[name=\"twitter:description\"]", "content", page.description],
-    ] as const;
-    const elements = targets.map(([selector]) => document.querySelector(selector));
-    const previousValues = elements.map((element, index) => element?.getAttribute(targets[index][1]) ?? null);
-
-    document.title = `${page.title} | Primegram X`;
-    targets.forEach(([selector, attribute, value]) => document.querySelector(selector)?.setAttribute(attribute, value));
-
-    return () => {
-      document.title = previousTitle;
-      elements.forEach((element, index) => {
-        const previousValue = previousValues[index];
-        if (previousValue !== null) element?.setAttribute(targets[index][1], previousValue);
-      });
-    };
-  }, [kind, page.description, page.title]);
+  usePageMeta({ title: `${page.title} | Primegram X`, description: page.description, path: `/${kind}` });
 
   return (
     <TrustPageLayout>

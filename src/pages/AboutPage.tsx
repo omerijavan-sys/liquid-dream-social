@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import { ArrowDown, ArrowRight, Clock3, Globe2, Heart, LockKeyhole, Mail, MessageCircle, Music2, PhoneCall, Play, Radio, Sparkles, Trophy } from "lucide-react";
 import TrustPageLayout from "@/components/TrustPageLayout";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const pillars = [
   { icon: Radio, number: "01", title: "Real-time social feeds", description: "Share updates, photos, and video, then follow the conversations moving through your community." },
@@ -11,30 +11,11 @@ const pillars = [
 ];
 
 const AboutPage = () => {
-  useEffect(() => {
-    const previousTitle = document.title;
-    document.title = "About Primegram X | Built in Kisumu, Kenya";
-
-    const metadata = [
-      { selector: 'meta[name="description"]', attribute: "content", value: "Meet Primegram X, a next-generation social, entertainment, and real-time connection platform built in Kisumu, Kenya by MR. AURA." },
-      { selector: 'link[rel="canonical"]', attribute: "href", value: "https://primegramx.co.ke/about" },
-      { selector: 'meta[property="og:title"]', attribute: "content", value: "About Primegram X | Built in Kisumu, Kenya" },
-      { selector: 'meta[property="og:description"]', attribute: "content", value: "Meet Primegram X, built in Kisumu, Kenya by MR. AURA." },
-      { selector: 'meta[property="og:url"]', attribute: "content", value: "https://primegramx.co.ke/about" },
-      { selector: 'meta[name="twitter:title"]', attribute: "content", value: "About Primegram X | Built in Kisumu, Kenya" },
-      { selector: 'meta[name="twitter:description"]', attribute: "content", value: "Meet Primegram X, built in Kisumu, Kenya by MR. AURA." },
-    ].map((item) => ({ ...item, element: document.querySelector(item.selector) }));
-    const previousMetadata = metadata.map(({ element, attribute }) => element?.getAttribute(attribute) ?? null);
-    metadata.forEach(({ element, attribute, value }) => element?.setAttribute(attribute, value));
-
-    return () => {
-      document.title = previousTitle;
-      metadata.forEach(({ element, attribute }, index) => {
-        const previousValue = previousMetadata[index];
-        if (previousValue !== null) element?.setAttribute(attribute, previousValue);
-      });
-    };
-  }, []);
+  usePageMeta({
+    title: "About Primegram X | Built in Kisumu, Kenya",
+    description: "Meet Primegram X, a next-generation social, entertainment, and real-time connection platform built in Kisumu, Kenya by MR. AURA.",
+    path: "/about",
+  });
 
   return (
     <TrustPageLayout>
