@@ -74,6 +74,24 @@
         <activity-alias android:name=".IconXSilver" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_xsilver" android:roundIcon="@mipmap/ic_launcher_xsilver" android:label="@string/app_name">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
+        <activity-alias android:name=".IconGAurora" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_gaurora" android:roundIcon="@mipmap/ic_launcher_gaurora" android:label="@string/app_name">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconGSunset" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_gsunset" android:roundIcon="@mipmap/ic_launcher_gsunset" android:label="@string/app_name">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconGOcean" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_gocean" android:roundIcon="@mipmap/ic_launcher_gocean" android:label="@string/app_name">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconGMint" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_gmint" android:roundIcon="@mipmap/ic_launcher_gmint" android:label="@string/app_name">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconGRose" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_grose" android:roundIcon="@mipmap/ic_launcher_grose" android:label="@string/app_name">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconGInk" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_gink" android:roundIcon="@mipmap/ic_launcher_gink" android:label="@string/app_name">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
 
         <!-- Builds message notifications with a Reply box and AI-suggested quick replies. Outranks the stock Capacitor service. -->
         <service android:name=".NotifyService" android:exported="false">

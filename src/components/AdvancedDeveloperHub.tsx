@@ -99,6 +99,12 @@ const AdvancedDeveloperHub = () => {
       const r = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" }); const v = await r.json() as { web?: string };
       out.push({ label: "App version", ok: v.web === __WEB_BUILD__, detail: v.web === __WEB_BUILD__ ? `Latest (${__WEB_BUILD__.slice(0, 7)})` : `Update available (${String(v.web).slice(0, 7)})` });
     } catch { out.push({ label: "App version", ok: false, detail: "Couldn't check" }); }
+    try {
+      const { data: t } = await supabase.functions.invoke("turn-credentials");
+      const td = t as { iceServers?: unknown[]; source?: string } | null;
+      const ok = td?.source === "metered" && !!td.iceServers?.length;
+      out.push({ label: "Call relay (long-distance calls)", ok, detail: ok ? `Private relay ready (${td!.iceServers!.length} servers)` : "Not set up — calls between far-apart networks may fail" });
+    } catch { out.push({ label: "Call relay (long-distance calls)", ok: false, detail: "Couldn't check" }); }
     const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration().catch(() => undefined) : undefined;
     out.push({ label: "Offline cache (service worker)", ok: !!reg?.active, detail: reg?.active ? (navigator.serviceWorker.controller ? "Active and in control" : "Installed, takes over on next open") : "Not installed" });
     const perm = "Notification" in window ? Notification.permission : "unsupported";

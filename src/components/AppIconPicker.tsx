@@ -13,6 +13,15 @@ const ICONS = [
   { id: "Rose", name: "Rose", img: "/icons/p-rose.png" },
   { id: "Sky", name: "Sky", img: "/icons/p-sky.png" },
 ];
+/** Prime X on colour gradients. */
+const G_ICONS = [
+  { id: "GAurora", name: "Aurora", img: "/icons/gaurora.png" },
+  { id: "GSunset", name: "Sunset", img: "/icons/gsunset.png" },
+  { id: "GOcean", name: "Ocean", img: "/icons/gocean.png" },
+  { id: "GMint", name: "Mint", img: "/icons/gmint.png" },
+  { id: "GRose", name: "Rose", img: "/icons/grose.png" },
+  { id: "GInk", name: "Ink", img: "/icons/gink.png" },
+];
 /** Neon "Prime X" glass icons. */
 const X_ICONS = [
   { id: "XViolet", name: "X Violet", img: "/icons/xviolet.png" },
@@ -50,6 +59,11 @@ const AppIconPicker = () => {
   );
   return (
     <div className="space-y-3">
+      <div className="liquid-glass relative z-10 rounded-2xl p-4">
+        <p className="text-sm font-semibold text-foreground">Prime X · colour glass</p>
+        <p className="mb-3 text-xs text-muted-foreground">The X on a rich gradient.</p>
+        {grid(G_ICONS)}
+      </div>
       <div className="liquid-glass relative z-10 rounded-2xl p-4">
         <p className="text-sm font-semibold text-foreground">Prime X · neon glass</p>
         <p className="mb-3 text-xs text-muted-foreground">Dark glass X with a glowing edge.</p>
