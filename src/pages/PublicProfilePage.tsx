@@ -1,3 +1,5 @@
+import PublicVibe from "@/features/vibe/PublicVibe";
+import StreakBadge from "@/features/drops/StreakBadge";
 import { useEffect, useState } from "react";
 import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
@@ -265,9 +267,11 @@ const PublicProfilePage = () => {
                 <h2 className="flex items-center gap-1 font-semibold text-foreground">
                   {profile.display_name || profile.username || "User"}
                   <VerifiedBadge isVerified={profile.is_verified} isOfficial={profile.is_official} badge={(profile as any).badge} />
+                  <StreakBadge userId={userId} />
                 </h2>
                 {profile.username && <p className="text-sm text-muted-foreground">@{profile.username}</p>}
                 {profile.bio && <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/80">{profile.bio}</p>}
+                {userId && <PublicVibe userId={userId} />}
               </div>
               {user && user.id !== userId && (
                 <div className="relative z-10 mt-4 flex gap-2">

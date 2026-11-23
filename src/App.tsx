@@ -10,6 +10,7 @@ import SplashLoader from "@/components/SplashLoader";
 import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
 import NativePush from "@/components/NativePush";
+import ReferralClaimer from "@/features/referrals/ReferralClaimer";
 import UpdateChecker from "@/components/UpdateChecker";
 import BackButtonHandler from "@/components/BackButtonHandler";
 import MiniPlayer from "@/components/MiniPlayer";
@@ -29,6 +30,7 @@ import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/AuthPage";
 import WelcomePage from "./pages/WelcomePage";
 import PublicLandingPage from "./pages/PublicLandingPage";
+const InvitePage = lazy(() => import("@/features/referrals/InvitePage"));
 const MessagesPage = lazy(() => import("./pages/MessagesPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
@@ -108,6 +110,7 @@ const App = () => (
         <MiniPlayer />
         <InAppBrowser />
         <AuthProvider>
+          <ReferralClaimer />
           <MuteProvider>
           <OnlineProvider>
           <ConsentGate />
@@ -115,6 +118,7 @@ const App = () => (
           <NativePush />
           <Suspense fallback={<SplashLoader />}>
           <Routes>
+            <Route path="/invite/:code" element={<InvitePage />} />
             <Route path="/welcome" element={<AuthRoute><WelcomePage /></AuthRoute>} />
             <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />
             <Route path="/" element={<HomeRoute />} />

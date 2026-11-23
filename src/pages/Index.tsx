@@ -2,6 +2,7 @@ import HomeReelCard from "@/components/HomeReelCard";
 import { useState, useEffect, useRef, useCallback } from "react";
 import TopNavBar from "@/components/TopNavBar";
 import GlassTabBar from "@/components/GlassTabBar";
+import DailyDrops from "@/features/drops/DailyDrops";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
 import UploadStrip from "@/components/UploadStrip";
@@ -153,6 +154,7 @@ const Index = () => {
         <div className="mt-2 mb-4">
           <StoriesBar />
         </div>
+        <DailyDrops />
         <div className="px-4">
           {posts.length === 0 && loading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>

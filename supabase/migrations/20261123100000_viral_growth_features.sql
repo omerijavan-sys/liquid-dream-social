@@ -12,10 +12,7 @@ language sql stable security definer set search_path = public as $$
      and exists (select 1 from follows where follower_id = b and following_id = a);
 $$;
 
-create or replace function public.is_group_member(gid uuid, uid uuid) returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (select 1 from chat_group_members where group_id = gid and user_id = uid);
-$$;
+-- is_group_member(_gid, _uid) already exists in this project and is reused as-is.
 
 -- Each user's own timezone drives "what day is it" for drops and streak resets.
 alter table public.profiles add column if not exists tz text not null default 'Africa/Nairobi';
@@ -260,7 +257,7 @@ create or replace function public.gen_referral_code() returns text language plpg
 declare c text;
 begin
   loop
-    c := upper(substr(translate(encode(gen_random_bytes(6), 'base64'), '+/=Il1O0', 'XYZABCD'), 1, 8));
+    c := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
     exit when not exists (select 1 from public.profiles where referral_code = c);
   end loop;
   return c;
@@ -304,6 +301,7 @@ begin
   end if;
   if n >= 10 then insert into user_perks (user_id, perk) values (uid,'platinum_badge') on conflict do nothing; end if;
 end $$;
+revoke execute on function public.grant_referral_perks(uuid, int) from public, anon, authenticated;
 
 -- Core claim logic, used by sign-up trigger and by the client RPC.
 create or replace function public._apply_referral(uid uuid, _code text, max_age interval) returns text
@@ -321,13 +319,14 @@ begin
 
   perform set_config('app.referral_write', '1', true);
   insert into referrals (referred_id, referrer_id) values (uid, ref_id) on conflict do nothing;
-  if not found then return 'already_referred'; end if;
+  if not found then perform set_config('app.referral_write', '', true); return 'already_referred'; end if;
   update profiles set referred_by = ref_id where user_id = uid;
   update profiles set referral_count = referral_count + 1 where user_id = ref_id returning referral_count into cnt;
   perform grant_referral_perks(ref_id, cnt);
   perform set_config('app.referral_write', '', true);
   return 'ok';
 end $$;
+revoke execute on function public._apply_referral(uuid, text, interval) from public, anon, authenticated;
 
 create or replace function public.claim_referral(_code text) returns jsonb
 language plpgsql security definer set search_path = public as $$
@@ -399,7 +398,7 @@ create policy "prompts: members create" on public.hangout_prompts for insert to 
   with check (author_id = auth.uid() and public.is_group_member(group_id, auth.uid()));
 create policy "prompts: author deletes" on public.hangout_prompts for delete to authenticated using (author_id = auth.uid());
 -- answers are ANONYMOUS: nobody can SELECT the table (so user_id never leaks); everyone reads through hangout_answers_for().
-create policy "answers: members add one" on public.hangout_answers for insert to authenticated
+create policy "answers: members add" on public.hangout_answers for insert to authenticated
   with check (user_id = auth.uid() and exists (select 1 from hangout_prompts p where p.id = prompt_id and p.kind = 'qa' and p.expires_at > now() and public.is_group_member(p.group_id, auth.uid())));
 create policy "votes: members vote" on public.hangout_votes for insert to authenticated
   with check (user_id = auth.uid() and exists (select 1 from hangout_prompts p where p.id = prompt_id and p.kind = 'poll' and p.expires_at > now() and public.is_group_member(p.group_id, auth.uid())));
