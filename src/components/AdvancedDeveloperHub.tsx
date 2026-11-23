@@ -1,365 +1,231 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  Activity, AudioLines, Braces, Check, ChevronRight, Cloud, Cpu, FlaskConical,
-  Gauge, Github, Link2, Loader2, Mic, Monitor, Music2, Radio, RefreshCw,
-  Sparkles, Waves,
-} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
+import { Activity, AudioLines, BellRing, Check, ClipboardCopy, Cpu, Gauge, Loader2, Mic, RefreshCw, Trash2, Wifi, X, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { readPreference, savePreference } from "@/utils/preferences";
 
-type DeveloperPreferences = {
-  fpsOverlay: boolean;
-  logDiagnostics: boolean;
-  betaFeatures: string[];
-  ambientMatch: boolean;
-  vibeIntensity: number;
-};
+/**
+ * Developer tools: everything on this panel is measured on this device right now (no simulated numbers).
+ * Live FPS / memory / latency / network, a one-tap health check, cache + push utilities and a copyable report.
+ */
+type Prefs = { fpsOverlay: boolean; vibeIntensity: number };
+type Check = { label: string; ok: boolean; detail: string };
+const KEY = "advanced-developer-hub";
+const N = 40; // samples kept per sparkline
 
-const PREFERENCE_KEY = "advanced-developer-hub";
-const BETA_FEATURES = [
-  { id: "summarizer", title: "AI Post Summarizer (Beta)", description: "Preview a shorter summary before sharing." },
-  { id: "gestures", title: "Gesture Navigation Test", description: "Try experimental swipe navigation controls." },
-  { id: "themes", title: "Custom Chat Themes (Beta)", description: "Explore new colors for your conversations." },
-];
-const BASE_WAVE = [20, 35, 18, 54, 72, 26, 42, 84, 36, 22, 63, 48, 92, 40, 24, 71, 34, 52, 88, 31, 45, 76, 25, 58, 38, 82, 29, 49, 68, 32, 90, 43, 21, 60, 36, 74, 28, 54, 86, 34, 47, 70, 24, 56, 38, 80, 31, 50];
-const randomTelemetry = (center: number, spread: number) =>
-  Array.from({ length: 36 }, (_, index) =>
-    Math.max(5, Math.min(95, center + Math.sin(index * 0.8 + Date.now() / 1200) * spread + Math.random() * spread * 0.55)),
-  );
-const chartPoints = (values: number[]) =>
-  values.map((value, index) => `${(index / (values.length - 1)) * 300},${100 - value}`).join(" ");
+const push = (a: number[], v: number) => [...a.slice(-(N - 1)), v];
+const Spark = ({ values, color, max }: { values: number[]; color: string; max?: number }) => {
+  const hi = max ?? Math.max(1, ...values) * 1.15;
+  const pts = values.map((v, i) => `${(i / Math.max(1, N - 1)) * 100},${30 - Math.min(30, (v / hi) * 30)}`).join(" ");
+  return <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="h-8 w-full"><polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" vectorEffect="non-scaling-stroke" strokeLinejoin="round" /></svg>;
+};
+const Tile = ({ label, value, unit, color, values, max }: { label: string; value: string; unit?: string; color: string; values: number[]; max?: number }) => (
+  <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
+    <p className="text-[11px] font-medium uppercase tracking-wider text-white/45">{label}</p>
+    <p className="mt-0.5 font-mono text-2xl font-bold tabular-nums" style={{ color, textShadow: `0 0 14px ${color}66` }}>{value}<span className="ml-1 text-xs font-normal text-white/40">{unit}</span></p>
+    <Spark values={values} color={color} max={max} />
+  </div>
+);
+const Btn = ({ icon, label, onClick, busy }: { icon: ReactNode; label: string; onClick: () => void; busy?: boolean }) => (
+  <button onClick={onClick} disabled={busy} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3 text-[13px] font-semibold text-white transition-colors active:bg-white/10 disabled:opacity-60 [&>svg]:h-4 [&>svg]:w-4">
+    {busy ? <Loader2 className="animate-spin" /> : icon}{label}
+  </button>
+);
 
 const AdvancedDeveloperHub = () => {
-  const [preferences, setPreferences] = useState<DeveloperPreferences>(() =>
-    readPreference(PREFERENCE_KEY, {
-      fpsOverlay: false,
-      logDiagnostics: false,
-      betaFeatures: [],
-      ambientMatch: false,
-      vibeIntensity: 55,
-    }),
-  );
-  const [telemetry, setTelemetry] = useState(() => ({
-    cpu: randomTelemetry(34, 18),
-    memory: randomTelemetry(57, 12),
-    network: randomTelemetry(22, 11),
-  }));
-  const [fps, setFps] = useState(0);
-  const [stressRunning, setStressRunning] = useState(false);
-  const [webhookRevision, setWebhookRevision] = useState(1);
-  const [appsOpen, setAppsOpen] = useState(false);
-  const [micEnabled, setMicEnabled] = useState(false);
-  const [wave, setWave] = useState(BASE_WAVE);
-  const micStream = useRef<MediaStream | null>(null);
-  const audioContext = useRef<AudioContext | null>(null);
-  const analyser = useRef<AnalyserNode | null>(null);
+  const { user } = useAuth();
+  const [prefs, setPrefs] = useState<Prefs>(() => ({ fpsOverlay: false, vibeIntensity: 55, ...readPreference<Partial<Prefs>>(KEY, {}) }));
+  const setPref = (u: Partial<Prefs>) => setPrefs(c => { const n = { ...c, ...u }; savePreference(KEY, n); return n; });
 
-  const updatePreference = (update: Partial<DeveloperPreferences>) => {
-    setPreferences(current => {
-      const next = { ...current, ...update };
-      savePreference(PREFERENCE_KEY, next);
-      return next;
-    });
-  };
+  // ---- live measurements ----
+  const [fps, setFps] = useState<number[]>([]);
+  const [mem, setMem] = useState<number[]>([]);
+  const [lat, setLat] = useState<number[]>([]);
+  const [online, setOnline] = useState(navigator.onLine);
+  const conn = (navigator as unknown as { connection?: { effectiveType?: string; downlink?: number; rtt?: number } }).connection;
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setTelemetry({
-        cpu: randomTelemetry(34, 18),
-        memory: randomTelemetry(57, 12),
-        network: randomTelemetry(22, 11),
-      });
-    }, 1400);
-    return () => window.clearInterval(timer);
+  const ping = useCallback(async () => {
+    const t0 = performance.now();
+    try { await supabase.from("profiles").select("user_id").limit(1); const ms = Math.round(performance.now() - t0); setLat(l => push(l, ms)); return ms; }
+    catch { return null; }
   }, []);
 
   useEffect(() => {
-    if (!preferences.fpsOverlay) {
-      setFps(0);
-      return;
-    }
-    let frame = 0;
-    let frames = 0;
-    let last = performance.now();
-    let stopped = false;
-    const measure = (now: number) => {
-      if (stopped) return;
-      frames++;
-      if (now - last >= 1000) {
-        setFps(Math.round((frames * 1000) / (now - last)));
-        frames = 0;
-        last = now;
-      }
-      frame = requestAnimationFrame(measure);
+    let frames = 0, last = performance.now(), raf = 0, dead = false;
+    const loop = (now: number) => {
+      if (dead) return; frames++;
+      if (now - last >= 1000) { setFps(f => push(f, Math.round((frames * 1000) / (now - last)))); frames = 0; last = now;
+        const m = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory; if (m) setMem(a => push(a, Math.round(m.usedJSHeapSize / 1048576))); }
+      raf = requestAnimationFrame(loop);
     };
-    frame = requestAnimationFrame(measure);
-    return () => {
-      stopped = true;
-      cancelAnimationFrame(frame);
-    };
-  }, [preferences.fpsOverlay]);
+    raf = requestAnimationFrame(loop);
+    void ping(); const t = setInterval(() => void ping(), 8000);
+    const on = () => setOnline(true), off = () => setOnline(false);
+    window.addEventListener("online", on); window.addEventListener("offline", off);
+    return () => { dead = true; cancelAnimationFrame(raf); clearInterval(t); window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, [ping]);
 
-  useEffect(() => {
-    if (!micEnabled || !analyser.current) return;
-    const currentAnalyser = analyser.current;
-    const samples = new Uint8Array(currentAnalyser.frequencyBinCount);
-    const timer = window.setInterval(() => {
-      currentAnalyser.getByteFrequencyData(samples);
-      const nextWave = BASE_WAVE.map((base, index) => {
-        const signal = samples[Math.floor(index * samples.length / BASE_WAVE.length)] ?? 0;
-        const scaled = (signal / 255) * 90 + base * 0.15;
-        return Math.max(8, Math.min(100, scaled * (preferences.vibeIntensity / 55)));
-      });
-      setWave(nextWave);
-    }, 90);
-    return () => window.clearInterval(timer);
-  }, [micEnabled, preferences.vibeIntensity]);
+  const curFps = fps.at(-1) ?? 0;
+  useEffect(() => { // optional on-screen FPS meter
+    if (!prefs.fpsOverlay) return;
+    const el = document.createElement("div");
+    el.style.cssText = "position:fixed;right:12px;top:80px;z-index:9999;padding:4px 10px;border-radius:10px;background:rgba(0,0,0,.8);border:1px solid rgba(34,211,238,.4);color:#67e8f9;font:12px ui-monospace,monospace;pointer-events:none";
+    document.body.appendChild(el);
+    const t = setInterval(() => { el.textContent = `${fps.at(-1) ?? 0} FPS`; }, 500);
+    return () => { clearInterval(t); el.remove(); };
+  }, [prefs.fpsOverlay, fps]);
 
-  useEffect(() => () => {
-    micStream.current?.getTracks().forEach(track => track.stop());
-    void audioContext.current?.close();
-  }, []);
+  // ---- health check ----
+  const [checks, setChecks] = useState<Check[] | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [native, setNative] = useState<{ version: string; build: string } | null>(null);
+  useEffect(() => { if (Capacitor.isNativePlatform()) void CapApp.getInfo().then(i => setNative({ version: i.version, build: i.build })).catch(() => undefined); }, []);
 
-  const toggleMicrophone = async (enabled: boolean) => {
-    if (!enabled) {
-      micStream.current?.getTracks().forEach(track => track.stop());
-      micStream.current = null;
-      analyser.current = null;
-      void audioContext.current?.close();
-      audioContext.current = null;
-      setMicEnabled(false);
-      setWave(BASE_WAVE);
-      return;
-    }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast.error("Microphone access is not available in this browser.");
-      return;
-    }
+  const runChecks = async () => {
+    setChecking(true);
+    const out: Check[] = [];
+    out.push({ label: "Internet", ok: navigator.onLine, detail: navigator.onLine ? `${conn?.effectiveType?.toUpperCase() ?? "connected"}${conn?.downlink ? ` · ${conn.downlink} Mbps` : ""}` : "Offline" });
+    const ms = await ping();
+    out.push({ label: "Primegram servers", ok: ms !== null, detail: ms !== null ? `${ms} ms round trip` : "Unreachable" });
+    const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+    out.push({ label: "Signed-in session", ok: !!data.session, detail: data.session ? "Valid" : "No active session" });
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const context = new AudioContext();
-      const source = context.createMediaStreamSource(stream);
-      const nextAnalyser = context.createAnalyser();
-      nextAnalyser.fftSize = 128;
-      source.connect(nextAnalyser);
-      micStream.current = stream;
-      audioContext.current = context;
-      analyser.current = nextAnalyser;
-      setMicEnabled(true);
-      toast.success("Microphone connected for on-device visualizer only.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Microphone permission was denied.");
-    }
+      const r = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" }); const v = await r.json() as { web?: string };
+      out.push({ label: "App version", ok: v.web === __WEB_BUILD__, detail: v.web === __WEB_BUILD__ ? `Latest (${__WEB_BUILD__.slice(0, 7)})` : `Update available (${String(v.web).slice(0, 7)})` });
+    } catch { out.push({ label: "App version", ok: false, detail: "Couldn't check" }); }
+    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration().catch(() => undefined) : undefined;
+    out.push({ label: "Offline cache (service worker)", ok: !!reg?.active, detail: reg?.active ? (navigator.serviceWorker.controller ? "Active and in control" : "Installed, takes over on next open") : "Not installed" });
+    const perm = "Notification" in window ? Notification.permission : "unsupported";
+    out.push({ label: "Notifications permission", ok: perm === "granted", detail: perm === "granted" ? "Allowed" : perm === "denied" ? "Blocked in system settings" : perm === "default" ? "Not asked yet" : "Not supported here" });
+    try { const e = await navigator.storage?.estimate?.(); if (e?.usage !== undefined) out.push({ label: "Local storage", ok: true, detail: `${(e.usage / 1048576).toFixed(1)} MB used` }); } catch { /* not available */ }
+    setChecks(out); setChecking(false);
+    return out;
   };
 
-  const runStressTest = () => {
-    if (stressRunning) return;
-    setStressRunning(true);
-    toast.info("Running a lightweight simulated diagnostics check.");
-    window.setTimeout(() => {
-      setStressRunning(false);
-      toast.success("Diagnostics check complete. No issues detected.");
-    }, 1800);
+  // ---- utilities ----
+  const [pushBusy, setPushBusy] = useState(false);
+  const testPush = async () => {
+    if (!user) return; setPushBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-message", { body: { test: user.id } });
+      if (error) throw error;
+      const d = data as { sent?: number; skipped?: string; errors?: string[] };
+      if (d?.sent) toast.success(`Test notification sent to ${d.sent} device${d.sent === 1 ? "" : "s"}`);
+      else toast.info(d?.skipped === "no devices" ? "No phone is registered for notifications yet. Open the Android app and allow notifications." : d?.skipped ?? d?.errors?.[0] ?? "Nothing was sent");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't send a test notification"); }
+    finally { setPushBusy(false); }
+  };
+  const clearCache = async () => {
+    try {
+      for (const k of await caches.keys()) await caches.delete(k);
+      for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    } catch { /* best effort */ }
+    toast.success("Cache cleared — reloading"); setTimeout(() => location.reload(), 500);
+  };
+  const copyReport = async () => {
+    const report = {
+      time: new Date().toISOString(), webBuild: __WEB_BUILD__, native, platform: Capacitor.getPlatform(), online,
+      network: conn ? { type: conn.effectiveType, downlinkMbps: conn.downlink, rttMs: conn.rtt } : null,
+      screen: `${screen.width}x${screen.height}@${window.devicePixelRatio}`, userAgent: navigator.userAgent, language: navigator.language,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, fps: curFps, latencyMs: lat.at(-1) ?? null, jsHeapMb: mem.at(-1) ?? null,
+      checks: checks ?? (await runChecks()),
+    };
+    try { await navigator.clipboard.writeText(JSON.stringify(report, null, 2)); toast.success("Diagnostics copied — paste it to support"); } catch { toast.error("Couldn't copy"); }
   };
 
-  const toggleBeta = (featureId: string) => {
-    const enabled = preferences.betaFeatures.includes(featureId);
-    updatePreference({
-      betaFeatures: enabled
-        ? preferences.betaFeatures.filter(id => id !== featureId)
-        : [...preferences.betaFeatures, featureId],
-    });
-    toast.success(enabled ? "Beta opt-in removed" : "Beta opt-in saved on this device");
+  // ---- vibe engine (real microphone visualizer, on-device only) ----
+  const [mic, setMic] = useState(false);
+  const [bars, setBars] = useState<number[]>(Array(32).fill(8));
+  const stream = useRef<MediaStream | null>(null); const ctx = useRef<AudioContext | null>(null); const an = useRef<AnalyserNode | null>(null);
+  const stopMic = () => { stream.current?.getTracks().forEach(t => t.stop()); stream.current = null; void ctx.current?.close(); ctx.current = null; an.current = null; setMic(false); setBars(Array(32).fill(8)); };
+  useEffect(() => () => stopMic(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!mic || !an.current) return;
+    const a = an.current, s = new Uint8Array(a.frequencyBinCount);
+    const t = setInterval(() => { a.getByteFrequencyData(s); setBars(Array.from({ length: 32 }, (_, i) => Math.max(8, Math.min(100, ((s[Math.floor(i * s.length / 32)] ?? 0) / 255) * 100 * (prefs.vibeIntensity / 55))))); }, 80);
+    return () => clearInterval(t);
+  }, [mic, prefs.vibeIntensity]);
+  const toggleMic = async (on: boolean) => {
+    if (!on) { stopMic(); return; }
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ audio: true }); const c = new AudioContext(); const src = c.createMediaStreamSource(st); const a = c.createAnalyser(); a.fftSize = 128; src.connect(a);
+      stream.current = st; ctx.current = c; an.current = a; setMic(true);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Microphone permission was denied."); }
   };
+
+  const fpsColor = curFps >= 50 ? "#4ade80" : curFps >= 30 ? "#fbbf24" : "#f87171";
+  const latMs = lat.at(-1);
+  const latColor = latMs === undefined ? "#a1a1aa" : latMs < 250 ? "#22d3ee" : latMs < 700 ? "#fbbf24" : "#f87171";
+  const env: [string, string][] = [
+    ["Platform", Capacitor.isNativePlatform() ? `Android app${native ? ` · v${native.version} (${native.build})` : ""}` : "Web / PWA"],
+    ["Web build", __WEB_BUILD__.slice(0, 10)],
+    ["Screen", `${screen.width}×${screen.height} @${window.devicePixelRatio}x`],
+    ["Timezone", Intl.DateTimeFormat().resolvedOptions().timeZone],
+    ["Language", navigator.language],
+  ];
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-4 text-white shadow-[0_0_30px_rgba(255,0,51,0.12)] backdrop-blur-xl sm:p-5">
-      {preferences.fpsOverlay && (
-        <div className="fixed right-3 top-20 z-[80] rounded-lg border border-cyan-400/40 bg-black/80 px-3 py-1.5 font-mono text-xs text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,.3)]">
-          {fps} FPS
-        </div>
-      )}
-
-      <header className="mb-4 flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-400/30 bg-red-500/10 text-red-300 shadow-[0_0_16px_rgba(255,0,51,.24)]">
-          <Braces className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-bold tracking-wide text-white sm:text-base">Advanced Developer Tools</h2>
-          <p className="text-[11px] text-white/45">Local previews · no server integrations configured</p>
-        </div>
-        <span className="rounded-full border border-red-400/30 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-red-300">Extreme</span>
+    <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/40 p-4 text-white shadow-[0_8px_40px_rgba(0,0,0,.4)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full bg-cyan-500/15 blur-3xl" />
+      <header className="relative flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-cyan-200 shadow-[0_0_20px_rgba(34,211,238,.25)]"><Cpu className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1"><h2 className="text-base font-bold">Developer tools</h2><p className="text-xs text-white/50">Live readings from this device</p></div>
+        <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${online ? "border-emerald-400/30 text-emerald-300" : "border-red-400/30 text-red-300"}`}><span className={`h-1.5 w-1.5 rounded-full ${online ? "animate-pulse bg-emerald-400" : "bg-red-400"}`} />{online ? "Online" : "Offline"}</span>
       </header>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <div className="space-y-3">
-          <article className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <Monitor className="h-4 w-4 text-cyan-300" />
-              <h3 className="text-xs font-semibold text-white">Real-time Performance</h3>
-              <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-300"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> SIMULATED</span>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border border-white/10 bg-black/60 p-2">
-              <div className="absolute inset-0 grid grid-cols-6 grid-rows-4">
-                {Array.from({ length: 24 }, (_, i) => <span key={i} className="border-b border-r border-white/[0.045]" />)}
-              </div>
-              <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="relative h-24 w-full">
-                <polyline points={chartPoints(telemetry.cpu)} fill="none" stroke="#22d3ee" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                <polyline points={chartPoints(telemetry.memory)} fill="none" stroke="#d946ef" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                <polyline points={chartPoints(telemetry.network)} fill="none" stroke="#4ade80" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-              </svg>
-              <div className="relative mt-1 flex justify-between font-mono text-[9px]">
-                <span className="text-cyan-300">CPU</span><span className="text-fuchsia-300">Memory</span><span className="text-emerald-300">Network latency</span>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              onClick={runStressTest}
-              disabled={stressRunning}
-              className="mt-2 h-9 w-full border-red-500/50 bg-gradient-to-r from-red-950/60 to-fuchsia-950/40 text-xs text-red-100 shadow-[0_0_14px_rgba(255,0,51,.15)] hover:bg-red-950"
-            >
-              {stressRunning ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Checking…</> : <><Activity className="mr-2 h-3.5 w-3.5" />Run System Stress Test</>}
-            </Button>
-            <p className="mt-1 text-center text-[9px] text-white/35">Runs a lightweight UI check; it does not stress your device.</p>
-            <div className="mt-3 space-y-2">
-              <SettingSwitch icon={<Gauge />} label="Show FPS Overlay" checked={preferences.fpsOverlay} onChange={value => updatePreference({ fpsOverlay: value })} />
-              <SettingSwitch icon={<Cpu />} label="Log Diagnostics" checked={preferences.logDiagnostics} onChange={value => updatePreference({ logDiagnostics: value })} />
-            </div>
-          </article>
-
-          <article className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <FlaskConical className="h-4 w-4 text-violet-300" />
-              <h3 className="text-xs font-semibold text-white">Beta Lab Access</h3>
-            </div>
-            <div className="space-y-2">
-              {BETA_FEATURES.map(feature => {
-                const optedIn = preferences.betaFeatures.includes(feature.id);
-                return (
-                  <div key={feature.id} className="flex items-center gap-2">
-                    <Sparkles className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium text-white">{feature.title}</p>
-                      <p className="text-[9px] text-white/45">{feature.description}</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => toggleBeta(feature.id)} className="h-7 shrink-0 border-white/15 bg-white/5 px-2 text-[10px] text-white hover:bg-white/10">
-                      {optedIn ? <><Check className="mr-1 h-3 w-3" />Opted in</> : "Opt-in"}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          </article>
-        </div>
-
-        <div className="space-y-3">
-          <article className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <Cloud className="h-4 w-4 text-cyan-300" />
-              <h3 className="text-xs font-semibold text-white">Webhook & Connected Apps</h3>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-black/35 p-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-white/75">Webhook status</span>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />Active · local preview</span>
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10"><div className="h-full w-2/3 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500" /></div>
-                <Button size="sm" variant="outline" onClick={() => {
-                  setWebhookRevision(value => value + 1);
-                  toast.info("Local preview refreshed. No external webhook key was changed.");
-                }} className="h-7 border-white/15 bg-white/5 px-2 text-[10px] text-white">
-                  <RefreshCw className="mr-1 h-3 w-3" />Regenerate
-                </Button>
-              </div>
-              <p className="mt-1 font-mono text-[9px] text-white/35">preview-{String(webhookRevision).padStart(3, "0")} · not a real webhook endpoint</p>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="flex-1 text-[11px] text-white/75">Connected apps</span>
-              {[{ icon: Github, color: "text-white" }, { icon: Link2, color: "text-indigo-300" }, { icon: Radio, color: "text-violet-300" }, { icon: Music2, color: "text-pink-300" }].map(({ icon: Icon, color }, index) => (
-                <span key={index} className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5" aria-hidden="true"><Icon className={`h-3.5 w-3.5 ${color}`} /></span>
-              ))}
-              <Button size="sm" variant="outline" onClick={() => setAppsOpen(true)} className="h-7 border-white/15 bg-white/5 px-2 text-[10px] text-white">Manage</Button>
-            </div>
-            <p className="mt-2 text-[9px] text-white/35">App tiles are previews; no third-party accounts are currently connected.</p>
-          </article>
-
-          <article className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <AudioLines className="h-4 w-4 text-red-300" />
-              <h3 className="text-xs font-semibold text-white">Vibe Engine</h3>
-              <span className="ml-auto text-[9px] uppercase tracking-wider text-red-300">{micEnabled ? "Mic reactive" : "Preview"}</span>
-            </div>
-            <div className="flex h-20 items-center justify-center gap-[3px] overflow-hidden rounded-lg border border-red-400/15 bg-gradient-to-r from-red-950/40 via-fuchsia-950/20 to-red-950/40 px-2 shadow-[inset_0_0_24px_rgba(255,0,51,.08)]">
-              {wave.map((height, index) => (
-                <span
-                  key={index}
-                  className="w-1.5 shrink-0 rounded-full bg-gradient-to-t from-red-600 via-rose-400 to-pink-200 shadow-[0_0_8px_rgba(255,75,110,.65)] transition-[height] duration-100"
-                  style={{ height: `${Math.max(8, height * preferences.vibeIntensity / 55)}%` }}
-                />
-              ))}
-            </div>
-            <p className="mt-1 text-[9px] text-white/40">Microphone audio is analyzed on-device for the visualizer and is never recorded or uploaded.</p>
-            <div className="mt-3 space-y-2">
-              <SettingSwitch icon={<Mic />} label="Microphone Access for Vibe" checked={micEnabled} onChange={toggleMicrophone} />
-              <SettingSwitch icon={<Waves />} label="Background Ambient Vibe Match" checked={preferences.ambientMatch} onChange={value => updatePreference({ ambientMatch: value })} />
-            </div>
-            <div className="mt-3 flex items-center gap-3">
-              <span className="shrink-0 text-[10px] text-white/70">Vibe intensity</span>
-              <Slider
-                min={0}
-                max={100}
-                step={1}
-                value={[preferences.vibeIntensity]}
-                onValueChange={([value]) => updatePreference({ vibeIntensity: value })}
-                aria-label="Vibe intensity"
-                className="[&_[data-radix-slider-range]]:bg-gradient-to-r [&_[data-radix-slider-range]]:from-red-500 [&_[data-radix-slider-range]]:to-fuchsia-400 [&_[data-radix-slider-thumb]]:border-red-300"
-              />
-              <span className="w-8 text-right font-mono text-[10px] text-red-200">{preferences.vibeIntensity}</span>
-            </div>
-          </article>
+      <div className="relative mt-4 grid grid-cols-2 gap-2.5">
+        <Tile label="Frame rate" value={String(curFps)} unit="fps" color={fpsColor} values={fps} max={65} />
+        <Tile label="Server latency" value={latMs === undefined ? "—" : String(latMs)} unit="ms" color={latColor} values={lat} />
+        <Tile label="JS memory" value={mem.length ? String(mem.at(-1)) : "n/a"} unit={mem.length ? "MB" : ""} color="#d946ef" values={mem} />
+        <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-white/45">Network</p>
+          <p className="mt-0.5 font-mono text-2xl font-bold text-sky-300">{online ? (conn?.effectiveType?.toUpperCase() ?? "OK") : "—"}</p>
+          <p className="mt-1 text-[11px] text-white/45">{conn?.downlink ? `${conn.downlink} Mbps` : "speed n/a"}{conn?.rtt ? ` · ${conn.rtt} ms RTT` : ""}</p>
         </div>
       </div>
 
-      <Dialog open={appsOpen} onOpenChange={setAppsOpen}>
-        <DialogContent>
-          <DialogTitle>Connected apps</DialogTitle>
-          <p className="text-sm text-muted-foreground">Third-party integrations are not configured for this account yet.</p>
-          <div className="space-y-2">
-            {["GitHub", "Primegram API", "Discord", "Music services"].map(name => (
-              <div key={name} className="flex items-center justify-between rounded-xl bg-secondary/60 p-3 text-sm">
-                <span>{name}</span><span className="text-xs text-muted-foreground">Not connected</span>
-              </div>
-            ))}
-          </div>
-          <Button variant="secondary" onClick={() => setAppsOpen(false)}><ChevronRight className="mr-2 h-4 w-4" />Done</Button>
-        </DialogContent>
-      </Dialog>
+      <div className="relative mt-3 grid grid-cols-2 gap-2.5">
+        <Btn icon={<Activity />} label="Run health check" onClick={() => void runChecks()} busy={checking} />
+        <Btn icon={<ClipboardCopy />} label="Copy report" onClick={() => void copyReport()} />
+        <Btn icon={<BellRing />} label="Test notification" onClick={() => void testPush()} busy={pushBusy} />
+        <Btn icon={<Trash2 />} label="Clear cache" onClick={() => void clearCache()} />
+      </div>
+
+      {checks && (
+        <div className="relative mt-3 divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/10 bg-black/35">
+          {checks.map(c => (
+            <div key={c.label} className="flex items-center gap-3 px-3.5 py-2.5">
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${c.ok ? "bg-emerald-400/15 text-emerald-300" : "bg-red-400/15 text-red-300"}`}>{c.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}</span>
+              <span className="min-w-0 flex-1"><span className="block text-[13px] font-medium">{c.label}</span><span className="block truncate text-xs text-white/50">{c.detail}</span></span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="relative mt-3 divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/10 bg-black/35">
+        {env.map(([k, v]) => <div key={k} className="flex items-center justify-between gap-3 px-3.5 py-2"><span className="text-xs text-white/45">{k}</span><span className="truncate font-mono text-xs text-white/85">{v}</span></div>)}
+        <div className="flex items-center gap-3 px-3.5 py-2.5"><Gauge className="h-4 w-4 text-cyan-300" /><span className="flex-1 text-[13px]">Show FPS on screen</span><Switch checked={prefs.fpsOverlay} onCheckedChange={v => setPref({ fpsOverlay: v })} aria-label="Show FPS on screen" /></div>
+      </div>
+
+      <div className="relative mt-3 rounded-2xl border border-white/10 bg-black/35 p-3.5">
+        <div className="flex items-center gap-2"><AudioLines className="h-4 w-4 text-rose-300" /><h3 className="text-[13px] font-semibold">Vibe engine</h3><span className="ml-auto text-[11px] text-white/40">{mic ? "Listening" : "Off"}</span></div>
+        <div className="mt-2 flex h-16 items-center justify-center gap-[3px] overflow-hidden rounded-xl bg-gradient-to-r from-rose-950/50 via-fuchsia-950/30 to-rose-950/50 px-2">
+          {bars.map((h, i) => <span key={i} className="w-1.5 shrink-0 rounded-full bg-gradient-to-t from-rose-600 to-pink-200 transition-[height] duration-100" style={{ height: `${h}%` }} />)}
+        </div>
+        <div className="mt-3 flex items-center gap-3"><Mic className="h-4 w-4 text-white/50" /><span className="flex-1 text-[13px]">Microphone visualizer</span><Switch checked={mic} onCheckedChange={v => void toggleMic(v)} aria-label="Microphone visualizer" /></div>
+        <div className="mt-3 flex items-center gap-3"><Zap className="h-4 w-4 text-white/50" /><span className="shrink-0 text-[13px]">Intensity</span>
+          <Slider min={0} max={100} step={1} value={[prefs.vibeIntensity]} onValueChange={([v]) => setPref({ vibeIntensity: v })} aria-label="Vibe intensity" /><span className="w-7 text-right font-mono text-xs text-white/60">{prefs.vibeIntensity}</span></div>
+        <p className="mt-2 text-[11px] text-white/35">Audio is analyzed on this device only — never recorded or uploaded.</p>
+      </div>
+      <p className="relative mt-3 flex items-center justify-center gap-1.5 text-[11px] text-white/30"><Wifi className="h-3 w-3" /><RefreshCw className="h-3 w-3" />All numbers refresh live</p>
     </section>
   );
 };
-
-const SettingSwitch = ({
-  icon,
-  label,
-  checked,
-  onChange,
-}: {
-  icon: ReactNode;
-  label: string;
-  checked: boolean;
-  onChange: (value: boolean) => void | Promise<void>;
-}) => (
-  <div className="flex items-center gap-2">
-    <span className="text-white/45 [&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span>
-    <span className="flex-1 text-[10px] text-white/75">{label}</span>
-    <Switch checked={checked} onCheckedChange={onChange} aria-label={label} className="scale-90 data-[state=checked]:bg-red-500" />
-  </div>
-);
 
 export default AdvancedDeveloperHub;
