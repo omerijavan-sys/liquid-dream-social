@@ -61,7 +61,7 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const { signOut, user, savedAccounts, switchAccount, removeSavedAccount, saveCurrentAccount } = useAuth();
   const currentUserId = user?.id;
-  const { isAdmin } = useRoles();
+  const { isAdmin, isModerator } = useRoles();
   const [activePanel, setActivePanel] = useState<Panel>(null);
   const [pushState, setPushState] = useState("checking…");
   useEffect(() => { if (activePanel !== "notifications") return; const r = () => void pushStatus().then(setPushState); r(); window.addEventListener("prime:push-enable", r); window.addEventListener("focus", r); return () => { window.removeEventListener("prime:push-enable", r); window.removeEventListener("focus", r); }; }, [activePanel]);
@@ -611,7 +611,7 @@ const SettingsPage = () => {
                 ] },
                 { title: "Support", items: [
                   { key: "help", icon: HelpCircle, tint: "bg-teal-500/20 text-teal-300", label: "Help & support", desc: "FAQs and contact", onClick: go("help") },
-                  ...(isAdmin ? [{ key: "admin", icon: Shield, tint: "bg-red-500/25 text-red-300", label: "Admin console", desc: "Moderation, users and reports", onClick: () => navigate("/admin") }] : []),
+                  ...(isAdmin || isModerator ? [{ key: "admin", icon: Shield, tint: "bg-red-500/25 text-red-300", label: "Admin console", desc: "Moderation, users and reports", onClick: () => navigate("/admin") }] : []),
                 ] },
               ];
               const needle = q.trim().toLowerCase();

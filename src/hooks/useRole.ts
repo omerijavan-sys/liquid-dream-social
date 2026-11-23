@@ -27,6 +27,8 @@ export const useRoles = () => {
     roles,
     isAdmin: roles.includes("admin"),
     isModerator: roles.includes("admin") || roles.includes("moderator"),
+    /** Minor admin: manages users and their posts only (no badges, revenue or payouts). */
+    isMinorAdmin: roles.includes("moderator") && !roles.includes("admin"),
     loading: query.isLoading,
   };
 };
