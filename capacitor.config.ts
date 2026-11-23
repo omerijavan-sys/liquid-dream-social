@@ -11,7 +11,6 @@ const config: CapacitorConfig = {
     cleartext: false,
     androidScheme: 'https',
     allowNavigation: ['primegramx.co.ke', 'www.primegramx.co.ke', '*.supabase.co'],
-    errorPath: 'offline.html', // bundled page shown when the site can't be reached
   },
 };
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'primegram-v3';
+const CACHE_NAME = 'primegram-v4';
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -16,7 +16,10 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Always live: the update check and server endpoints. Range requests (media seeking) are left to the network.
+  if (url.pathname === '/version.json' || url.pathname.startsWith('/api/') || request.headers.has('range')) return;
 
+  // Page loads: network first, but when offline serve the last cached app shell so the UI still opens.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -31,9 +34,19 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Scripts, styles, fonts, images: serve from cache instantly and refresh in the background, so the app
+  // boots offline after it has been opened once. Failures never throw into the page.
   event.respondWith(
-    caches.match(request, { cacheName: CACHE_NAME })
-      .then(response => response || fetch(request))
+    caches.open(CACHE_NAME).then(async cache => {
+      const cached = await cache.match(request);
+      const network = fetch(request)
+        .then(response => {
+          if (response.ok && response.type === 'basic') void cache.put(request, response.clone());
+          return response;
+        })
+        .catch(() => null);
+      return cached || (await network) || Response.error();
+    })
   );
 });
 

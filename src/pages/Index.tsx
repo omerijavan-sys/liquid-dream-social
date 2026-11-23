@@ -90,7 +90,8 @@ const Index = () => {
         setPosts([]);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't load posts");
+      // Offline: keep showing whatever is already on screen and stay quiet instead of toasting on every refresh.
+      if (navigator.onLine) toast.error(error instanceof Error ? error.message : "Couldn't load posts");
     } finally {
       loadingRef.current = false;
       setLoading(false);
