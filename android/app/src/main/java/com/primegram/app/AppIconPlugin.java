@@ -11,7 +11,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 /** Switches the launcher icon by enabling exactly one of the manifest activity-aliases. */
 @CapacitorPlugin(name = "AppIcon")
 public class AppIconPlugin extends Plugin {
-    private static final String[] ALIASES = {"Default", "Gold", "Midnight", "Violet", "Emerald", "Rose", "Sky"};
+    private static final String[] ALIASES = {"Default", "Gold", "Midnight", "Violet", "Emerald", "Rose", "Sky", "XViolet", "XBlue", "XCyan", "XGreen", "XGold", "XRed", "XPink", "XSilver"};
 
     @PluginMethod
     public void set(PluginCall call) {

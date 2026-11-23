@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="ic_bg_x">#000000</color>
     <color name="ic_bg_gold">#E8CA7F</color>
     <color name="ic_bg_midnight">#6473A0</color>
     <color name="ic_bg_violet">#AB90EB</color>

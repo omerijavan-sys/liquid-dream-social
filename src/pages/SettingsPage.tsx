@@ -273,7 +273,7 @@ const SettingsPage = () => {
     { icon: Shield, label: "Blocked Accounts", desc: "People you blocked", panel: "blocked" as Panel },
     { icon: Shield, label: "Security", desc: "Password & 2FA", panel: "security" as Panel },
     { icon: Palette, label: "Appearance", desc: "Theme & display", panel: "appearance" as Panel },
-    { icon: Palette, label: "App icon", desc: "Home-screen icon", panel: "appicon" as Panel },
+    { icon: Palette, label: "Icons", desc: "Home-screen icons", panel: "appicon" as Panel },
     { icon: Moon, label: "Dark Mode", desc: darkMode ? "On" : "Off", panel: "darkmode" as Panel },
     { icon: HelpCircle, label: "Help & Support", desc: "FAQs and contact", panel: "help" as Panel },
     { icon: User, label: "Switch Accounts", desc: "Manage up to two saved accounts", panel: "accounts" as Panel },
@@ -600,7 +600,7 @@ const SettingsPage = () => {
                 { title: "Experience", items: [
                   { key: "notifications", icon: Bell, tint: "bg-red-500/20 text-red-300", label: "Notifications", desc: "Messages, calls and alerts", onClick: go("notifications") },
                   { key: "appearance", icon: Palette, tint: "bg-fuchsia-500/20 text-fuchsia-300", label: "Appearance", desc: "Themes and colors", onClick: go("appearance") },
-                  ...(Capacitor.isNativePlatform() ? [{ key: "appicon", icon: Sparkles, tint: "bg-sky-500/20 text-sky-300", label: "App icon", desc: "Choose your home-screen icon", onClick: go("appicon") }] : []),
+                  ...(Capacitor.isNativePlatform() ? [{ key: "appicon", icon: Sparkles, tint: "bg-sky-500/20 text-sky-300", label: "Icons", desc: "Choose your home-screen icon", onClick: go("appicon") }] : []),
                   { key: "dark", icon: Moon, tint: "bg-violet-500/20 text-violet-300", label: "Dark mode", desc: darkMode ? "On" : "Off", right: <Switch checked={darkMode} onCheckedChange={setDarkMode} aria-label="Dark Mode" /> },
                   { key: "content", icon: Sparkles, tint: "bg-cyan-500/20 text-cyan-300", label: "Captions, search & reels", desc: "How content behaves for you", onClick: go("content") },
                 ] },

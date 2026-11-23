@@ -1,3 +1,4 @@
+import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { requestPin } from "@/components/WalletPin";
@@ -37,6 +38,7 @@ const LivePage = () => {
   const [cam, setCam] = useState(true);
   const [needsTap, setNeedsTap] = useState(false);
   const [hasVideo, setHasVideo] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const [hostName, setHostName] = useState("");
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -298,7 +300,7 @@ const LivePage = () => {
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-black text-white">
-      <video ref={videoRef} autoPlay playsInline muted={hostView} className={`absolute inset-0 h-full w-full object-cover ${hostView && stream ? "" : ""}`} />
+      <video ref={videoRef} autoPlay playsInline muted={hostView} poster={BLANK_POSTER} controls={false} disablePictureInPicture disableRemotePlayback onPlaying={() => setPlaying(true)} className={`absolute inset-0 h-full w-full object-cover ${hostView && stream ? "" : ""}`} />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/70" />
 
       {/* top bar */}
@@ -316,7 +318,7 @@ const LivePage = () => {
       </div>
 
       {/* viewer waiting / full states */}
-      {!hostView && !hasVideo && <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3"><Loader2 className="h-8 w-8 animate-spin" /><p className="text-sm">Joining live…</p></div>}
+      {!hostView && !playing && !needsTap && <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-[radial-gradient(ellipse_at_50%_35%,#2a0f4d,#000_70%)]"><img src="/icons/xviolet.png" alt="" className="h-20 w-20 rounded-3xl shadow-[0_0_40px_rgba(168,85,247,.45)]" /><Loader2 className="h-6 w-6 animate-spin text-white/80" /><p className="text-sm text-white/80">Joining live…</p></div>}
       {needsTap && <button onClick={() => { void videoRef.current?.play(); setNeedsTap(false); }} className="relative z-10 m-auto rounded-full bg-white px-6 py-3 text-sm font-semibold text-black">Tap to watch</button>}
 
       {/* host setup */}
