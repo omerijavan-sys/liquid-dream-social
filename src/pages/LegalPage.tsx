@@ -1,73 +1,75 @@
-import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import TrustPageLayout from "@/components/TrustPageLayout";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 type Kind = "terms" | "privacy" | "help";
 
-const content: Record<Kind, { title: string; sections: Array<[string, string]> }> = {
+const content: Record<Kind, { title: string; description: string; sections: Array<[string, string]> }> = {
   terms: {
     title: "Terms of Service",
+    description: "Read the Primegram X terms, including community standards, user content rights, age-restricted rooms, and support contact information.",
     sections: [
-      ["Using Primegram", "You must be 18 or older, or the age of majority where you live, to use Primegram. You are responsible for your account and for everything posted from it."],
-      ["Your content", "You keep ownership of what you post. You grant Primegram a licence to host and display it to provide the service. Do not post illegal content, harassment, hate, or content that exploits minors. Adult content is allowed only in the sections that are age-gated and clearly marked."],
-      ["Wallet, tips and subscriptions", "Wallet balances are held in KES. Creators receive 95% of tips and subscriptions; the remainder is a platform fee. Creator subscriptions are prepaid for one month and do not auto-renew. Subscription payments are non-refundable once access has been granted."],
-      ["Withdrawals", "Withdrawal requests (minimum KES 50) are reviewed and paid manually to an M-Pesa number. Funds are held when you request a withdrawal and are refunded if you cancel or the request is rejected. Accounts may be reviewed for fraud before payment."],
-      ["Camera, microphone, photos and notifications", "With your permission the app uses the camera and microphone for calls and posting, your photos and videos so you can choose media to share, and notifications for messages and calls. You can turn any of these off in your phone settings."],
-      ["Music", "Songs are streamed from third-party services for personal listening inside the app. Do not use music in a way that infringes someone else's rights."],
-      ["Copyright and takedowns", "Only post content you own or have permission to use, including any music you add. If you believe something on Primegram infringes your copyright, send the work, the link to the post and your contact details to officialprimegram.app@gmail.com (subject: Copyright) or through Settings → Help & Support. We remove infringing content promptly and may suspend repeat infringers."],
-      ["Community rules", "No violence or threats, harassment, hate, scams or impersonation, sexual content involving minors (zero tolerance, reported to the authorities), or content that breaks the law in Kenya or where you live. Posts you mark as followers-only are visible only to your followers."],
-      ["Age", "Primegram is for people 18 and over. Accounts found to belong to under-18s are closed."],
-      ["Enforcement", "We may remove content or suspend accounts that violate these terms. You can report content or users from the app."],
-      ["Deleting your account", "You can delete your account in Settings → Security. Any remaining wallet balance is forfeited, so withdraw it first."],
-      ["Contact", "Questions? Email officialprimegram.app@gmail.com or use Settings → Help & Support → Contact Support."],
+      ["Who can use Primegram X", "You must be at least 18 years old to create or use an account. You are responsible for keeping your account secure and for activity carried out through it. Do not use the service if you are not legally able to agree to these terms."],
+      ["Community standards", "Treat people respectfully. Do not post threats, harassment, hateful or discriminatory abuse, scams, impersonation, unlawful material, spam, or content that exploits or endangers anyone. Do not manipulate engagement, disrupt the service, or access another person's account without permission. You can report content or accounts in the app."],
+      ["Age-restricted rooms", "Any room or feature marked 18+ is strictly for adults aged 18 or older. Do not enter or facilitate access to an age-restricted room if you are under 18. Do not share sexual content involving minors under any circumstances; it is prohibited and may be reported to the appropriate authorities."],
+      ["Your content and intellectual property", "You retain ownership of content you create. By posting or sharing it, you give Primegram X a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, display, and distribute that content only as needed to operate, improve, and promote the service. You confirm you have the rights and permissions needed for what you share, including music and other third-party material. You can remove content you posted, subject to limited legal or operational retention."],
+      ["Payments and third-party services", "Some features may involve payments or payment processing through providers such as Paystack or M-Pesa. Their services are subject to their own terms and privacy practices. Primegram X does not receive or store full payment credentials handled directly by those providers. Check the amount and terms shown before confirming a transaction."],
+      ["Moderation and account actions", "We may review reports, remove content, restrict features, or suspend accounts when we reasonably believe these terms or applicable law have been violated, or when action is needed to protect the community or service. Where appropriate, you may contact support to ask about an action."],
+      ["Changes and availability", "Features may change, and access may be interrupted for maintenance, security, or circumstances outside our control. We may update these terms; the latest version will be posted on this page."],
+      ["Contact", "Questions about these terms or a community concern? Email support@primegramx.co.ke."],
     ],
   },
   privacy: {
     title: "Privacy Policy",
+    description: "Learn what information Primegram X collects, how it is used and protected, payment disclosures, and how to request deletion.",
     sections: [
-      ["What we collect", "Account details (email or phone number), profile information, content you post, messages, wallet and payment records, and basic device information needed to run the app. We also keep simple crash and usage logs (which screen was opened, error messages, and whether you use the website or Android app) to fix bugs and improve the app; these do not include your messages or content."],
-      ["How we use it", "To provide the service, secure accounts, process payments and withdrawals, show you relevant content, and handle reports and support requests."],
-      ["Photos, camera and microphone", "Photos and videos are read from your device only when you choose them to post or send. Camera and microphone are used only during calls, video recording and similar features, and are never used in the background."],
-      ["Sharing", "We do not sell your personal data. Data is processed by infrastructure providers (hosting, database, SMS and email delivery, and payment processing) strictly to run Primegram."],
-      ["Your controls", "Edit your profile, set your account to private, control who can message you, block users, download a copy of your data, or delete your account at any time from Settings."],
-      ["Security", "Data is encrypted in transit and protected by row-level access controls. You can enable two-factor authentication and sign out of all devices from Settings → Security."],
-      ["Your rights", "Under the Kenya Data Protection Act 2019 and similar laws you can ask to access, correct, export or delete your data, and object to processing. Use Settings, or email officialprimegram.app@gmail.com. Data controller: Primegram, operated by Java Prime."],
-      ["Children", "Primegram is not directed at anyone under 18 and we do not knowingly collect data from them."],
-      ["Retention", "When you delete your account, your profile, posts and wallet history are removed from our systems, except records we must keep for legal or fraud-prevention reasons."],
+      ["Information we collect", "Depending on the features you use, we collect account details such as email or phone number, profile information, posts and other content you share, and messaging content. We also process real-time messaging metadata such as participants, timestamps, delivery status, and related technical events. Basic device, log, and usage information helps us operate, troubleshoot, and secure the service."],
+      ["How we use information", "We use information to provide social features, deliver messages and notifications, personalize feeds, maintain account security, prevent abuse, process transactions, and respond to support requests or legal obligations."],
+      ["Payments: Paystack and M-Pesa", "When you make or receive a payment, payment details may be handled by Paystack, M-Pesa, or another provider shown at checkout. Those providers process transactions under their own terms and privacy policies. We may receive transaction references, status, and limited payment details needed to display receipts, manage balances, and prevent fraud."],
+      ["How we protect information", "We use encrypted connections (HTTPS/TLS) to protect information in transit and apply database access controls intended to limit access to authorized accounts and service operations. No online service can guarantee absolute security, so please use a unique password and keep your sign-in details private."],
+      ["Sharing and service providers", "We do not sell personal information. We share only what is reasonably necessary with service providers that help host, secure, operate, and support Primegram X, and when required to comply with law or protect people and the service."],
+      ["Your choices and deletion rights", "You may update profile information and manage available privacy settings in the app. To request access, correction, or deletion of personal information, use the account-deletion controls in Settings or email support@primegramx.co.ke. We may retain limited records when required by law, payment reconciliation, security, or dispute resolution."],
+      ["Retention", "We keep information while needed to provide the service and for legitimate operational purposes. When an account is deleted, we remove or de-identify associated information where practical, subject to legal, security, payment, and backup-retention requirements."],
+      ["Children", "Primegram X is intended for adults 18 and older. We do not knowingly invite children to use the service. If you believe a minor has created an account, contact support@primegramx.co.ke."],
+      ["Contact and privacy requests", "For privacy questions or requests, email support@primegramx.co.ke. Please include enough information for us to locate your account without sending your password."],
     ],
   },
   help: {
     title: "Help Center",
+    description: "Get help with Primegram X.",
     sections: [
-      ["How do I top up my wallet?", "Open Wallet and choose Top up. Enter your M-Pesa number and amount, then approve the prompt on your phone."],
-      ["How do I withdraw earnings?", "Open Wallet → Withdraw, enter an amount (min KES 50) and your M-Pesa number. An admin reviews and pays it; you'll see the status in your withdrawals list. You can cancel while it is pending for an instant refund."],
-      ["How do creator subscriptions work?", "Creators set a monthly price in Settings → Creator Dashboard. Subscribers pay from their wallet for one month of access; creators receive 95%."],
-      ["I didn't get my verification code", "Check spam, wait a minute, then request a new code. For phone numbers use the international format, e.g. +2547XXXXXXXX."],
-      ["How do I block or report someone?", "Open their profile or post menu and choose Block or Report."],
-      ["Still need help?", "Email our support team at officialprimegram.app@gmail.com and we'll get back to you."],
-      ["About Primegram", "Primegram v1.0 — created by Java Prime, sponsored by JP7 ULTRA."],
+      ["Contact support", "Email support@primegramx.co.ke for help with your account, safety, or app features."],
     ],
   },
 };
 
 const LegalPage = ({ kind }: { kind: Kind }) => {
-  const navigate = useNavigate();
   const page = content[kind];
+  usePageMeta({ title: `${page.title} | Primegram X`, description: page.description, path: `/${kind}` });
+
   return (
-    <div className="min-h-screen bg-background pb-16">
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-background/80 px-4 py-3 backdrop-blur-xl">
-        <button onClick={() => navigate(-1)} aria-label="Back" className="depth-press"><ArrowLeft className="h-5 w-5 text-foreground" /></button>
-        <h1 className="text-base font-semibold text-foreground">{page.title}</h1>
-      </header>
-      <main className="mx-auto max-w-2xl space-y-5 p-5">
-        {page.sections.map(([h, body]) => (
-          <section key={h} id={h.startsWith("About") ? "about" : undefined}>
-            <h2 className="mb-1 text-sm font-semibold text-foreground">{h}</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">{body}</p>
-          </section>
-        ))}
-        <p className="pt-4 text-[11px] text-muted-foreground">Last updated November 2026</p>
-      </main>
-    </div>
+    <TrustPageLayout>
+      <article className="mx-auto w-full max-w-4xl px-5 pb-20 pt-12 sm:px-8 sm:pt-20">
+        <header className="mb-10 border-b border-white/10 pb-8 sm:mb-12 sm:pb-10">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Primegram X · Public policy</p>
+          <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">{page.title}</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">{page.description}</p>
+        </header>
+        <div className="grid gap-4 sm:gap-5">
+          {page.sections.map(([heading, body], index) => (
+            <section key={heading} className="liquid-glass rounded-2xl p-5 sm:p-7">
+              <div className="relative z-10 grid gap-3 sm:grid-cols-[2.5rem_1fr] sm:gap-5">
+                <span aria-hidden="true" className="flex size-9 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-xs font-bold text-primary">{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <h2 className="text-base font-bold sm:text-lg">{heading}</h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-300">{body}</p>
+                </div>
+              </div>
+            </section>
+          ))}
+        </div>
+        <p className="mt-8 text-xs text-muted-foreground">Last updated November 2026 · For questions, contact <a className="text-slate-200 underline decoration-primary/60 underline-offset-4" href="mailto:support@primegramx.co.ke">support@primegramx.co.ke</a>.</p>
+      </article>
+    </TrustPageLayout>
   );
 };
 

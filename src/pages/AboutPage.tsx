@@ -1,103 +1,39 @@
-import { useEffect } from "react";
-import { Capacitor } from "@capacitor/core";
-import { ArrowDown, ArrowRight, Download, Heart, LockKeyhole, MessageCircle, Music2, Play, Sparkles, Wallet } from "lucide-react";
-import { ANDROID_APK_URL } from "@/components/AndroidDownloadCard";
-import PrimeLogo from "@/components/PrimeLogo";
+import { ArrowDown, ArrowRight, Clock3, Globe2, Heart, LockKeyhole, Mail, MessageCircle, Music2, PhoneCall, Play, Radio, Sparkles, Trophy } from "lucide-react";
+import TrustPageLayout from "@/components/TrustPageLayout";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const pillars = [
-  {
-    icon: Play,
-    number: "01",
-    title: "Short Videos, Reels & Stories",
-    description: "Share high-energy clips, daily moments, and creative edits with live view counters and instant feed discovery.",
-  },
-  {
-    icon: Music2,
-    number: "02",
-    title: "In-Feed Music & Audio",
-    description: "Attach background tracks to your posts and discover trending sounds directly inside the feed.",
-  },
-  {
-    icon: MessageCircle,
-    number: "03",
-    title: "Instant Messaging & Live Calls",
-    description: "Stay connected with friends and communities through fast chat and real-time audio and video calling.",
-  },
-  {
-    icon: Sparkles,
-    number: "04",
-    title: "Primegram X Hub",
-    description: "Explore interactive social features, AI-powered matching and assistants, and creator badges designed for a dynamic Gen Z experience.",
-  },
+  { icon: Radio, number: "01", title: "Real-time social feeds", description: "Share updates, photos, and video, then follow the conversations moving through your community." },
+  { icon: Clock3, number: "02", title: "24-hour stories", description: "Post everyday moments that stay in the spotlight for a day, then disappear from your story." },
+  { icon: PhoneCall, number: "03", title: "Live audio and video rooms", description: "Meet face to face in WebRTC-powered calls and rooms for real-time conversations." },
+  { icon: Music2, number: "04", title: "Music and sports hubs", description: "Discover sounds, entertainment, and sports content alongside the people you follow." },
+  { icon: Trophy, number: "05", title: "Aura points and badges", description: "Build your Aura through participation, milestones, and profile badges." },
 ];
 
 const AboutPage = () => {
-  useEffect(() => {
-    const previousTitle = document.title;
-    document.title = "About Primegram X | Primegram X";
-
-    const metadata = [
-      { selector: 'meta[name="description"]', attribute: "content", value: "Welcome to Primegram X, a next-generation social platform for creators, music lovers, and communities. Share Reels, discover music, message, call, and connect at primegramx.co.ke." },
-      { selector: 'link[rel="canonical"]', attribute: "href", value: "https://primegramx.co.ke/about" },
-      { selector: 'meta[property="og:title"]', attribute: "content", value: "About Primegram X | Primegram X" },
-      { selector: 'meta[property="og:description"]', attribute: "content", value: "Welcome to Primegram X, a next-generation social platform for creators, music lovers, and communities." },
-      { selector: 'meta[property="og:url"]', attribute: "content", value: "https://primegramx.co.ke/about" },
-      { selector: 'meta[name="twitter:title"]', attribute: "content", value: "About Primegram X | Primegram X" },
-      { selector: 'meta[name="twitter:description"]', attribute: "content", value: "Welcome to Primegram X, a next-generation social platform for creators, music lovers, and communities." },
-    ].map((item) => ({ ...item, element: document.querySelector(item.selector) }));
-    const previousMetadata = metadata.map(({ element, attribute }) => element?.getAttribute(attribute) ?? null);
-    metadata.forEach(({ element, attribute, value }) => element?.setAttribute(attribute, value));
-
-    return () => {
-      document.title = previousTitle;
-      metadata.forEach(({ element, attribute }, index) => {
-        const previousValue = previousMetadata[index];
-        if (previousValue !== null) element?.setAttribute(attribute, previousValue);
-      });
-    };
-  }, []);
+  usePageMeta({
+    title: "About Primegram X | Built in Kisumu, Kenya",
+    description: "Meet Primegram X, a next-generation social, entertainment, and real-time connection platform built in Kisumu, Kenya by MR. AURA.",
+    path: "/about",
+  });
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30">
+    <TrustPageLayout>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-48 top-16 size-[30rem] rounded-full bg-primary/[0.09] blur-[130px]" />
-        <div className="absolute -right-48 top-[30rem] size-[32rem] rounded-full bg-blue-500/[0.08] blur-[140px]" />
+        <div className="absolute -right-48 top-[30rem] size-[32rem] rounded-full bg-slate-300/[0.06] blur-[140px]" />
       </div>
-
-      <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
-        <a href="/" className="flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Primegram home">
-          <PrimeLogo size={40} glow={false} className="border-white/10" />
-          <span className="text-sm font-extrabold tracking-[0.14em]">PRIMEGRAM X</span>
-        </a>
-        <nav aria-label="Main navigation" className="flex items-center gap-2 sm:gap-5">
-          <a href="/help" className="hidden rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline-flex">Help</a>
-          {!Capacitor.isNativePlatform() && (
-            <a
-              href={ANDROID_APK_URL}
-              download
-              aria-label="Download Primegram X for Android"
-              title="Download APK"
-              className="inline-flex size-10 items-center justify-center rounded-full border border-emerald-300/30 text-emerald-200 transition-colors hover:bg-emerald-400/10 hover:text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-            >
-              <Download className="size-4" aria-hidden="true" />
-            </a>
-          )}
-          <a href="/auth" className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            Join Primegram <ArrowRight className="size-4" aria-hidden="true" />
-          </a>
-        </nav>
-      </header>
 
       <section className="relative z-10 mx-auto grid min-h-[78vh] w-full max-w-7xl items-center gap-14 px-5 pb-20 pt-12 sm:px-8 md:grid-cols-[1.05fr_.95fr] md:pb-28 md:pt-16">
         <div className="max-w-2xl">
           <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.07] px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.13em] text-primary">
-            <Sparkles className="size-4" aria-hidden="true" /> Welcome to Primegram X
+            <Sparkles className="size-4" aria-hidden="true" /> Built in Kisumu, Kenya by MR. AURA
           </p>
           <h1 className="text-5xl font-black leading-[1.02] tracking-[-0.055em] sm:text-6xl md:text-7xl">
-            Social, in<br /><span className="bg-gradient-to-r from-primary via-amber-200 to-sky-300 bg-clip-text text-transparent">full colour.</span>
+            Social, in<br /><span className="bg-gradient-to-r from-primary via-slate-200 to-white bg-clip-text text-transparent">full colour.</span>
           </h1>
           <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            Primegram X is a next-generation social networking platform built for creators, music lovers, and communities who want fast, expressive connections in one place. Accessible directly at primegramx.co.ke, Primegram brings together short-form videos, Reels, photo feeds, music discovery, real-time messaging, and interactive social hubs inside a sleek, modern interface.
+            Primegram X is a next-generation social, entertainment, and real-time connection platform for Gen Z. Built in Kisumu, Kenya by founder MR. AURA, it brings real-time feeds, stories, live rooms, music, sports, and creator communities together at primegramx.co.ke.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <a href="/auth" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-[0_8px_30px_hsla(var(--primary)/.2)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
@@ -117,22 +53,18 @@ const AboutPage = () => {
               <span className="flex size-11 items-center justify-center rounded-2xl bg-primary/15 text-primary"><Play className="size-5 fill-current" aria-hidden="true" /></span>
               <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Create</p><p className="mt-1 text-lg font-bold">Moments worth sharing</p></div>
             </div>
-            <div className="liquid-glass mt-10 flex min-h-48 flex-col justify-between overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-sky-500/[0.08] to-transparent p-5 sm:min-h-56 sm:p-6">
-              <span className="flex size-11 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-300"><MessageCircle className="size-5" aria-hidden="true" /></span>
-              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">Connect</p><p className="mt-1 text-lg font-bold">Conversations that flow</p></div>
+            <div className="liquid-glass mt-10 flex min-h-48 flex-col justify-between overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-slate-300/[0.07] to-transparent p-5 sm:min-h-56 sm:p-6">
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-slate-300/10 text-slate-200"><MessageCircle className="size-5" aria-hidden="true" /></span>
+              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Connect</p><p className="mt-1 text-lg font-bold">Conversations that flow</p></div>
             </div>
-            <div className="liquid-glass -mt-7 flex min-h-48 flex-col justify-between overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-rose-500/[0.08] to-transparent p-5 sm:min-h-56 sm:p-6">
-              <span className="flex size-11 items-center justify-center rounded-2xl bg-rose-400/15 text-rose-300"><Heart className="size-5" aria-hidden="true" /></span>
-              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-300">Discover</p><p className="mt-1 text-lg font-bold">A feed that feels alive</p></div>
+            <div className="liquid-glass -mt-7 flex min-h-48 flex-col justify-between overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary/[0.08] to-transparent p-5 sm:min-h-56 sm:p-6">
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-primary/15 text-primary"><Heart className="size-5" aria-hidden="true" /></span>
+              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Discover</p><p className="mt-1 text-lg font-bold">A feed that feels alive</p></div>
             </div>
-            <div className="liquid-glass flex min-h-48 flex-col justify-between overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-5 sm:min-h-56 sm:p-6">
-              <span className="flex size-11 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300"><Wallet className="size-5" aria-hidden="true" /></span>
-              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">Support</p><p className="mt-1 text-lg font-bold">Creators you believe in</p></div>
+            <div className="liquid-glass flex min-h-48 flex-col justify-between overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-slate-300/[0.07] to-transparent p-5 sm:min-h-56 sm:p-6">
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-slate-300/10 text-slate-200"><Trophy className="size-5" aria-hidden="true" /></span>
+              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Build your Aura</p><p className="mt-1 text-lg font-bold">Milestones worth earning</p></div>
             </div>
-          </div>
-          <div className="liquid-glass absolute -right-2 top-1/2 hidden -translate-y-1/2 items-center gap-3 rounded-2xl px-4 py-3 shadow-xl sm:flex">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary"><Music2 className="size-4" aria-hidden="true" /></span>
-            <div><p className="text-xs font-semibold">Sound on</p><p className="text-[11px] text-muted-foreground">Find your next favorite</p></div>
           </div>
         </div>
       </section>
@@ -140,7 +72,7 @@ const AboutPage = () => {
       <section id="what-matters" className="relative z-10 border-y border-white/[0.08] bg-white/[0.02]">
         <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-20 sm:px-8 md:grid-cols-[.8fr_1.2fr] md:gap-20 md:py-28">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">What you can do on Primegram</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">The Primegram X experience</p>
             <h2 className="mt-4 max-w-md text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Everything you need to connect, create, and discover.</h2>
             <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground">From short-form video and music to live conversations and interactive hubs, Primegram brings your social world together in one place.</p>
           </div>
@@ -161,18 +93,20 @@ const AboutPage = () => {
           <h2 className="mt-4 max-w-sm text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Make social feel more alive.</h2>
         </div>
         <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
-          Built in Kenya for a global generation, Primegram X (also known as Primegram Extreme) was created to make social media feel more alive, visual, and personal—combining entertainment, music, and real-time communication without the clutter of legacy platforms.
+          Founded and built in Kisumu, Kenya by MR. AURA, Primegram X brings Gen Z together through expressive social features, entertainment, and real-time connection.
         </p>
       </section>
 
-      <section aria-labelledby="who-runs" className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-6 sm:px-8">
-        <div className="liquid-glass rounded-[2rem] p-6 sm:p-10">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Who we are</p>
-          <h2 id="who-runs" className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">A Kenyan-built platform, run in the open.</h2>
-          <div className="mt-5 grid gap-6 text-sm leading-7 text-muted-foreground sm:grid-cols-3">
-            <div><h3 className="font-semibold text-foreground">Operator</h3><p>Primegram X (Primegram Extreme) is created and operated by Java Prime, Kenya, at primegramx.co.ke.</p></div>
-            <div><h3 className="font-semibold text-foreground">Safety</h3><p>Adults only (18+). Content and people can be reported in the app, and we remove illegal content and act on copyright takedown requests. See our <a className="underline" href="/terms">Terms</a>.</p></div>
-            <div><h3 className="font-semibold text-foreground">Your data and money</h3><p>We follow our <a className="underline" href="/privacy">Privacy Policy</a> and Kenya's Data Protection Act. Wallet payments and withdrawals use M-Pesa and Paystack. Contact us at <a className="underline" href="mailto:officialprimegram.app@gmail.com">officialprimegram.app@gmail.com</a> or through the <a className="underline" href="/help">Help centre</a>.</p></div>
+      <section className="relative z-10 mx-auto w-full max-w-7xl px-5 py-8 sm:px-8">
+        <div className="liquid-glass flex flex-col gap-5 rounded-[1.75rem] p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Official contact &amp; verification</p>
+            <h2 className="mt-2 text-xl font-bold">Need help or want to verify Primegram X?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">For support and official enquiries, contact the team directly.</p>
+          </div>
+          <div className="flex flex-col gap-3 text-sm sm:items-end">
+            <a className="inline-flex items-center gap-2 font-semibold hover:text-primary" href="mailto:support@primegramx.co.ke"><Mail className="size-4 text-primary" aria-hidden="true" /> support@primegramx.co.ke</a>
+            <a className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground" href="https://primegramx.co.ke"><Globe2 className="size-4" aria-hidden="true" /> https://primegramx.co.ke</a>
           </div>
         </div>
       </section>
@@ -187,14 +121,7 @@ const AboutPage = () => {
         </div>
       </section>
 
-      <footer className="relative z-10 border-t border-white/[0.08] px-5 py-7 sm:px-8">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <a href="/" className="font-bold tracking-[0.12em] text-foreground">PRIMEGRAM X</a>
-          <p>Connect, create, and discover.</p>
-          <nav aria-label="Legal links" className="flex gap-5"><a className="transition-colors hover:text-foreground" href="/privacy">Privacy</a><a className="transition-colors hover:text-foreground" href="/terms">Terms</a><a className="transition-colors hover:text-foreground" href="/help">Help</a></nav>
-        </div>
-      </footer>
-    </main>
+    </TrustPageLayout>
   );
 };
 

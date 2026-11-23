@@ -454,7 +454,7 @@ const AuthPage = () => {
   }, [otpCountdown]);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="relative flex min-h-screen flex-col items-center justify-center gap-6 overflow-y-auto bg-background p-6">
       {showIntro && <AuthCinematic onDone={() => { sessionStorage.setItem("authIntroSeen", "1"); setShowIntro(false); }} />}
 
       <div className="absolute top-1/4 left-1/3 w-80 h-80 rounded-full opacity-[0.05]" style={{ background: "radial-gradient(circle, hsl(210,100%,60%), transparent)" }} />
@@ -859,6 +859,13 @@ const AuthPage = () => {
           )}
         </div>
       </motion.div>
+      <footer className="relative z-10 w-full max-w-sm py-1 text-center text-xs text-muted-foreground">
+        <nav aria-label="Trust and legal pages" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
+          <a className="transition-colors hover:text-foreground" href="/about">About</a>
+          <a className="transition-colors hover:text-foreground" href="/privacy">Privacy</a>
+          <a className="transition-colors hover:text-foreground" href="/terms">Terms</a>
+        </nav>
+      </footer>
     </div>
   );
 };

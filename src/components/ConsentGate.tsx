@@ -27,7 +27,7 @@ const ConsentGate = () => {
       .upsert({ user_id: user.id, version: LEGAL_VERSION, platform: Capacitor.getPlatform() }, { onConflict: "user_id,version", ignoreDuplicates: true });
   }, [user?.id, ok]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (ok || pathname === "/terms" || pathname === "/privacy") return null;
+  if (ok || !user || ["/about", "/privacy", "/terms"].includes(pathname)) return null;
 
   const accept = () => { try { localStorage.setItem(KEY, LEGAL_VERSION); } catch { /* private mode */ } setOk(true); };
   const decline = async () => {

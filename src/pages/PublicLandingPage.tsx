@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { ArrowRight, Bot, Download, Film, Globe2, MessageCircle, Music2, ShieldCheck, Sparkles } from "lucide-react";
 import { ANDROID_APK_URL } from "@/components/AndroidDownloadCard";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const features = [
   {
@@ -25,7 +26,14 @@ const features = [
   },
 ];
 
-const PublicLandingPage = () => (
+const PublicLandingPage = () => {
+  usePageMeta({
+    title: "Primegram Extreme (Primegram X) – Social Network for Reels, Music & Chat",
+    description: "Primegram Extreme, also written Primegram X, is a social network for Reels, photos, messaging, music discovery and creator communities. Join free on web and Android.",
+    path: "/",
+  });
+
+  return (
   <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-primary/10 blur-[120px]" />
@@ -42,7 +50,7 @@ const PublicLandingPage = () => (
           <a
             href={ANDROID_APK_URL}
             download
-            aria-label="Download Primegram X for Android"
+            aria-label="Download Primegram Extreme for Android"
             title="Download APK"
             className="inline-flex size-10 items-center justify-center rounded-full border border-emerald-300/30 text-emerald-200 transition-colors hover:bg-emerald-400/10 hover:text-emerald-100"
           >
@@ -61,10 +69,10 @@ const PublicLandingPage = () => (
           <Globe2 className="h-4 w-4" /> A social world for what you love
         </p>
         <h1 className="max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-5xl md:text-6xl">
-          Connect, create, and discover on <span className="text-primary">Primegram Extreme</span>
+          Connect, create, and discover on <span className="text-primary">Primegram</span>
         </h1>
         <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-          Primegram Extreme (also called Primegram X) lets you share photos and Reels, message friends, explore music, and find new creators and communities — all in one social app.
+          Share photos and Reels, message friends, explore music, and find new creators and communities — all in one social app.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <a href="/auth" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-transform hover:scale-[1.02]">
@@ -106,11 +114,18 @@ const PublicLandingPage = () => (
       </div>
     </section>
 
-    <footer className="relative z-10 border-t border-white/10 px-5 py-6 text-center text-xs text-muted-foreground">
-      <nav aria-label="Company links" className="mb-3 flex flex-wrap justify-center gap-5"><a className="hover:text-foreground" href="/about">About</a><a className="hover:text-foreground" href="/privacy">Privacy</a><a className="hover:text-foreground" href="/terms">Terms</a><a className="hover:text-foreground" href="/help">Help</a><a className="hover:text-foreground" href="mailto:officialprimegram.app@gmail.com">Contact</a></nav>
-      © {new Date().getFullYear()} Primegram X · created by Java Prime, Kenya
+    <footer className="relative z-10 border-t border-white/10 px-5 py-6 text-xs text-muted-foreground">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p>© {new Date().getFullYear()} Primegram X</p>
+        <nav aria-label="Trust and legal pages" className="flex flex-wrap gap-x-5 gap-y-2">
+          <a className="transition-colors hover:text-foreground" href="/about">About</a>
+          <a className="transition-colors hover:text-foreground" href="/privacy">Privacy</a>
+          <a className="transition-colors hover:text-foreground" href="/terms">Terms</a>
+        </nav>
+      </div>
     </footer>
   </main>
-);
+  );
+};
 
 export default PublicLandingPage;
