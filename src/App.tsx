@@ -1,3 +1,5 @@
+import RouteSeo from "./components/RouteSeo";
+import BanGate from "./components/BanGate";
 import { PinHost } from "@/components/WalletPin";
 import BackgroundAudio from "./components/BackgroundAudio";
 import PostMusicGuard from "./components/PostMusicGuard";
@@ -8,6 +10,7 @@ import SplashLoader from "@/components/SplashLoader";
 import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
 import NativePush from "@/components/NativePush";
+import ReferralClaimer from "@/features/referrals/ReferralClaimer";
 import UpdateChecker from "@/components/UpdateChecker";
 import BackButtonHandler from "@/components/BackButtonHandler";
 import MiniPlayer from "@/components/MiniPlayer";
@@ -27,6 +30,7 @@ import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/AuthPage";
 import WelcomePage from "./pages/WelcomePage";
 import PublicLandingPage from "./pages/PublicLandingPage";
+const InvitePage = lazy(() => import("@/features/referrals/InvitePage"));
 const MessagesPage = lazy(() => import("./pages/MessagesPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
@@ -47,6 +51,7 @@ const ExtremePage = lazy(() => import("./pages/ExtremePage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const CrushPage = lazy(() => import("./pages/CrushPage"));
 const AdultPage = lazy(() => import("./pages/AdultPage"));
+const AdultVideoChatPage = lazy(() => import("./pages/AdultVideoChatPage"));
 const MeetPage = lazy(() => import("./pages/MeetPage"));
 const AIBotsPage = lazy(() => import("./pages/AIBotsPage"));
 const PublicProfilePage = lazy(() => import("./pages/PublicProfilePage"));
@@ -92,6 +97,8 @@ const App = () => (
       <PinHost />
       <Sonner />
       <BrowserRouter>
+        <RouteSeo />
+        <BanGate />
         <NativeAuthBridge />
         <BackButtonHandler />
         <NativeMediaPicker />
@@ -103,6 +110,7 @@ const App = () => (
         <MiniPlayer />
         <InAppBrowser />
         <AuthProvider>
+          <ReferralClaimer />
           <MuteProvider>
           <OnlineProvider>
           <ConsentGate />
@@ -110,6 +118,7 @@ const App = () => (
           <NativePush />
           <Suspense fallback={<SplashLoader />}>
           <Routes>
+            <Route path="/invite/:code" element={<InvitePage />} />
             <Route path="/welcome" element={<AuthRoute><WelcomePage /></AuthRoute>} />
             <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />
             <Route path="/" element={<HomeRoute />} />
@@ -137,6 +146,7 @@ const App = () => (
             <Route path="/crush" element={<ProtectedRoute><CrushPage /></ProtectedRoute>} />
             <Route path="/meet" element={<ProtectedRoute><MeetPage /></ProtectedRoute>} />
             <Route path="/adult" element={<ProtectedRoute><AdultPage /></ProtectedRoute>} />
+            <Route path="/adult/video" element={<ProtectedRoute><AdultVideoChatPage /></ProtectedRoute>} />
             <Route path="/bots" element={<ProtectedRoute><AIBotsPage /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
             <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />

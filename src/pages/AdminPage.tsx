@@ -69,6 +69,35 @@ const AdminPage = () => {
     },
   });
 
+  const { data: chatReports } = useQuery({
+    queryKey: ["admin", "chat-reports"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("video_chat_reports" as never).select("*").order("created_at", { ascending: false }).limit(300);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  const { data: events } = useQuery({
+    queryKey: ["admin", "events"],
+    enabled,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 7 * 864e5).toISOString();
+      const { data, error } = await supabase.from("client_events" as never).select("kind,name,message,path,platform,app_version,created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(3000);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  const { data: bans } = useQuery({
+    queryKey: ["admin", "bans"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("user_bans" as never).select("*").order("banned_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
   const { data: reports } = useQuery({
     queryKey: ["admin", "reports"],
     enabled,
@@ -194,6 +223,27 @@ const AdminPage = () => {
     qc.invalidateQueries({ queryKey: ["admin", "profiles"] });
   };
 
+  const banUser = async (userId: string, reason: string, reportId?: string) => {
+    if (!window.confirm("Ban this user? They will be locked out of the app immediately.")) return;
+    const { error } = await supabase.from("user_bans" as never).upsert({ user_id: userId, reason, banned_by: user?.id } as never);
+    if (error) return toast.error(error.message);
+    if (reportId) await supabase.from("video_chat_reports" as never).update({ status: "actioned", resolved_by: user?.id, resolved_at: new Date().toISOString() } as never).eq("id", reportId);
+    toast.success("User banned");
+    qc.invalidateQueries({ queryKey: ["admin", "bans"] });
+    qc.invalidateQueries({ queryKey: ["admin", "chat-reports"] });
+  };
+  const unbanUser = async (userId: string) => {
+    const { error } = await supabase.from("user_bans" as never).delete().eq("user_id", userId);
+    if (error) return toast.error(error.message);
+    toast.success("Ban lifted");
+    qc.invalidateQueries({ queryKey: ["admin", "bans"] });
+  };
+  const dismissChatReport = async (id: string) => {
+    const { error } = await supabase.from("video_chat_reports" as never).update({ status: "dismissed", resolved_by: user?.id, resolved_at: new Date().toISOString() } as never).eq("id", id);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["admin", "chat-reports"] });
+  };
+
   const setReportStatus = async (id: string, status: string) => {
     const { error } = await supabase
       .from("reports")
@@ -288,6 +338,9 @@ const AdminPage = () => {
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="content">Content</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="chat">Chat reports ({(chatReports ?? []).filter((r: any) => r.status === "open").length})</TabsTrigger>
+              <TabsTrigger value="bans">Bans ({(bans ?? []).length})</TabsTrigger>
+              <TabsTrigger value="health">Health &amp; usage</TabsTrigger>
               <TabsTrigger value="revenue">Revenue</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
               <TabsTrigger value="tickets">Support ({(tickets ?? []).filter((t: any) => t.status === "open").length})</TabsTrigger>
@@ -338,6 +391,9 @@ const AdminPage = () => {
                       <option value="black">Founder Black</option>
                       <option value="all_access">All Access</option>
                     </select>
+                    {(bans ?? []).some((b: any) => b.user_id === p.user_id)
+                      ? <Button size="sm" variant="secondary" onClick={() => unbanUser(p.user_id)}>Unban</Button>
+                      : <Button size="sm" variant="destructive" onClick={() => { const r = window.prompt("Reason for ban:", "Violated community rules"); if (r) void banUser(p.user_id, r); }}>Ban</Button>}
                   </CardContent>
                 </Card>
               ))}
@@ -406,6 +462,78 @@ const AdminPage = () => {
                   </CardContent>
                 </Card>
               ))}
+            </TabsContent>
+
+            <TabsContent value="chat" className="mt-4 space-y-3">
+              {(chatReports ?? []).length === 0 && <p className="text-sm text-muted-foreground">No video chat reports.</p>}
+              {(chatReports ?? []).map((r: any) => {
+                const count = (chatReports ?? []).filter((x: any) => x.reported_id && x.reported_id === r.reported_id).length;
+                const banned = (bans ?? []).some((b: any) => b.user_id === r.reported_id);
+                return (
+                  <Card key={r.id} className={glass}>
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Flag className="h-4 w-4 text-destructive" />
+                        <span className="text-sm font-medium capitalize">{String(r.reason).replace(/_/g, " ")}</span>
+                        <Badge variant={r.reason === "underage" ? "destructive" : "secondary"} className="capitalize">{r.status}</Badge>
+                        {count > 1 && <Badge variant="destructive">{count} reports on this user</Badge>}
+                        {banned && <Badge>banned</Badge>}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Reported: {r.reported_id ? usernameFor(r.reported_id) : "unknown"} · by {usernameFor(r.reporter_id)} · {new Date(r.created_at).toLocaleString()}
+                      </p>
+                      {r.status === "open" && (
+                        <div className="flex gap-2">
+                          {r.reported_id && !banned && <Button size="sm" variant="destructive" onClick={() => banUser(r.reported_id, `Video chat: ${r.reason}`, r.id)}>Ban user</Button>}
+                          <Button size="sm" variant="ghost" onClick={() => dismissChatReport(r.id)}>Dismiss</Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </TabsContent>
+
+            <TabsContent value="bans" className="mt-4 space-y-3">
+              {(bans ?? []).length === 0 && <p className="text-sm text-muted-foreground">No banned users.</p>}
+              {(bans ?? []).map((b: any) => (
+                <Card key={b.user_id} className={glass}>
+                  <CardContent className="flex items-center justify-between gap-2 p-3">
+                    <div className="min-w-0"><p className="text-sm font-medium">{usernameFor(b.user_id)}</p><p className="truncate text-xs text-muted-foreground">{b.reason} · {new Date(b.banned_at).toLocaleDateString()}</p></div>
+                    <Button size="sm" variant="secondary" onClick={() => unbanUser(b.user_id)}>Unban</Button>
+                  </CardContent>
+                </Card>
+              ))}
+              <p className="text-xs text-muted-foreground">To ban someone from anywhere, find them in the Users tab. Banned accounts are locked out on their next app load.</p>
+            </TabsContent>
+
+            <TabsContent value="health" className="mt-4 space-y-3">
+              {(() => {
+                const ev = events ?? [];
+                const errs = ev.filter((e) => e.kind === "error");
+                const pages = ev.filter((e) => e.kind === "page");
+                const top = (rows: any[], f: (r: any) => string) => Object.entries(rows.reduce((m: Record<string, number>, r) => { const k = f(r); m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
+                const day = new Date(Date.now() - 864e5).toISOString();
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[["Page views (7d)", pages.length], ["Errors (7d)", errs.length], ["Errors (24h)", errs.filter((e) => e.created_at > day).length]].map(([l, v]) => (
+                        <Card key={String(l)} className={glass}><CardContent className="p-3"><p className="text-xs text-muted-foreground">{l}</p><p className="text-xl font-bold">{v}</p></CardContent></Card>
+                      ))}
+                    </div>
+                    <Card className={glass}><CardHeader className="pb-1"><CardTitle className="text-sm">Top errors</CardTitle></CardHeader><CardContent className="space-y-1.5">
+                      {top(errs, (e) => `${e.name}: ${(e.message || "").slice(0, 110)}`).map(([k, n]) => <p key={k} className="text-xs break-words"><b>{n}×</b> {k}</p>)}
+                      {errs.length === 0 && <p className="text-xs text-muted-foreground">No errors logged. Good.</p>}
+                    </CardContent></Card>
+                    <Card className={glass}><CardHeader className="pb-1"><CardTitle className="text-sm">Most visited screens</CardTitle></CardHeader><CardContent className="space-y-1">
+                      {top(pages, (e) => e.name).map(([k, n]) => <p key={k} className="flex justify-between text-xs"><span>{k}</span><b>{n}</b></p>)}
+                    </CardContent></Card>
+                    <Card className={glass}><CardHeader className="pb-1"><CardTitle className="text-sm">Where users are</CardTitle></CardHeader><CardContent className="space-y-1">
+                      {top(pages, (e) => e.platform || "unknown").map(([k, n]) => <p key={k} className="flex justify-between text-xs"><span>{k}</span><b>{n}</b></p>)}
+                    </CardContent></Card>
+                  </>
+                );
+              })()}
             </TabsContent>
 
             <TabsContent value="revenue" className="mt-4 space-y-3">

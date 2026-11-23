@@ -1,3 +1,4 @@
+import { readRef } from "@/features/referrals/referral";
 import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { nativeGoogleSignIn } from "@/components/NativeAuthBridge";
@@ -141,7 +142,7 @@ const AuthPage = () => {
         const { data, error } = await supabase.auth.signUp({
           email: sanitizedEmail,
           password,
-          options: { data: { full_name: sanitizedFullName, ...signupDetails }, emailRedirectTo: postAuthRedirect() },
+          options: { data: { full_name: sanitizedFullName, ...signupDetails, ...(readRef() ? { ref: readRef() } : {}) }, emailRedirectTo: postAuthRedirect() },
         });
         if (error) {
           if ((error.message || "").toLowerCase().includes("already")) {
@@ -338,7 +339,7 @@ const AuthPage = () => {
         const { error } = await supabase.auth.signUp({
           phone: sanitizedPhone,
           password,
-          options: { data: { full_name: sanitizeName(fullName), ...signupDetails } },
+          options: { data: { full_name: sanitizeName(fullName), ...signupDetails, ...(readRef() ? { ref: readRef() } : {}) } },
         } as any);
         void logSecurityEvent("auth", "phone_signup", sanitizedPhone, { failed: !!error });
         if (error) {

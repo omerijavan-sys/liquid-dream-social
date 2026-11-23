@@ -86,13 +86,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (_event === 'SIGNED_OUT') localStorage.removeItem('guestMode');
     });
 
+    // Never leave the app on the loading screen: if the session lookup fails or hangs (stuck lock, network), carry on signed-out.
+    const failsafe = window.setTimeout(() => setLoading(false), 6000);
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) storeSession(session);
       setLoading(false);
-    });
+    }).catch((e) => { console.error("getSession failed:", e); setLoading(false); });
 
-    return () => subscription.unsubscribe();
+    return () => { window.clearTimeout(failsafe); subscription.unsubscribe(); };
   }, [storeSession]);
 
   const saveCurrentAccount = async () => {

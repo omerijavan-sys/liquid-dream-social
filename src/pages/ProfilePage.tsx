@@ -1,3 +1,6 @@
+import VibeSection from "@/features/vibe/VibeSection";
+import PublicVibe from "@/features/vibe/PublicVibe";
+import StreakBadge from "@/features/drops/StreakBadge";
 import { useState, useEffect, useRef } from "react";
 import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
@@ -196,8 +199,9 @@ const ProfilePage = () => {
             <button onClick={() => setListMode("following")} className="depth-press"><p className="text-base font-bold text-white">{myFollowing.size}</p><p className="text-[10px] text-white/65">Following</p></button>
           </div>
         </div>
-        <p className="text-sm font-bold text-white">{profile?.display_name || "User"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={(profile as any)?.badge} /></p>
+        <p className="text-sm font-bold text-white">{profile?.display_name || "User"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={(profile as any)?.badge} /><StreakBadge userId={user?.id} /></p>
         <p className="mt-1 text-xs text-white/60">{profile?.bio || "No bio yet"}</p>
+        {user && <PublicVibe userId={user.id} />}
 
         <div className="mt-3 flex gap-2">
           <button onClick={() => navigate("/settings")} className="prime-profile-action depth-press relative z-10 flex-1 rounded-xl py-2 text-xs font-semibold">
@@ -207,6 +211,7 @@ const ProfilePage = () => {
             Share Profile
           </button>
         </div>
+        <VibeSection />
 
         {suggested.length > 0 && (
           <div className="mt-4">

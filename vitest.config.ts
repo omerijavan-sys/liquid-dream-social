@@ -4,9 +4,11 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+  define: { __WEB_BUILD__: JSON.stringify("test") },
   test: {
     environment: "jsdom",
     globals: true,
+    env: { VITE_SUPABASE_URL: "http://localhost:54321", VITE_SUPABASE_PUBLISHABLE_KEY: "test-key" },
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },

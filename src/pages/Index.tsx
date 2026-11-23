@@ -2,6 +2,7 @@ import HomeReelCard from "@/components/HomeReelCard";
 import { useState, useEffect, useRef, useCallback } from "react";
 import TopNavBar from "@/components/TopNavBar";
 import GlassTabBar from "@/components/GlassTabBar";
+import DailyDrops from "@/features/drops/DailyDrops";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
 import UploadStrip from "@/components/UploadStrip";
@@ -89,7 +90,8 @@ const Index = () => {
         setPosts([]);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't load posts");
+      // Offline: keep showing whatever is already on screen and stay quiet instead of toasting on every refresh.
+      if (navigator.onLine) toast.error(error instanceof Error ? error.message : "Couldn't load posts");
     } finally {
       loadingRef.current = false;
       setLoading(false);
@@ -153,6 +155,7 @@ const Index = () => {
         <div className="mt-2 mb-4">
           <StoriesBar />
         </div>
+        <DailyDrops />
         <div className="px-4">
           {posts.length === 0 && loading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
@@ -198,6 +201,7 @@ const Index = () => {
                   youtube_id: post.music_youtube_id,
                   start: (post as any).music_start,
                   len: (post as any).music_len,
+                  volume: (post as any).music_volume,
                 } : null}
               />
             ))

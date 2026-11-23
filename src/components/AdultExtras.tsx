@@ -30,7 +30,7 @@ export const AdultMeetTab = () => {
     <div className={`${panel} space-y-4 text-center`}>
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-500/15"><Shuffle className="h-8 w-8 text-rose-300" /></div>
       <div><p className="text-lg font-bold text-foreground">18+ Meet</p><p className="mt-1 text-sm text-muted-foreground">Random video or voice chat with other age-verified adults. Tap Next any time to skip.</p></div>
-      <Button className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-500" onClick={() => navigate("/meet?mode=adult")}><Video className="h-4 w-4" />Start video chat</Button>
+      <Button className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-500" onClick={() => navigate("/adult/video")}><Video className="h-4 w-4" />Start video chat</Button>
       <Button variant="secondary" className="w-full" onClick={() => navigate("/meet?mode=adult&audio=1")}>Voice only</Button>
     </div>
   );

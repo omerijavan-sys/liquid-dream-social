@@ -171,7 +171,11 @@ async function playNative(t: EngineTrack) {
   return true;
 }
 
+/** Software volume (0–1) for the web player; post/story/reel songs use it, everything else plays at full volume. */
+export const setMusicVolume = (v: number) => { const x = Math.max(0, Math.min(1, v)); if (audio) audio.volume = x; try { (yt as unknown as { setVolume?: (n: number) => void } | null)?.setVolume?.(x * 100); } catch { /* ignore */ } };
+
 export async function playUrl(t: EngineTrack) {
+  if (!t.key.startsWith("post|")) setMusicVolume(1);
   spotifyStop();
   if (yt) try { yt.pauseVideo(); } catch { /* ignore */ }
   if (canNative() && t.url && /^(https?|file):/.test(t.url) && !t.key.startsWith("post|") && !t.key.startsWith("clip|")) {
@@ -207,6 +211,9 @@ export async function playSong(title: string, artist: string, artwork?: string |
 }
 
 const toggleIfPaused = () => { if (state.paused) toggleMusic(); };
+/** Exact playback position right now (the shared state only refreshes about once a second). */
+export const livePos = () => (mode === "audio" && audio ? audio.currentTime : mode === "yt" && yt ? (yt.getCurrentTime?.() ?? state.pos) : state.pos);
+
 export const toggleMusic = () => {
   if (mode === "native") { void Native.control({ action: "toggle" }); return; }
   if (mode === "yt") { if (state.paused) yt?.playVideo(); else yt?.pauseVideo(); return; }

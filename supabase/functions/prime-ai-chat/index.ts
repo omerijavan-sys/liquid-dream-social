@@ -51,10 +51,18 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
-    const { data: claims, error: claimsError } = await authClient.auth.getClaims(
-      authHeader.replace("Bearer ", ""),
-    );
-    if (claimsError || !claims?.claims?.sub) {
+    const token = authHeader.replace("Bearer ", "");
+    // getClaims verifies the JWT locally; if that path is unavailable or fails, ask the auth server directly.
+    let userId: string | undefined;
+    try {
+      const { data: claims } = await authClient.auth.getClaims(token);
+      userId = claims?.claims?.sub as string | undefined;
+    } catch (_) { /* fall through to getUser */ }
+    if (!userId) {
+      const { data: u } = await authClient.auth.getUser(token);
+      userId = u?.user?.id;
+    }
+    if (!userId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -117,9 +125,38 @@ serve(async (req) => {
       });
     }
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    // Some free models stream hundreds of internal "reasoning" chunks before the answer. Forward only real
+    // answer text so the app shows it as soon as it exists, and say so plainly if nothing useful comes back.
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    let buf = "", gotAnswer = false;
+    const out = new ReadableStream({
+      async start(controller) {
+        const reader = response.body!.getReader();
+        const send = (o: unknown) => controller.enqueue(enc.encode(`data: ${JSON.stringify(o)}\n\n`));
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            let i: number;
+            while ((i = buf.indexOf("\n")) !== -1) {
+              const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+              if (!line.startsWith("data: ")) continue;
+              const j = line.slice(6);
+              if (j === "[DONE]") continue;
+              try {
+                const c = JSON.parse(j).choices?.[0]?.delta?.content;
+                if (c) { gotAnswer = true; send({ choices: [{ delta: { content: c } }] }); }
+              } catch (_) { /* ignore malformed chunk */ }
+            }
+          }
+        } catch (e) { console.error("stream error:", e); }
+        if (!gotAnswer) send({ choices: [{ delta: { content: "Sorry, I couldn't come up with an answer just now. Please try again in a moment." } }] });
+        controller.enqueue(enc.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
     });
+    return new Response(out, { headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
   } catch (e) {
     console.error("chat error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {

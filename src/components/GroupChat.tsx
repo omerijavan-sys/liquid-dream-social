@@ -8,6 +8,7 @@ import { themeById } from "@/utils/chatThemes";
 import { openLink } from "@/utils/openLink";
 import ThemePicker from "@/components/ThemePicker";
 import PeoplePicker, { type Person } from "@/components/PeoplePicker";
+import HangoutBar from "@/features/hangout/HangoutBar";
 import { MessageActionSheet, SwipeRow, linkify } from "@/components/MessageGestures";
 
 interface GMsg {
@@ -134,6 +135,8 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
         <button onClick={() => setThemeOpen(true)} aria-label="Change theme" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><Palette className="h-4 w-4" /></button>
         <button onClick={() => setInfoOpen(true)} aria-label="Members" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><Users className="h-4 w-4" /></button>
       </div>
+
+      <HangoutBar groupId={groupId} myName={people[user?.id ?? ""]?.display_name || people[user?.id ?? ""]?.username || "Someone"} />
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {msgs.length === 0 && <p className="py-10 text-center text-sm text-white/50">No messages yet. Say hello to the group!</p>}
