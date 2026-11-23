@@ -16,7 +16,7 @@ import CreatorTipButton from "@/components/CreatorTipButton";
 import { runInBackground } from "@/utils/backgroundUpload";
 import { countReelView } from "@/utils/reelViews";
 import FilterStrip from "@/components/FilterStrip";
-import { bakeVideoFilter } from "@/utils/bakeVideo";
+import { bakeVideoFilter, compressVideo } from "@/utils/bakeVideo";
 import { captureVideoThumb } from "@/utils/videoThumb";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { suggestCaptions } from "@/utils/aiCaption";
@@ -161,6 +161,7 @@ const ReelsPage = () => {
     setCreating(false); setCaption(""); setMusicTitle(""); setReelTrack(null); setReelClip({ start: 0, len: 30 }); setVideoFile(null); setVideoPreview(null); setSuggestions([]); setReelFilter("none");
     runInBackground("Uploading your reel", async (progress) => {
       if (snap.filter !== "none") { progress("Applying filter…"); snap.file = await bakeVideoFilter(snap.file, snap.filter, (p) => progress(`Applying filter… ${p}%`)); }
+      progress("Optimizing video…"); snap.file = await compressVideo(snap.file, (p) => progress(`Optimizing video… ${p}%`));
       progress("Preparing cover…");
       const thumbnail_url = await uploadVideoCover(snap.uid, snap.file);
       progress("Uploading reel…");

@@ -9,7 +9,7 @@ const VideoThumb = ({ src, poster, className = "h-full w-full object-cover", sho
         src={`${src}#t=1.2`}
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
         className={className}
         aria-hidden="true"
         poster={BLANK_POSTER}

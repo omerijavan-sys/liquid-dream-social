@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { CAMERA_CONSTRAINTS, VIDEO_BITRATE } from "@/utils/media";
 import MediaEditor from "@/components/MediaEditor";
 import FilterStrip from "@/components/FilterStrip";
-import { bakeVideoFilter } from "@/utils/bakeVideo";
+import { bakeVideoFilter, compressVideo } from "@/utils/bakeVideo";
 import { captureVideoThumb } from "@/utils/videoThumb";
 import MusicClipPicker from "@/components/MusicClipPicker";
 import { playSong, seekMusic, stopMusic } from "@/services/MusicEngine";
@@ -478,6 +478,10 @@ const CreatePostPage = () => {
         if (snap.mediaType === "video" && snap.filter !== "none") {
           progress("Applying filter…");
           finalFile = await bakeVideoFilter(finalFile, snap.filter, (p) => progress(`Applying filter… ${p}%`));
+        }
+        if (snap.mediaType === "video") {
+          progress("Optimizing video…");
+          finalFile = await compressVideo(finalFile, (p) => progress(`Optimizing video… ${p}%`));
         }
         const ext = finalFile.name.split(".").pop();
         const path = `${snap.uid}/${Date.now()}.${ext}`;
