@@ -24,7 +24,7 @@ const DailyDrops = () => {
   const accent = tier === "none" ? "#a78bfa" : TIER_STYLE[tier].color;
 
   return (
-    <section className={`${glass} mx-4 mb-4 rounded-3xl p-4 text-white`} style={{ boxShadow: glow(accent, 0.18, 30) }}>
+    <section className={`${glass} mx-4 mb-4 rounded-3xl bg-gradient-to-br from-violet-500/20 via-fuchsia-500/10 to-transparent p-4 text-foreground`} style={{ boxShadow: glow(accent, 0.18, 30) }}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: accent }}>Daily Drop</p>

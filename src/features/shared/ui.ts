@@ -22,7 +22,7 @@ export const table = (name: string) => (supabase.from as unknown as (t: string) 
 export const deviceTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Nairobi"; } catch { return "Africa/Nairobi"; } };
 
 export const uploadMedia = async (userId: string, folder: string, blob: Blob, ext: string): Promise<string> => {
-  const path = `${folder}/${userId}/${Date.now()}.${ext}`;
+  const path = `${userId}/${folder}/${Date.now()}.${ext}`; // storage policy: first folder must be the user id
   const { error } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined });
   if (error) throw error;
   return supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
