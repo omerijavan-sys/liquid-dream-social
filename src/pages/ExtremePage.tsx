@@ -361,7 +361,7 @@ const SoundsTab = () => {
 
 const tabs = [
   { v: "verified", l: "Verified", i: BadgeCheck }, { v: "tips", l: "Tips", i: Coins },
-  { v: "crush", l: "Crush", i: Heart }, { v: "adult", l: "18+", i: ShieldAlert }, { v: "bots", l: "AI Bots", i: Bot },
+  { v: "crush", l: "Crush", i: Heart }, { v: "adult", l: "Primempire", i: ShieldAlert }, { v: "bots", l: "AI Bots", i: Bot },
   { v: "garage", l: "Garage", i: Store }, { v: "bounty", l: "Bounty", i: Target }, { v: "sounds", l: "Sounds", i: Music2 },
 ];
 

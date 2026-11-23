@@ -338,7 +338,7 @@ export const ContentPanel = () => {
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Posting</p>
       <Row k="aiCaptions" title="AI caption suggestions" desc="Show a ✨ Suggest caption button when you create a post" />
       <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Search</p>
-      <Row k="safeSearch" title="Safe search" desc="Hide adult-marked posts from search results" />
+      <Row k="safeSearch" title="Safe search" desc="Hide Primempire-marked posts from search results" />
       <Row k="saveSearchHistory" title="Save search history" desc="Remember what you searched on this device" />
       <div className={card}>
         <p className="text-sm font-semibold text-foreground">Search results show</p>

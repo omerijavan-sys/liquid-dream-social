@@ -11,7 +11,7 @@ const field = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 
 
 type Alias = { user_id: string; alias: string; bio: string | null };
 
-/** The private 18+ username. It is the only name other 18+ members see. */
+/** The private Primempire username. It is the only name other Primempire members see. */
 export function useMyAlias() {
   const { user } = useAuth();
   const [alias, setAlias] = useState<Alias | null | undefined>(undefined);
@@ -29,7 +29,7 @@ export const AdultMeetTab = () => {
   return (
     <div className={`${panel} space-y-4 text-center`}>
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-500/15"><Shuffle className="h-8 w-8 text-rose-300" /></div>
-      <div><p className="text-lg font-bold text-foreground">18+ Meet</p><p className="mt-1 text-sm text-muted-foreground">Random video or voice chat with other age-verified adults. Tap Next any time to skip.</p></div>
+      <div><p className="text-lg font-bold text-foreground">Primempire Meet</p><p className="mt-1 text-sm text-muted-foreground">Random video or voice chat with other age-verified members. Tap Next any time to skip.</p></div>
       <Button className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-500" onClick={() => navigate("/adult/video")}><Video className="h-4 w-4" />Start video chat</Button>
       <Button variant="secondary" className="w-full" onClick={() => navigate("/meet?mode=adult&audio=1")}>Voice only</Button>
     </div>
@@ -54,7 +54,7 @@ export const AliasSetup = ({ onDone }: { onDone: () => void }) => {
   return (
     <div className={`${panel} space-y-3`}>
       <p className="font-semibold text-foreground">Pick your private username</p>
-      <p className="text-xs text-muted-foreground">This name is separate from your main profile. Other 18+ members only see it — never your main username.</p>
+      <p className="text-xs text-muted-foreground">This name is separate from your main profile. Other Primempire members only see it — never your main username.</p>
       <input value={alias} onChange={e => setAlias(e.target.value)} placeholder="private_username" maxLength={24} className={field} />
       <textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Short bio (optional)" maxLength={300} className={`${field} h-20 resize-none`} />
       <Button disabled={busy} onClick={() => void save()} className="w-full bg-rose-600 text-white hover:bg-rose-500">Create</Button>

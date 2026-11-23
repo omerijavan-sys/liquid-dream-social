@@ -68,7 +68,7 @@ const MeetPage = () => {
     <div className={`flex h-dvh flex-col ${adult ? "bg-[#12060a]" : "bg-background"} text-foreground`}>
       <header className="safe-area-top flex items-center gap-3 px-5 py-4">
         <button onClick={() => { void stop(); navigate(adult ? "/adult" : "/"); }} aria-label="Back" className="depth-press"><ArrowLeft className="h-5 w-5" /></button>
-        <h1 className="flex-1 text-lg font-bold">{adult ? "18+ Meet" : "Meet"}</h1>
+        <h1 className="flex-1 text-lg font-bold">{adult ? "Primempire Meet" : "Meet"}</h1>
         {adult && <ShieldAlert className="h-5 w-5 text-rose-400" />}
       </header>
       <main className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
@@ -91,7 +91,7 @@ const MeetPage = () => {
         {searching
           ? <Button size="lg" variant="secondary" onClick={() => void stop()} className="w-full max-w-xs">Cancel</Button>
           : <Button size="lg" onClick={start} disabled={camOk === null || camOk === false} className={`w-full max-w-xs gap-2 ${adult ? "bg-rose-600 hover:bg-rose-500 text-white" : ""}`}><Shuffle className="h-5 w-5" />Start</Button>}
-        <p className="max-w-xs text-[11px] text-muted-foreground">{adult ? "Only age-verified adults are matched here. " : ""}Be respectful. You can report or skip anyone during the chat. Never share personal details.</p>
+        <p className="max-w-xs text-[11px] text-muted-foreground">{adult ? "Only age-verified members are matched here. " : ""}Be respectful. You can report or skip anyone during the chat. Never share personal details.</p>
       </main>
     </div>
   );

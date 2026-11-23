@@ -68,7 +68,7 @@ const AdultVideoChatPage = () => {
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#07070a] p-6 text-center text-white">
       <ShieldAlert className="h-10 w-10 text-rose-400" /><p className="text-lg font-bold">Verify your age first</p>
       <p className="max-w-xs text-sm text-white/60">Random video chat is only for age-verified adults.</p>
-      <button onClick={() => navigate("/adult")} className="rounded-full bg-rose-600 px-6 py-2.5 text-sm font-bold">Go to 18+ verification</button>
+      <button onClick={() => navigate("/adult")} className="rounded-full bg-rose-600 px-6 py-2.5 text-sm font-bold">Go to Primempire verification</button>
     </div>
   );
 
@@ -76,7 +76,7 @@ const AdultVideoChatPage = () => {
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-[#07070a] text-white" style={{ backgroundImage: "radial-gradient(ellipse at 15% 0%, rgba(190,18,60,.28), transparent 55%), radial-gradient(ellipse at 90% 100%, rgba(244,63,94,.14), transparent 55%)" }}>
       <header className="flex items-center gap-3 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button onClick={() => { chat.stop(); navigate(-1); }} aria-label="Leave" className={`flex h-10 w-10 items-center justify-center rounded-full ${glass}`}><ArrowLeft className="h-5 w-5" /></button>
-        <div className="min-w-0 flex-1"><p className="truncate text-base font-bold">18+ Random Video</p>
+        <div className="min-w-0 flex-1"><p className="truncate text-base font-bold">Primempire Random Video</p>
           <p className="flex items-center gap-1.5 text-xs text-white/70"><span className={`h-2 w-2 rounded-full ${dot}`} />{label}</p></div>
         {active && <span className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs ${glass}`}><Users className="h-3.5 w-3.5" />{online} searching</span>}
       </header>
@@ -148,20 +148,20 @@ const AdultVideoChatPage = () => {
         <label className="mt-2 flex items-center justify-center gap-2 text-[11px] text-white/60"><input type="checkbox" checked={autoNext} onChange={e => setAutoNext(e.target.checked)} className="h-4 w-4 accent-rose-500" />Auto-find someone new when a partner leaves · press Esc twice for Next</label>
       </div>
 
-      {/* 18+ & safety gate — shown before any camera access */}
+      {/* Primempire & safety gate — shown before any camera access */}
       {!accepted && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className={`w-full max-w-md space-y-4 rounded-3xl p-6 ${glass}`}>
-            <div className="flex items-center gap-3"><ShieldAlert className="h-7 w-7 text-rose-400" /><div><p className="text-lg font-bold">Adults only (18+)</p><p className="text-xs text-white/60">Before we turn on your camera</p></div></div>
+            <div className="flex items-center gap-3"><ShieldAlert className="h-7 w-7 text-rose-400" /><div><p className="text-lg font-bold">Primempire members only</p><p className="text-xs text-white/60">Before we turn on your camera</p></div></div>
             <ul className="space-y-1.5 text-xs leading-5 text-white/75">
               <li>• This is a <b>SFW</b> random chat: no nudity or sexual acts on camera.</li>
               <li>• No harassment, hate, threats, scams or pressuring anyone.</li>
               <li>• Never record, screenshot or share someone without their consent.</li>
-              <li>• No one under 18. Anyone who looks underage is reported and removed.</li>
+              <li>• No one below the age of majority. Anyone who looks underage is reported and removed.</li>
               <li>• You can report &amp; block anyone instantly. Reports are reviewed by our team.</li>
             </ul>
-            <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={is18} onChange={e => setIs18(e.target.checked)} className="mt-0.5 h-5 w-5 accent-rose-500" />I confirm I am 18 years of age or older.</label>
-            <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={rules} onChange={e => setRules(e.target.checked)} className="mt-0.5 h-5 w-5 accent-rose-500" />I agree to the <a href="/terms" target="_blank" rel="noreferrer" className="underline">Community Guidelines</a> and Adult Safety Rules.</label>
+            <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={is18} onChange={e => setIs18(e.target.checked)} className="mt-0.5 h-5 w-5 accent-rose-500" />I confirm I am of legal age (age of majority).</label>
+            <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={rules} onChange={e => setRules(e.target.checked)} className="mt-0.5 h-5 w-5 accent-rose-500" />I agree to the <a href="/terms" target="_blank" rel="noreferrer" className="underline">Community Guidelines</a> and Primempire Safety Rules.</label>
             <button disabled={!is18 || !rules || verified === null} onClick={() => { setAccepted(true); void chat.start(); }} className="w-full rounded-full bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 py-3 text-sm font-extrabold text-black disabled:opacity-40">Accept &amp; Start</button>
             <button onClick={() => navigate(-1)} className="w-full text-xs text-white/50">Not now</button>
           </div>

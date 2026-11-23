@@ -128,7 +128,7 @@ const AdultTab = () => {
       return;
     }
     if (!consent) {
-      toast.error("Confirm you're 18+ to continue");
+      toast.error("Confirm you're of legal age to continue");
       return;
     }
     setChecking(true);
@@ -141,7 +141,7 @@ const AdultTab = () => {
         return;
       }
       if (!data) {
-        toast.error("That date of birth shows you're under 18");
+        toast.error("That date of birth shows you're below the age of majority");
         return;
       }
       toast.success("Verified — welcome");
@@ -173,8 +173,8 @@ const AdultTab = () => {
             <ShieldAlert className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <p className="font-bold">18+ Only · Age Verification</p>
-            <p className="text-xs text-muted-foreground">Mature content. Confirm your date of birth to enter.</p>
+            <p className="font-bold">Primempire · Age Verification</p>
+            <p className="text-xs text-muted-foreground">Primempire content. Confirm your date of birth to enter.</p>
           </div>
         </div>
         <div className="flex gap-2 mb-3">
@@ -198,7 +198,7 @@ const AdultTab = () => {
             onChange={(e) => setConsent(e.target.checked)}
             className="mt-0.5 accent-primary"
           />
-          I confirm I am 18 years or older and I want to see mature content. My confirmation is stored securely on the server.
+          I confirm I am 18 years or older and I want to see Primempire content. My confirmation is stored securely on the server.
         </label>
         <p className="mb-3 text-[11px] text-muted-foreground">Age is checked from your date of birth. This flow does not scan or store face images.</p>
         <Button className="w-full gap-2" onClick={verify} disabled={checking}>
@@ -221,11 +221,11 @@ const AdultTab = () => {
       {sub === "me" && <AdultMeTab />}
       {sub === "feed" && <>
       <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
-        <Check className="w-3.5 h-3.5 text-primary" /> Verified 18+ · access stays active on your account
+        <Check className="w-3.5 h-3.5 text-primary" /> Verified Primempire · access stays active on your account
       </div>
       <button onClick={() => navigate("/adult/video")} className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 py-3.5 text-sm font-extrabold text-black shadow-[0_8px_30px_rgba(244,63,94,.4)] active:scale-[0.98]"><Video className="h-5 w-5" />Random Video Chat · meet someone online now</button>
-      <Button className="mb-4 w-full gap-2" variant="secondary" onClick={() => navigate("/create?adult=1")}><PlusSquare className="h-4 w-4" />Post to 18+</Button>
-      <div className="mb-4 flex gap-2" role="group" aria-label="Filter mature posts">
+      <Button className="mb-4 w-full gap-2" variant="secondary" onClick={() => navigate("/create?adult=1")}><PlusSquare className="h-4 w-4" />Post to Primempire</Button>
+      <div className="mb-4 flex gap-2" role="group" aria-label="Filter Primempire posts">
         {(["all", "photo", "video"] as const).map((value) => (
           <Button key={value} size="sm" variant={filter === value ? "default" : "secondary"} onClick={() => setFilter(value)}>
             {value === "all" ? "All" : value === "photo" ? "Photos" : "Videos"}
@@ -234,7 +234,7 @@ const AdultTab = () => {
       </div>
       {visiblePosts.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-10">
-          {posts.length === 0 ? "No 18+ posts yet. Creators can mark a post as 18+ from the post composer." : "No posts match this filter."}
+          {posts.length === 0 ? "No Primempire posts yet. Creators can mark a post as Primempire from the post composer." : "No posts match this filter."}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -275,9 +275,9 @@ const AdultTab = () => {
 
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
         <DialogContent className="max-w-none w-screen h-dvh p-0 border-0 rounded-none bg-background flex flex-col [&>button]:hidden">
-          <DialogTitle className="sr-only">18+ post</DialogTitle>
+          <DialogTitle className="sr-only">Primempire post</DialogTitle>
           <div className="flex items-center justify-between p-4">
-            <span className="text-xs font-semibold text-muted-foreground">18+ · Mature content</span>
+            <span className="text-xs font-semibold text-muted-foreground">Primempire</span>
             <button
               onClick={() => setOpen(null)}
               aria-label="Close"

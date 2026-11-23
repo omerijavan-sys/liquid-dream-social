@@ -42,7 +42,7 @@ const ConsentGate = () => {
           <div className="mb-3 flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-primary" /><h1 className="text-lg font-bold text-foreground">Before you continue</h1></div>
           <p className="text-sm text-muted-foreground">Primegram needs your agreement to its Terms of Service and Privacy Policy. In short:</p>
           <ul className="mt-3 space-y-1.5 text-sm text-foreground/90">
-            <li>• You must be 18+ (or the age of majority where you live).</li>
+            <li>• You must be of legal age (the age of majority where you live).</li>
             <li>• You own what you post and let Primegram show it to others.</li>
             <li>• We never sell your personal data.</li>
             <li>• We use your camera, microphone, photos and notifications only for features you use (posts, calls, messages).</li>

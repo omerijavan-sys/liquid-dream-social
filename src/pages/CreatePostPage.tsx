@@ -714,7 +714,7 @@ const CreatePostPage = () => {
               )}
             </div>
 
-            {/* Background track + 18+ flag */}
+            {/* Background track + Primempire flag */}
             <div className="flex items-center gap-2 relative z-10">
               <button
                 onClick={() => setMusicOpen(true)}
@@ -725,13 +725,13 @@ const CreatePostPage = () => {
               </button>
               <button
                 onClick={() => setIsAdult((v) => !v)}
-                aria-label="Mark as 18+ content"
+                aria-label="Mark as Primempire content"
                 aria-pressed={isAdult}
                 className={`depth-press px-4 py-2.5 rounded-xl text-sm font-bold ${
                   isAdult ? "bg-destructive text-destructive-foreground" : "liquid-glass text-muted-foreground"
                 }`}
               >
-                18+
+                Primempire
               </button>
             </div>
             {track && (
