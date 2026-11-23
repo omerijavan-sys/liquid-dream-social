@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import LockedMedia from "@/features/ppv/LockedMedia";
+import { fetchItems, kes } from "@/features/ppv/ppv";
 import VideoThumb from "@/components/VideoThumb";
 import { motion } from "framer-motion";
-import { Check, Eye, Loader2, MessageCircle, Mic, Play, PlusSquare, ShieldAlert, Video, X } from "lucide-react";
+import { Check, Eye, Loader2, Lock, MessageCircle, Mic, Play, PlusSquare, ShieldAlert, Video, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +15,7 @@ import { AdultMeetTab, AdultMessagesTab, AdultMeTab } from "@/components/AdultEx
 
 interface AdultPost {
   id: string;
+  ppv_item_id?: string | null;
   caption: string | null;
   media_url: string | null;
   media_type: string | null;
@@ -34,6 +37,7 @@ const AdultTab = () => {
   const [consent, setConsent] = useState(false);
   const [checking, setChecking] = useState(false);
   const [posts, setPosts] = useState<AdultPost[]>([]);
+  const [prices, setPrices] = useState<Record<string, number>>({});
   const [open, setOpen] = useState<AdultPost | null>(null);
   const [filter, setFilter] = useState<"all" | "photo" | "video">("all");
   const [sub, setSub] = useState<"feed" | "meet" | "messages" | "me">("feed");
@@ -88,6 +92,8 @@ const AdultTab = () => {
           return;
         }
         setPosts(data ?? []);
+        const ids = ((data ?? []) as { ppv_item_id?: string | null }[]).map((x) => x.ppv_item_id).filter(Boolean) as string[];
+        void fetchItems(ids).then((m) => { if (!cancelled) setPrices(Object.fromEntries(Object.values(m).map((i) => [i.id, i.price_kes]))); });
       });
     return () => { cancelled = true; };
   }, [user, verified]);
@@ -247,7 +253,13 @@ const AdultTab = () => {
               onClick={() => setOpen(p)}
               className="relative aspect-square rounded-2xl overflow-hidden bg-secondary liquid-glass"
             >
-              {p.media_url ? (
+              {p.ppv_item_id ? (
+                <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[radial-gradient(ellipse_at_30%_20%,#7c3aed66,transparent_60%),radial-gradient(ellipse_at_80%_80%,#ec489966,transparent_60%),#0b0b16]">
+                  <Lock className="h-6 w-6 text-white" />
+                  <span className="rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white">{prices[p.ppv_item_id] !== undefined ? kes(prices[p.ppv_item_id]) : "Paid"}</span>
+                  {p.caption && <span className="max-w-full truncate px-2 text-[10px] text-white/70">{p.caption}</span>}
+                </span>
+              ) : p.media_url ? (
                 p.media_type === "video" ? (
                   <>
                     <VideoThumb src={p.media_url} poster={p.thumbnail_url} />
@@ -287,7 +299,9 @@ const AdultTab = () => {
             </button>
           </div>
           <div className="flex-1 min-h-0 flex items-center justify-center px-2">
-            {open?.media_type === "video" ? (
+            {open?.ppv_item_id ? (
+              <div className="w-full max-w-md"><LockedMedia itemId={open.ppv_item_id} /></div>
+            ) : open?.media_type === "video" ? (
               <video src={open?.media_url || ""} controls autoPlay playsInline className="max-w-full max-h-full object-contain" />
             ) : (
               <img src={open?.media_url || ""} alt="" className="max-w-full max-h-full object-contain" />

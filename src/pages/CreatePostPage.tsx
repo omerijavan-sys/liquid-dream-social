@@ -33,6 +33,8 @@ import { toast } from "sonner";
 import { CAMERA_CONSTRAINTS, VIDEO_BITRATE } from "@/utils/media";
 import MediaEditor from "@/components/MediaEditor";
 import FilterStrip from "@/components/FilterStrip";
+import { creatorShare, kes as fmtKes, priceError, uploadLocked } from "@/features/ppv/ppv";
+import { rpc as ppvRpc } from "@/features/shared/ui";
 import { bakeVideoFilter, compressVideo } from "@/utils/bakeVideo";
 import { captureVideoThumb } from "@/utils/videoThumb";
 import MusicClipPicker from "@/components/MusicClipPicker";
@@ -99,6 +101,8 @@ const CreatePostPage = () => {
   const [beauty, setBeauty] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [ppvOn, setPpvOn] = useState(false);
+  const [ppvPrice, setPpvPrice] = useState("");
   const [isAdult, setIsAdult] = useState(() => new URLSearchParams(window.location.search).get("adult") === "1");
 
   useEffect(() => {
@@ -467,7 +471,9 @@ const CreatePostPage = () => {
       return;
     }
     // Snapshot everything, then upload in the background so the person can keep using the app.
-    const snap = { file, caption, track, clip, isAdult, mediaType, uid: user.id, filter: filterCss };
+    const lockIt = isAdult && ppvOn && !!file;
+    if (lockIt) { const pe = priceError(ppvPrice); if (pe) { toast.error(pe); return; } }
+    const snap = { file, caption, track, clip, isAdult, mediaType, uid: user.id, filter: filterCss, ppvPrice: lockIt ? Number(ppvPrice) : 0 };
     const hadMedia = Boolean(file);
     setUploading(true);
     runInBackground(snap.mediaType === "video" ? "Uploading your video" : "Sharing your post", async (progress) => {
@@ -482,6 +488,14 @@ const CreatePostPage = () => {
         if (snap.mediaType === "video") {
           progress("Optimizing video…");
           finalFile = await compressVideo(finalFile, (p) => progress(`Optimizing video… ${p}%`));
+        }
+        if (snap.ppvPrice) { // pay-to-view: private upload, 15% platform fee is taken when someone unlocks it
+          progress("Locking your content…");
+          const lockedPath = await uploadLocked(snap.uid, finalFile, finalFile.name);
+          const { error: ppvErr } = await ppvRpc("ppv_create_post", { _caption: snap.caption || null, _price: snap.ppvPrice, _path: lockedPath, _type: snap.mediaType, _teaser: snap.caption ? snap.caption.slice(0, 60) : null });
+          if (ppvErr) throw new Error(ppvErr.message);
+          window.dispatchEvent(new Event("prime:posted"));
+          return;
         }
         const ext = finalFile.name.split(".").pop();
         const path = `${snap.uid}/${Date.now()}.${ext}`;
@@ -734,6 +748,20 @@ const CreatePostPage = () => {
                 Primempire
               </button>
             </div>
+            {isAdult && file && (
+              <div className="liquid-glass relative z-10 space-y-2 rounded-xl p-3">
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">Pay to view</p><p className="text-xs text-muted-foreground">Viewers pay to unlock this post</p></div>
+                  <button onClick={() => setPpvOn((v) => !v)} aria-pressed={ppvOn} aria-label="Pay to view" className={`h-7 w-12 rounded-full p-0.5 transition-colors ${ppvOn ? "bg-primary" : "bg-secondary"}`}><span className={`block h-6 w-6 rounded-full bg-white transition-transform ${ppvOn ? "translate-x-5" : ""}`} /></button>
+                </div>
+                {ppvOn && (
+                  <>
+                    <input value={ppvPrice} onChange={(e) => setPpvPrice(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))} inputMode="decimal" placeholder="Price in KES (20 – 20,000)" aria-label="Price in KES" className="w-full rounded-xl bg-secondary/60 px-3 py-2.5 text-sm outline-none" />
+                    {Number(ppvPrice) >= 20 && <p className="text-xs text-muted-foreground">You earn <span className="font-semibold text-foreground">{fmtKes(creatorShare(Number(ppvPrice)))}</span> per unlock. Primegram keeps 15%.</p>}
+                  </>
+                )}
+              </div>
+            )}
             {track && (
               <div className="liquid-glass rounded-xl px-3 py-2 flex items-center gap-2 relative z-10">
                 <Music className="w-3.5 h-3.5 text-primary shrink-0" />
