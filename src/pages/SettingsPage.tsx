@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Moon, Lock, Bell, HelpCircle, LogOut, ChevronRight, User, Shield, Palette, Sun, Users, WalletCards, Heart, Music2, Fingerprint, Disc3, UserRound, Sparkles } from "lucide-react";
+import { ArrowLeft, Moon, Lock, Bell, HelpCircle, LogOut, ChevronRight, User, Shield, Palette, Sun, Users, WalletCards, Heart, Music2, Fingerprint, Disc3, UserRound, Sparkles, Search, Ban } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,12 +36,33 @@ const Toggle = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
   <Switch checked={on} onCheckedChange={onToggle} aria-label="Toggle setting" />
 );
 
+const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="relative z-10">
+    <p className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">{title}</p>
+    <div className="divide-y divide-white/[0.06] overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_8px_30px_rgba(0,0,0,.25)] backdrop-blur-xl">{children}</div>
+  </div>
+);
+
+type RowProps = { icon: React.ComponentType<{ className?: string }>; tint: string; label: string; desc?: string; onClick?: () => void; right?: React.ReactNode };
+const Row = ({ icon: Icon, tint, label, desc, onClick, right }: RowProps) => {
+  const body = (
+    <>
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tint}`}><Icon className="h-5 w-5" /></span>
+      <span className="min-w-0 flex-1"><span className="block text-[15px] font-medium leading-tight text-foreground">{label}</span>{desc && <span className="mt-0.5 block truncate text-xs text-muted-foreground">{desc}</span>}</span>
+      {right ?? <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />}
+    </>
+  );
+  const cls = "flex w-full items-center gap-3.5 px-4 py-3 text-left";
+  return onClick ? <button onClick={onClick} className={`${cls} transition-colors active:bg-white/[0.06]`}>{body}</button> : <div className={cls}>{body}</div>;
+};
+
 const SettingsPage = () => {
   const navigate = useNavigate();
   const { signOut, user, savedAccounts, switchAccount, removeSavedAccount, saveCurrentAccount } = useAuth();
   const currentUserId = user?.id;
   const { isAdmin } = useRoles();
   const [activePanel, setActivePanel] = useState<Panel>(null);
+  const [q, setQ] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
@@ -414,6 +435,14 @@ const SettingsPage = () => {
       case "accounts":
         return (
           <div className="space-y-4">
+            <AccountManagement
+              user={user}
+              savedAccounts={savedAccounts}
+              switchAccount={switchAccount}
+              onManageProfiles={() => undefined}
+              onSwitched={label => toast.success(`Switched to ${label}`)}
+              onSwitchError={error => toast.error(error instanceof Error ? error.message : "Couldn't switch accounts")}
+            />
             <p className="text-sm text-muted-foreground">Saved sessions stay on this device for one-tap switching. Passwords are never saved.</p>
             <div className="space-y-2">
               {savedAccounts.map(account => (
@@ -522,78 +551,77 @@ const SettingsPage = () => {
           </motion.div>
         ) : (
           <motion.div key="main" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mx-auto max-w-3xl space-y-3 px-4 py-4 sm:px-5">
-            <section className="liquid-glass-elevated flex items-center gap-3 rounded-2xl p-3 relative z-10">
-              <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-white/15 bg-secondary">
-                {settingsProfile?.avatar_url
-                  ? <img src={settingsProfile.avatar_url} alt="" className="h-full w-full object-cover" />
-                  : <div className="flex h-full w-full items-center justify-center text-lg font-bold text-primary">{(settingsProfile?.display_name || user?.email || "U")[0].toUpperCase()}</div>}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-foreground">{settingsProfile?.display_name || user?.user_metadata?.nickname || user?.email?.split("@")[0] || "Primegram user"}</p>
-                <p className="truncate text-[11px] text-muted-foreground">{settingsProfile?.username ? `@${settingsProfile.username}` : user?.email}</p>
-              </div>
-              <div className="w-24 shrink-0 sm:w-36">
-                <div className="flex justify-between text-[9px] text-muted-foreground">
-                  <span className="hidden sm:inline">Quick storage usage</span><span>{storageUse ? `${storageUse.percent}%` : "—"}</span>
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
-                  <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-fuchsia-400" style={{ width: `${storageUse?.percent ?? 0}%` }} />
-                </div>
-                <p className="mt-1 text-right text-[9px] text-muted-foreground">{storageUse ? `${storageUse.used} / ${storageUse.total}` : "Storage usage unavailable"}</p>
-              </div>
-            </section>
-
-            <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/35 shadow-[0_0_24px_rgba(255,0,51,.08)] backdrop-blur-xl">
-              <button onClick={() => { setActivePanel("profile"); void loadProfile(); }} className="flex w-full items-center gap-3 px-4 pb-2 pt-3 text-left">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.07] text-foreground"><UserRound className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-semibold text-foreground">Account Management</span>
-                  <span className="block text-[10px] text-muted-foreground">Update your info and switch profiles</span>
-                </span>
-                <ChevronRight className="h-4 w-4 text-red-300" />
-              </button>
-              <div className="grid gap-2 px-3 pb-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                  <p className="mb-2 text-[10px] font-semibold text-white/75">1. Linked Accounts</p>
-                  <div className="space-y-2">
-                    {savedAccounts.length ? savedAccounts.map(account => (
-                      <div key={account.userId} className="flex min-w-0 items-center gap-2 rounded-lg bg-black/25 px-2 py-1.5">
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${account.userId === user?.id ? "bg-emerald-400" : "bg-white/25"}`} />
-                        <span className="min-w-0 flex-1 truncate text-[10px] text-white/80">{account.label}</span>
-                        {account.userId === user?.id && <span className="text-[9px] text-emerald-300">Current</span>}
-                      </div>
-                    )) : <p className="text-[10px] text-white/40">No saved account profiles.</p>}
+            {/* Hero */}
+            <section className="relative z-10 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-fuchsia-500/20 via-white/[0.04] to-cyan-500/15 p-4 backdrop-blur-xl">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-fuchsia-500/25 blur-3xl" />
+              <div className="relative flex items-center gap-4">
+                <div className="h-16 w-16 shrink-0 rounded-full bg-gradient-to-tr from-fuchsia-400 via-rose-400 to-amber-300 p-[3px] shadow-[0_0_24px_rgba(217,70,239,.45)]">
+                  <div className="h-full w-full overflow-hidden rounded-full border-2 border-background bg-secondary">
+                    {settingsProfile?.avatar_url
+                      ? <img src={settingsProfile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      : <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-primary">{(settingsProfile?.display_name || user?.email || "U")[0].toUpperCase()}</div>}
                   </div>
-                  <button onClick={() => setActivePanel("accounts")} className="mt-2 text-[10px] text-cyan-200 hover:text-cyan-100">Manage linked accounts</button>
                 </div>
-                <AccountManagement
-                  user={user}
-                  savedAccounts={savedAccounts}
-                  switchAccount={switchAccount}
-                  onManageProfiles={() => setActivePanel("accounts")}
-                  onSwitched={label => toast.success(`Switched to ${label}`)}
-                  onSwitchError={error => toast.error(error instanceof Error ? error.message : "Couldn't switch accounts")}
-                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lg font-bold text-foreground">{settingsProfile?.display_name || user?.user_metadata?.nickname || user?.email?.split("@")[0] || "Primegram user"}</p>
+                  <p className="truncate text-sm text-muted-foreground">{settingsProfile?.username ? `@${settingsProfile.username}` : user?.email}</p>
+                  <button onClick={() => { setActivePanel("profile"); void loadProfile(); }} className="mt-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-foreground active:bg-white/20">Edit profile</button>
+                </div>
               </div>
-              <div className="grid border-t border-white/10 sm:grid-cols-2">
-                <button onClick={() => setActivePanel("privacy")} className="flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.035]">
-                  <Lock className="h-4 w-4 text-white/75" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Privacy</span><span className="block text-[10px] text-muted-foreground">Account privacy settings</span></span><ChevronRight className="h-4 w-4 text-red-300" />
-                </button>
-                <button onClick={() => setActivePanel("security")} className="flex items-center gap-3 border-t border-white/10 px-4 py-3 text-left hover:bg-white/[0.035] sm:border-l sm:border-t-0">
-                  <Shield className="h-4 w-4 text-white/75" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Security</span><span className="block text-[10px] text-muted-foreground">Password & 2FA</span></span><ChevronRight className="h-4 w-4 text-red-300" />
-                </button>
+              <div className="relative mt-4">
+                <div className="flex justify-between text-[11px] text-muted-foreground"><span>Storage</span><span>{storageUse ? `${storageUse.used} of ${storageUse.total}` : "Unavailable"}</span></div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-cyan-300" style={{ width: `${storageUse?.percent ?? 0}%` }} /></div>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-black/35 p-3 shadow-[0_0_24px_rgba(255,0,51,.08)] backdrop-blur-xl">
-              <button onClick={() => setActivePanel("appearance")} className="flex w-full items-center gap-3 text-left">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.07] text-foreground"><Palette className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Appearance</span><span className="block text-[10px] text-muted-foreground">Theme switcher: Midnight Obsidian, Liquid Glass, Neon</span></span>
-                <span className="h-5 w-5 shrink-0 rounded-md border border-red-300/50 bg-red-600 shadow-[0_0_12px_rgba(255,0,51,.6)]" /><ChevronRight className="h-4 w-4 text-red-300" />
-              </button>
-              {creatorActive && <div className="mt-3"><AdvancedDeveloperHub /></div>}
-            </section>
+            {/* Search */}
+            <label className="relative z-10 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 backdrop-blur-xl">
+              <Search className="h-4 w-4 text-white/40" />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search settings" aria-label="Search settings" className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-white/35" />
+            </label>
 
+            {(() => {
+              const go = (panel: Panel, open?: () => void) => () => { setActivePanel(panel); open?.(); };
+              type Item = RowProps & { key: string };
+              const groups: { title: string; items: Item[] }[] = [
+                { title: "Account", items: [
+                  { key: "profile", icon: User, tint: "bg-sky-500/20 text-sky-300", label: "Edit profile", desc: "Name, username and bio", onClick: go("profile", () => void loadProfile()) },
+                  { key: "accounts", icon: Users, tint: "bg-indigo-500/20 text-indigo-300", label: "Switch accounts", desc: "Linked accounts on this device", onClick: go("accounts") },
+                  { key: "privacy", icon: Lock, tint: "bg-emerald-500/20 text-emerald-300", label: "Privacy", desc: "Who can see and contact you", onClick: go("privacy") },
+                  { key: "security", icon: Shield, tint: "bg-amber-500/20 text-amber-300", label: "Security", desc: "Password and two-step login", onClick: go("security") },
+                  { key: "blocked", icon: Ban, tint: "bg-rose-500/20 text-rose-300", label: "Blocked accounts", desc: "People you've blocked", onClick: go("blocked") },
+                ] },
+                { title: "Experience", items: [
+                  { key: "notifications", icon: Bell, tint: "bg-red-500/20 text-red-300", label: "Notifications", desc: "Messages, calls and alerts", onClick: go("notifications") },
+                  { key: "appearance", icon: Palette, tint: "bg-fuchsia-500/20 text-fuchsia-300", label: "Appearance", desc: "Themes, colors and app icon", onClick: go("appearance") },
+                  { key: "dark", icon: Moon, tint: "bg-violet-500/20 text-violet-300", label: "Dark mode", desc: darkMode ? "On" : "Off", right: <Switch checked={darkMode} onCheckedChange={setDarkMode} aria-label="Dark Mode" /> },
+                  { key: "content", icon: Sparkles, tint: "bg-cyan-500/20 text-cyan-300", label: "Captions, search & reels", desc: "How content behaves for you", onClick: go("content") },
+                ] },
+                { title: "Creator & money", items: [
+                  { key: "wallet", icon: WalletCards, tint: "bg-green-500/20 text-green-300", label: "Wallet", desc: "Balance, top up and withdraw", onClick: () => navigate("/wallet") },
+                  { key: "creator", icon: Users, tint: "bg-pink-500/20 text-pink-300", label: "Creator dashboard", desc: creatorActive ? "Manage plan and subscribers" : "Register as a creator", onClick: go("creator", () => void loadCreatorData()) },
+                  { key: "subs", icon: Heart, tint: "bg-orange-500/20 text-orange-300", label: "Subscriptions", desc: "Creators you support", onClick: go("subscriptions", () => void loadMySubscriptions()) },
+                ] },
+                { title: "Support", items: [
+                  { key: "help", icon: HelpCircle, tint: "bg-teal-500/20 text-teal-300", label: "Help & support", desc: "FAQs and contact", onClick: go("help") },
+                  ...(isAdmin ? [{ key: "admin", icon: Shield, tint: "bg-red-500/25 text-red-300", label: "Admin console", desc: "Moderation, users and reports", onClick: () => navigate("/admin") }] : []),
+                ] },
+              ];
+              const needle = q.trim().toLowerCase();
+              const shown = groups.map(g => ({ ...g, items: needle ? g.items.filter(i => `${i.label} ${i.desc ?? ""}`.toLowerCase().includes(needle)) : g.items })).filter(g => g.items.length);
+              return (
+                <>
+                  {shown.length === 0 && <p className="relative z-10 py-8 text-center text-sm text-muted-foreground">No settings match "{q}".</p>}
+                  {shown.map(g => <Group key={g.title} title={g.title}>{g.items.map(({ key, ...r }) => <Row key={key} {...r} />)}</Group>)}
+                </>
+              );
+            })()}
+
+            {creatorActive && !q && <div className="relative z-10"><AdvancedDeveloperHub /></div>}
+
+            {!q && (
+              <div className="space-y-3">
+                <p className="relative z-10 -mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">Preferences</p>
             <section className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur-xl">
               <div className="mb-3 flex items-center gap-2"><Heart className="h-4 w-4 text-rose-300" /><h2 className="text-xs font-semibold text-foreground">AI Crush & Match Hub</h2></div>
               <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -640,50 +668,14 @@ const SettingsPage = () => {
               </div>
             </section>
 
-            <section className="flex items-center gap-3 border-y border-white/10 px-3 py-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.07]"><Moon className="h-4 w-4 text-foreground" /></span>
-              <span className="flex-1"><span className="block text-xs font-semibold text-foreground">Dark Mode</span><span className="block text-[10px] text-muted-foreground">{darkMode ? "On" : "Off"}</span></span>
-              <Switch checked={darkMode} onCheckedChange={setDarkMode} aria-label="Dark Mode" />
-            </section>
-
-            <button onClick={() => setActivePanel("help")} className="flex w-full items-center gap-3 border-b border-white/10 px-3 py-3 text-left">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.07]"><HelpCircle className="h-4 w-4 text-foreground" /></span>
-              <span className="flex-1"><span className="block text-xs font-semibold text-foreground">Help & Support</span><span className="block text-[10px] text-muted-foreground">FAQs and contact</span></span>
-              <ChevronRight className="h-4 w-4 text-red-300" />
-            </button>
-
-            <WalletShortcut />
-            <div className="grid gap-2 sm:grid-cols-2">
-              <button onClick={() => { setActivePanel("creator"); void loadCreatorData(); }} className="depth-press flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-3 text-left">
-                <Users className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Creator Dashboard</span><span className="block text-[10px] text-muted-foreground">{creatorActive ? "Manage plan and subscribers" : "Register as a creator"}</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <button onClick={() => setActivePanel("content")} className="depth-press flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-3 text-left">
-                <Sparkles className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Captions, Search & Reels</span><span className="block text-[10px] text-muted-foreground">AI captions, search and reel options</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <button onClick={() => { setActivePanel("subscriptions"); void loadMySubscriptions(); }} className="depth-press flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-3 text-left">
-                <WalletCards className="h-4 w-4 text-primary" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">Subscriptions</span><span className="block text-[10px] text-muted-foreground">Your creator memberships</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </div>
-
-            {isAdmin && (
-              <motion.button
-                onClick={() => navigate("/admin")}
-                className="depth-press liquid-glass rounded-2xl p-4 flex items-center gap-3 w-full text-left relative z-10 border border-primary/30"
-              >
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-foreground">Admin Console</p>
-                  <p className="text-caption text-muted-foreground">Moderation, users, reports & audit log</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </motion.button>
+              </div>
             )}
-            <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} onClick={handleSignOut}
-              className="depth-press w-full mt-1 py-3 rounded-2xl border border-red-300/30 bg-gradient-to-r from-red-950/60 to-rose-950/30 text-red-300 text-sm font-semibold flex items-center justify-center gap-2 relative z-10 shadow-[0_0_16px_rgba(255,0,51,.12)]">
-              <LogOut className="w-4 h-4" /> Sign Out
+
+            <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} onClick={handleSignOut}
+              className="depth-press relative z-10 flex w-full items-center justify-center gap-2 rounded-3xl border border-red-400/25 bg-red-500/10 py-3.5 text-[15px] font-semibold text-red-300 backdrop-blur-xl">
+              <LogOut className="h-4 w-4" /> Sign out
             </motion.button>
+            <p className="relative z-10 pb-4 text-center text-[11px] text-white/30">Primegram Extreme · primegramx.co.ke</p>
           </motion.div>
         )}
       </AnimatePresence>

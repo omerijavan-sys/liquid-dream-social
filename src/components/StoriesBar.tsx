@@ -465,7 +465,6 @@ const StoriesBar = () => {
                 <img src={viewingStory.image_url} alt="Story" className={`h-full w-full ${fit}`} onLoad={e => setStoryCover(e.currentTarget.naturalHeight / Math.max(1, e.currentTarget.naturalWidth) >= 1.2)} />
               )}
               <div role="presentation" onPointerDown={zoneDown} onPointerUp={zoneUp} onPointerLeave={() => { window.clearTimeout(holdTimer.current); if (held.current) { setPaused(false); held.current = false; } }} className="absolute inset-0 z-10 touch-manipulation select-none">
-                {paused && <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20"><Play className="h-12 w-12 fill-white text-white" /></span>}
               </div>
             </div>
             <div className="absolute bottom-4 left-4 right-28 z-20 flex flex-col gap-2">
