@@ -106,8 +106,15 @@ const PublicLandingPage = () => (
       </div>
     </section>
 
-    <footer className="relative z-10 border-t border-white/10 px-5 py-6 text-center text-xs text-muted-foreground">
-      © {new Date().getFullYear()} Primegram Extreme
+    <footer className="relative z-10 border-t border-white/10 px-5 py-6 text-xs text-muted-foreground">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p>© {new Date().getFullYear()} Primegram X</p>
+        <nav aria-label="Trust and legal pages" className="flex flex-wrap gap-x-5 gap-y-2">
+          <a className="transition-colors hover:text-foreground" href="/about">About</a>
+          <a className="transition-colors hover:text-foreground" href="/privacy">Privacy</a>
+          <a className="transition-colors hover:text-foreground" href="/terms">Terms</a>
+        </nav>
+      </div>
     </footer>
   </main>
 );
