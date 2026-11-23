@@ -16,16 +16,41 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // One fixed signing key for every build. Android only accepts an in-place upgrade when the new APK
-    // is signed with the same key as the installed one, so builds must never use a random debug key.
+    // Release signing. Order of precedence:
+    //   1. android/keystore.properties  (local machine, git-ignored)  -> your permanent release key
+    //   2. PRIMEGRAM_KEYSTORE_* env vars (GitHub Actions secrets)
+    //   3. the legacy key committed in the repo, ONLY so existing installs can still upgrade until the new key is in place.
+    // Android only accepts an in-place upgrade when the new APK is signed with the same key as the installed one.
+    def keystoreProps = new Properties()
+    def keystorePropsFile = rootProject.file("keystore.properties")
+    if (keystorePropsFile.exists()) keystorePropsFile.withInputStream { keystoreProps.load(it) }
+
     signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            } else if (System.getenv("PRIMEGRAM_KEYSTORE_FILE")) {
+                storeFile file(System.getenv("PRIMEGRAM_KEYSTORE_FILE"))
+                storePassword System.getenv("PRIMEGRAM_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("PRIMEGRAM_KEY_ALIAS") ?: "primegram"
+                keyPassword System.getenv("PRIMEGRAM_KEY_PASSWORD")
+            } else {
+                logger.warn("WARNING: no keystore.properties / secrets found - signing with the legacy in-repo key.")
+                storeFile file("primegram.keystore")
+                storePassword "primegram-keystore"
+                keyAlias "primegram"
+                keyPassword "primegram-keystore"
+            }
+        }
+        // Debug builds keep the legacy key so debug installs upgrade over each other.
         primegram {
-            // Secrets win when set (GitHub Actions: PRIMEGRAM_KEYSTORE_PASSWORD / PRIMEGRAM_KEY_PASSWORD / PRIMEGRAM_KEYSTORE_FILE).
-            // The fallback keeps today's builds working until the real key is moved into secrets.
-            storeFile file(System.getenv("PRIMEGRAM_KEYSTORE_FILE") ?: "primegram.keystore")
-            storePassword System.getenv("PRIMEGRAM_KEYSTORE_PASSWORD") ?: "primegram-keystore"
-            keyAlias System.getenv("PRIMEGRAM_KEY_ALIAS") ?: "primegram"
-            keyPassword System.getenv("PRIMEGRAM_KEY_PASSWORD") ?: "primegram-keystore"
+            storeFile file("primegram.keystore")
+            storePassword "primegram-keystore"
+            keyAlias "primegram"
+            keyPassword "primegram-keystore"
         }
     }
     buildTypes {
@@ -33,9 +58,10 @@ android {
             signingConfig signingConfigs.primegram
         }
         release {
-            signingConfig signingConfigs.primegram
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }

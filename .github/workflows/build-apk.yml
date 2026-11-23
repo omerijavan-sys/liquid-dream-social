@@ -38,8 +38,11 @@ jobs:
             echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
             echo "VITE_PUSH_ENABLED=true" >> "$GITHUB_ENV"
             echo "google-services.json added - push enabled"
+          elif grep -q '"package_name": *"com.primegram.app"' android/app/google-services.json 2>/dev/null; then
+            echo "VITE_PUSH_ENABLED=true" >> "$GITHUB_ENV"
+            echo "Using google-services.json from the repo - push enabled"
           else
-            echo "No valid GOOGLE_SERVICES_JSON (package must be com.primegram.app) - push disabled in this build"
+            echo "No valid google-services.json (package must be com.primegram.app) - push disabled in this build"
           fi
 
       - name: Build web assets

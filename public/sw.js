@@ -1,4 +1,4 @@
-const CACHE_NAME = 'primegram-v2';
+const CACHE_NAME = 'primegram-v3';
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -60,7 +60,17 @@ self.addEventListener('notificationclick', event => {
     path = `/messages?to=${encodeURIComponent(senderId)}&aiReply=1`;
   }
   const target = new URL(path, self.location.origin).href;
-  event.waitUntil(self.clients.openWindow(target));
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of wins) {
+      if (new URL(w.url).origin === self.location.origin && 'focus' in w) {
+        await w.focus();
+        if ('navigate' in w) { try { await w.navigate(target); } catch (e) { /* ignore */ } }
+        return;
+      }
+    }
+    await self.clients.openWindow(target);
+  })());
 });
 
 self.addEventListener('push', event => {

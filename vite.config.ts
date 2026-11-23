@@ -1,8 +1,20 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
+
+// Bump this ONLY when a release needs new native code (new plugin / permission). Older Android apps then
+// send people to the official download page instead of offering a web reload.
+const MIN_NATIVE_BUILD = 0;
+const WEB_BUILD = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 10) || process.env.GITHUB_SHA?.slice(0, 10) || String(Date.now());
+
+const versionFile = (): Plugin => ({
+  name: "primegram-version-file",
+  generateBundle() {
+    this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ web: WEB_BUILD, minNative: MIN_NATIVE_BUILD }) });
+  },
+});
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -12,6 +24,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     define: {
+      __WEB_BUILD__: JSON.stringify(WEB_BUILD),
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl ?? ""),
       "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey ?? ""),
     },
@@ -22,7 +35,7 @@ export default defineConfig(({ mode }) => {
         overlay: false,
       },
     },
-    plugins: [react(), mode === "development" && componentTagger(), mcpPlugin()].filter(Boolean),
+    plugins: [react(), versionFile(), mode === "development" && componentTagger(), mcpPlugin()].filter(Boolean),
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
