@@ -7,7 +7,7 @@ import { Download, ExternalLink, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
 export const ANDROID_APK_URL = "/primegram.apk";
-export const PRIMEGRAM_ISA_DEV_URL = "https://primegram-extreme.is-a.dev";
+export const PRIMEGRAM_ISA_DEV_URL = "https://primegramx.co.ke";
 
 const AndroidDownloadCard = ({ compact = false }: { compact?: boolean }) => {
   const isNativeApp = Capacitor.isNativePlatform();
