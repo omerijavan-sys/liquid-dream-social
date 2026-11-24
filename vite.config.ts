@@ -35,24 +35,7 @@ export default defineConfig(({ mode }) => {
         overlay: false,
       },
     },
-    build: {
-      chunkSizeWarningLimit: 900,
-      rollupOptions: {
-        output: {
-          // Stable vendor chunks: they change rarely, so phones keep them cached across our frequent deploys.
-          manualChunks(id: string) {
-            if (!id.includes("node_modules")) return undefined;
-            if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return "vendor-react";
-            if (id.includes("@supabase")) return "vendor-supabase";
-            if (id.includes("framer-motion") || id.includes("/motion-")) return "vendor-motion";
-            if (id.includes("@radix-ui")) return "vendor-radix";
-            if (id.includes("@tanstack")) return "vendor-query";
-            if (id.includes("lucide-react")) return "vendor-icons";
-            return undefined;
-          },
-        },
-      },
-    },
+    build: { chunkSizeWarningLimit: 900 },
     plugins: [react(), versionFile(), mode === "development" && componentTagger(), mcpPlugin()].filter(Boolean),
     resolve: {
       alias: {
