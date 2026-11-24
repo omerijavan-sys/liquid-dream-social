@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Primegram",
+    "slug": "primegram-mobile",
+    "scheme": "primegram",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      ["expo-video", { "supportsBackgroundPlayback": false, "supportsPictureInPicture": false }],
+      "expo-file-system"
+    ],
+    "experiments": { "typedRoutes": true },
+    "ios": { "supportsTablet": false },
+    "android": { "edgeToEdgeEnabled": true }
+  }
+}
