@@ -12,7 +12,6 @@ import CommentsSection from "@/components/CommentsSection";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useVideoPoster } from "@/utils/videoPoster";
 import MediaViewer from "@/components/MediaViewer";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import ShareSheet from "@/components/ShareSheet";
@@ -60,7 +59,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
   );
 
 const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, badge, authorId, music, views = 0, mediaItems, allowComments = true, hideLikes = false, location = null }: FeedPostProps) => {
-  const coverImg = useVideoPoster(mediaType === "video" ? image : null, poster);
+  const coverImg = poster || undefined;
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
   const [me, setMe] = useState<string | null>(null);
@@ -70,8 +69,8 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
   const [likeCount, setLikeCount] = useState(likes);
   const [showHeart, setShowHeart] = useState(false);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [, setIsPlaying] = useState(false);
   const lastTap = useRef(0);
   const tapTimer = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -192,7 +191,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
   const [near, setNear] = useState(false);
   useEffect(() => {
     if (!isVideo || !wrapRef.current) return;
-    const obs = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: "120% 0px", threshold: 0 });
+    const obs = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: "75% 0px", threshold: 0 });
     obs.observe(wrapRef.current);
     return () => obs.disconnect();
   }, [isVideo]);
@@ -200,29 +199,14 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
     if (!isVideo || !autoPlay || !wrapRef.current) return;
     const obs = new IntersectionObserver(([entry]) => {
       const el = videoRef.current;
-      setIsVisible(entry.isIntersecting);
-      if (entry.isIntersecting) { el?.play().catch(() => {}); }
-      else { el?.pause(); }
+      const active = entry.isIntersecting && entry.intersectionRatio >= 0.5;
+      setIsVisible(active);
+      if (active) { setVideoLoading(true); el?.play().catch(() => setVideoLoading(false)); }
+      else { setVideoLoading(false); el?.pause(); }
     }, { threshold: 0.5 });
     obs.observe(wrapRef.current);
     return () => obs.disconnect();
   }, [isVideo, autoPlay, near]);
-
-  // If a visible video is still empty after 6s (a stalled request), reload it once instead of spinning forever.
-  useEffect(() => {
-    if (!isVideo || !near || !isVisible) return;
-    let tries = 0;
-    const t = window.setInterval(() => {
-      const v = videoRef.current;
-      if (!v || v.readyState >= 3) { if (v) setVideoLoading(false); return; }
-      tries += 1;
-      if (tries > 3) { window.clearInterval(t); return; }
-      // still empty: ask again (second try bypasses a bad cached/partial response)
-      if (tries >= 2) v.src = `${image}${image.includes("?") ? "&" : "?"}r=${Date.now()}`;
-      v.load(); void v.play().catch(() => {});
-    }, 4000);
-    return () => window.clearInterval(t);
-  }, [isVideo, near, isVisible, image]);
 
   const togglePlayPause = () => {
     const v = videoRef.current; if (!v) return;
@@ -315,21 +299,37 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
                 playsInline
                 muted={muted}
                 loop
-                preload={isVisible ? "auto" : "metadata"}
-                onStalled={() => { const v = videoRef.current; if (v && isVisible) window.setTimeout(() => { if (v.readyState < 3 && !v.paused) { const t = v.currentTime; v.load(); v.currentTime = t; void v.play().catch(() => {}); } }, 2500); }}
-                onCanPlay={() => setVideoLoading(false)}
+                preload={isVisible ? "auto" : "none"}
+                onStalled={() => { if (isVisible) setVideoLoading(true); }}
+                onCanPlay={() => { setVideoLoading(false); setVideoError(false); }}
                 onLoadedData={() => setVideoLoading(false)}
-                onWaiting={() => setVideoLoading(true)}
-                onPlaying={() => { setVideoLoading(false); setIsPlaying(true); }}
-                onPause={() => setIsPlaying(false)}
+                onWaiting={() => { if (isVisible) setVideoLoading(true); }}
+                onPlaying={() => { setVideoLoading(false); setVideoError(false); }}
                 onTimeUpdate={() => { if (videoLoading) setVideoLoading(false); }}
-                onError={() => { const v = videoRef.current; if (v) window.setTimeout(() => v.load(), 1500); setVideoLoading(false); }}
+                onError={() => { setVideoLoading(false); setVideoError(true); }}
               />
               )}
               {videoLoading && (
-                <div className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden pointer-events-none">
+                <div role="status" aria-label="Buffering video" className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden pointer-events-none">
                   <div className="h-full w-1/3 animate-[loadbar_1s_ease-in-out_infinite] bg-primary" />
                 </div>
+              )}
+              {videoError && isVisible && (
+                <button
+                  type="button"
+                  onClick={event => {
+                    event.stopPropagation();
+                    const video = videoRef.current;
+                    if (!video) return;
+                    setVideoError(false);
+                    setVideoLoading(true);
+                    video.load();
+                    void video.play().catch(() => { setVideoLoading(false); setVideoError(true); });
+                  }}
+                  className="absolute inset-0 z-10 flex items-center justify-center bg-black/35 text-sm font-semibold text-white"
+                >
+                  Video didn&apos;t load. Tap to retry
+                </button>
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); toggleMuted(); }}

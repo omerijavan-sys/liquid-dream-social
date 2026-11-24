@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Share2, Volume2, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +17,7 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [near, setNear] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState<number>(reel.likes_count ?? 0);
   const [shareOpen, setShareOpen] = useState(false);
@@ -25,21 +26,29 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
     const el = boxRef.current;
     if (!el) return;
     let viewTimer = 0;
-    const io = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) setNear(true);
-      const video = videoRef.current;
-      if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-        if (video) void video.play().catch(() => {});
+    const preloadObserver = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: "400px 0px" });
+    const playbackObserver = new IntersectionObserver(([entry]) => {
+      const active = entry.isIntersecting && entry.intersectionRatio >= 0.6;
+      setVisible(active);
+      if (active) {
         window.clearTimeout(viewTimer);
         viewTimer = window.setTimeout(() => countReelView(reel.id), 1500);
       } else {
         window.clearTimeout(viewTimer);
-        video?.pause();
+        videoRef.current?.pause();
       }
-    }, { threshold: [0, 0.6], rootMargin: "300px 0px" });
-    io.observe(el);
-    return () => { window.clearTimeout(viewTimer); io.disconnect(); };
+    }, { threshold: 0.6 });
+    preloadObserver.observe(el);
+    playbackObserver.observe(el);
+    return () => { window.clearTimeout(viewTimer); preloadObserver.disconnect(); playbackObserver.disconnect(); };
   }, [reel.id]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (near && visible) void video.play().catch(() => {});
+    else video.pause();
+  }, [near, visible]);
 
   useEffect(() => {
     if (!user) return;
@@ -68,9 +77,10 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
         </div>
       </div>
       <div ref={boxRef} className="relative flex w-full items-center justify-center bg-background/40" onClick={() => { const v = videoRef.current; if (!v) return; if (v.paused) void v.play().catch(() => {}); else v.pause(); }}>
-        {reel.thumbnail_url && !near && <img src={reel.thumbnail_url} alt="" loading="lazy" decoding="async" className="h-auto max-h-[75vh] min-h-[30vh] w-full object-contain bg-background" />}
+        {!near && reel.thumbnail_url && <img src={reel.thumbnail_url} alt="" loading="lazy" decoding="async" className="h-auto max-h-[75vh] min-h-[30vh] w-full object-contain bg-background" />}
+        {!near && !reel.thumbnail_url && <div aria-hidden="true" className="flex min-h-[30vh] w-full items-center justify-center bg-gradient-to-br from-muted via-background to-muted"><Play className="size-10 fill-current text-muted-foreground" /></div>}
         {near && (
-          <video ref={videoRef} src={reel.thumbnail_url ? reel.video_url : `${reel.video_url}#t=0.1`} poster={reel.thumbnail_url || BLANK_POSTER} className="h-auto max-h-[75vh] w-full bg-background object-contain" muted={muted} loop playsInline preload="auto" />
+          <video ref={videoRef} src={reel.video_url} poster={reel.thumbnail_url || BLANK_POSTER} className="h-auto max-h-[75vh] w-full bg-background object-contain" muted={muted} loop playsInline preload={visible ? "auto" : "none"} />
         )}
         <button aria-label={muted ? "Unmute" : "Mute"} onClick={event => { event.stopPropagation(); toggleMuted(); }} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 backdrop-blur">{muted ? <VolumeX className="h-4 w-4 text-white" /> : <Volume2 className="h-4 w-4 text-white" />}</button>
       </div>
