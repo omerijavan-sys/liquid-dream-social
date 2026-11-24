@@ -22,7 +22,7 @@ const AuthCinematic = ({ onDone }: Props) => {
         style={{ background: "radial-gradient(circle, rgba(168,85,247,.34) 0%, rgba(236,72,153,.14) 30%, transparent 60%)" }}
         initial={{ scale: 0.2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }} />
       <motion.div aria-hidden="true" className="absolute z-0 h-40 w-40 rounded-full bg-violet-500/60 blur-[60px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 1 }} />
-      <motion.img src="/icons/x-logo.png" alt="Primegram X" width={132} height={132}
+      <motion.img src="/icons/x-logo-256.webp" alt="Primegram X" width={132} height={132}
         className="relative z-10 h-32 w-32 rounded-[2rem]"
         initial={{ scale: 0.5, opacity: 0, rotate: -8 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 140, damping: 14, delay: 0.1 }} />
       <motion.p className="relative z-10 mt-6 text-sm font-black tracking-[0.35em] text-white" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 0.6 }}>

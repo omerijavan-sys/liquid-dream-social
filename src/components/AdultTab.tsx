@@ -19,6 +19,7 @@ interface AdultPost {
   caption: string | null;
   media_url: string | null;
   media_type: string | null;
+  thumbnail_url?: string | null;
   views_count: number;
   user_id: string;
   creator?: string | null;

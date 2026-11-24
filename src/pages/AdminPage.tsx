@@ -621,7 +621,7 @@ const AdminPage = () => {
                 const ev = events ?? [];
                 const errs = ev.filter((e) => e.kind === "error");
                 const pages = ev.filter((e) => e.kind === "page");
-                const top = (rows: any[], f: (r: any) => string) => Object.entries(rows.reduce((m: Record<string, number>, r) => { const k = f(r); m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
+                const top = (rows: any[], f: (r: any) => string) => (Object.entries(rows.reduce((m: Record<string, number>, r) => { const k = f(r); m[k] = (m[k] || 0) + 1; return m; }, {} as Record<string, number>)) as [string, number][]).sort((a, b) => b[1] - a[1]).slice(0, 8);
                 const day = new Date(Date.now() - 864e5).toISOString();
                 return (
                   <>

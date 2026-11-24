@@ -36,7 +36,7 @@ const WITHDRAWAL_STATUS: Record<Withdrawal["status"], { label: string; cls: stri
   cancelled: { label: "Cancelled — refunded", cls: "text-muted-foreground" },
 };
 
-const txLabel = (tx: Pick<Transaction, "type" | "note">) => {
+const txLabel = (tx: Pick<Transaction, "type" | "note" | "counterparty">) => {
   const note = tx.note || "";
   if (note.startsWith("Withdrawal cancelled")) return "Withdrawal refund";
   if (note.startsWith("Withdrawal rejected")) return "Withdrawal refund";

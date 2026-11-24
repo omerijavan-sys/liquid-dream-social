@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { MessageCircle, Settings, Wallet, Rocket } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import pLogo from "@/assets/p-logo-lux.png";
+const pLogo = "/icons/x-logo-128.webp";
 
 const TopNavBar = () => {
   const [collapsed, setCollapsed] = useState(false);

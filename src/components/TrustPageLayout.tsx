@@ -23,7 +23,7 @@ const TrustPageLayout = ({ children }: { children: ReactNode }) => (
 
     <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
       <Link to="/" className="flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Primegram X home">
-        <img src="/icons/x-logo.png" alt="" width={42} height={42} className="h-[42px] w-[42px] rounded-xl shadow-[0_0_24px_rgba(168,85,247,.5)]" />
+        <img src="/icons/x-logo-128.webp" alt="" width={42} height={42} className="h-[42px] w-[42px] rounded-xl shadow-[0_0_24px_rgba(168,85,247,.5)]" />
         <span className="text-sm font-extrabold tracking-[0.12em]">PRIMEGRAM <span className="text-primary">X</span></span>
       </Link>
       <nav aria-label="Main navigation" className="flex items-center gap-3 sm:gap-5">

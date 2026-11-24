@@ -1,12 +1,16 @@
-import { useState, useRef, useEffect } from "react";
+import { lazy, Suspense, useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SiriOrb from "./SiriOrb";
-import PrimeAIChat from "./PrimeAIChat";
+const PrimeAIChat = lazy(() => import("./PrimeAIChat"));
 import SiriAssistant from "./SiriAssistant";
 
 const FloatingOrb = () => {
   const [aiOpen, setAiOpen] = useState(false);
+  // The chat bundle is big: load it after the first screen is interactive, or immediately when asked for.
+  const [idle, setIdle] = useState(false);
+  useEffect(() => { const t = window.setTimeout(() => setIdle(true), 5000); return () => window.clearTimeout(t); }, []);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const chatReady = idle || aiOpen || voiceOpen;
   const [isListening, setIsListening] = useState(false);
   const [voiceIntensity, setVoiceIntensity] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -137,11 +141,11 @@ const FloatingOrb = () => {
           onOpenTextChat={() => setAiOpen(true)}
         />
 
-        <PrimeAIChat 
-          open={aiOpen} 
-          onClose={() => setAiOpen(false)} 
-          onOpen={() => setAiOpen(true)}
-        />
+        {chatReady && (
+          <Suspense fallback={null}>
+            <PrimeAIChat open={aiOpen} onClose={() => setAiOpen(false)} onOpen={() => setAiOpen(true)} />
+          </Suspense>
+        )}
       </motion.div>
     </>
   );

@@ -49,7 +49,7 @@ const Flow = ({ onDone }: { onDone: () => void }) => {
   return createPortal(
     <div className="fixed inset-0 z-[150] flex flex-col bg-[radial-gradient(ellipse_at_50%_0%,#2a1050,#0b0618_55%,#000)] text-white">
       <div className="flex items-center gap-2 px-5 pt-[max(1rem,env(safe-area-inset-top))]">
-        <img src="/icons/x-logo.png" alt="" className="h-8 w-8 rounded-xl" />
+        <img src="/icons/x-logo-128.webp" alt="" className="h-8 w-8 rounded-xl" />
         <div className="flex flex-1 gap-1.5">{[0, 1, 2].map((i) => <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-gradient-to-r from-violet-400 to-fuchsia-400" : "bg-white/15"}`} />)}</div>
         <button onClick={() => void finish(true)} className="text-xs font-semibold text-white/55">Skip</button>
       </div>

@@ -66,7 +66,7 @@ const PublicLandingPage = () => {
 
       <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5">
         <a href="/" className="flex items-center gap-3" aria-label="Primegram X home">
-          <img src="/icons/x-logo.png" alt="" width={40} height={40} className="h-10 w-10 rounded-xl shadow-[0_0_24px_rgba(168,85,247,.5)]" />
+          <img src="/icons/x-logo-128.webp" alt="" width={40} height={40} className="h-10 w-10 rounded-xl shadow-[0_0_24px_rgba(168,85,247,.5)]" />
           <span className="text-sm font-black tracking-[0.18em]">PRIMEGRAM <span className="text-fuchsia-400">X</span></span>
         </a>
         <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ const PublicLandingPage = () => {
 
       <section className="relative z-10 mx-auto w-full max-w-6xl px-5 py-20">
         <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-violet-600/30 via-fuchsia-600/15 to-transparent px-6 py-14 text-center sm:px-12">
-          <img src="/icons/x-logo.png" alt="" width={72} height={72} className="mx-auto h-[72px] w-[72px] rounded-2xl shadow-[0_0_50px_rgba(168,85,247,.6)]" />
+          <img src="/icons/x-logo-256.webp" alt="" width={72} height={72} className="mx-auto h-[72px] w-[72px] rounded-2xl shadow-[0_0_50px_rgba(168,85,247,.6)]" />
           <h2 className="mx-auto mt-6 max-w-2xl text-3xl font-black tracking-tight sm:text-5xl">Come earn at Primegram.</h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-white/70">Make a profile, share what moves you and let your people find you.</p>
           <a href="/auth" className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-black transition-transform hover:scale-[1.03]">Get started <ArrowRight className="h-4 w-4" /></a>

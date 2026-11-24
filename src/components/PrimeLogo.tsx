@@ -1,6 +1,4 @@
-import { Capacitor } from "@capacitor/core";
-import appLogo from "@/assets/primegram-app-p-logo.png";
-import webLogo from "@/assets/p-logo-lux.png";
+const LOGO = "/icons/x-logo-256.webp";
 
 interface PrimeLogoProps {
   size?: number;
@@ -12,7 +10,7 @@ interface PrimeLogoProps {
  * Architectural liquid-glass "P" mark with metallic accents.
  */
 const PrimeLogo = ({ size = 44, className = "", glow = true }: PrimeLogoProps) => {
-  const logo = Capacitor.isNativePlatform() ? appLogo : webLogo;
+  const logo = LOGO;
 
   return (
     <div
