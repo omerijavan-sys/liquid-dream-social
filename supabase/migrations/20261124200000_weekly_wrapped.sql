@@ -1,0 +1,1 @@
+-- Applied via MCP (weekly_wrapped): my_weekly_wrapped() returns the caller's 7-day stats (posts, reels, drops, likes, comments, followers, views, top post).
