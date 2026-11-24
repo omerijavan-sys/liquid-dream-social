@@ -507,7 +507,8 @@ const AdminPage = () => {
                       <span className="text-sm font-medium capitalize">{r.target_type}</span>
                       <Badge variant="secondary" className="capitalize">{r.status}</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground break-words">{r.reason}</p>
+                    <p className="text-sm font-medium break-words">{r.reason}</p>
+                    {r.details && <p className="rounded-lg bg-secondary/50 p-2 text-sm text-muted-foreground break-words">“{r.details}”</p>}
                     <div className="flex gap-2">
                       <Button size="sm" variant="secondary" onClick={() => setReportStatus(r.id, "resolved")}>
                         Resolve

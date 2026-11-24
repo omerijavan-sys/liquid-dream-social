@@ -3,7 +3,7 @@ import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, MessageCircle, Send, Bookmark, Loader2, Volume2, VolumeX, MoreHorizontal, Link2, Flag, EyeOff, UserMinus, User, X, Maximize2, Eye, Rocket } from "lucide-react";
+import { Heart, MessageCircle, Send, Bookmark, Loader2, Volume2, VolumeX, MoreHorizontal, Link2, Flag, EyeOff, UserMinus, User, X, Maximize2, Eye, Rocket, Trash2 } from "lucide-react";
 import { useMute } from "@/contexts/MuteContext";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,7 @@ import PostMusicPlayer from "@/components/PostMusicPlayer";
 import ShareSheet from "@/components/ShareSheet";
 import type { PostMusic } from "@/components/PostMusicPlayer";
 import { BOOSTS } from "@/lib/extreme";
+import ReportDialog from "@/components/ReportDialog";
 import CreatorTipButton from "@/components/CreatorTipButton";
 
 interface FeedPostProps {
@@ -178,12 +179,16 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
     toast.success(`Unfollowed ${username}`);
   };
 
-  const report = async () => {
-    const reason = window.prompt("Report this post — what's wrong with it?");
-    if (!reason?.trim()) return;
-    if (!postId) return toast.error("This post can't be reported");
-    const { error } = await supabase.from("reports").insert({ target_type: "post", target_id: postId, reason: reason.trim() });
-    if (error) toast.error(error.message); else toast.success("Report sent to the Primegram team");
+  const [reportOpen, setReportOpen] = useState(false);
+  const report = () => { if (!postId) { toast.error("This post can't be reported"); return; } setReportOpen(true); };
+  const deleteOwn = async () => {
+    if (!postId || !me || authorId !== me) return;
+    if (!window.confirm("Delete this post? This can't be undone.")) return;
+    const { error } = await supabase.from("posts").delete().eq("id", postId).eq("user_id", me);
+    if (error) { toast.error("Couldn't delete the post"); return; }
+    setHidden(true);
+    toast.success("Post deleted");
+    window.dispatchEvent(new Event("prime:posted"));
   };
 
   // Autoplay when visible.
@@ -288,9 +293,12 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               {following && authorId !== me && <DropdownMenuItem onClick={unfollow}><UserMinus className="w-4 h-4 mr-2" />Unfollow</DropdownMenuItem>}
               <DropdownMenuItem onClick={hidePost}><EyeOff className="w-4 h-4 mr-2" />Not interested</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={report} className="text-destructive focus:text-destructive"><Flag className="w-4 h-4 mr-2" />Report</DropdownMenuItem>
+              {authorId && authorId === me
+                ? <DropdownMenuItem onClick={() => void deleteOwn()} className="text-destructive focus:text-destructive"><Trash2 className="w-4 h-4 mr-2" />Delete post</DropdownMenuItem>
+                : <DropdownMenuItem onClick={report} className="text-destructive focus:text-destructive"><Flag className="w-4 h-4 mr-2" />Report</DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
+          <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={postId} />
         </div>
 
         <div className="relative bg-background/40 flex items-center justify-center" onClick={handleTap}>

@@ -1,3 +1,4 @@
+import ReportDialog from "@/components/ReportDialog";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
 import MusicClipPicker from "@/components/MusicClipPicker";
@@ -6,7 +7,7 @@ import { useMute } from "@/contexts/MuteContext";
 import ShareSheet from "@/components/ShareSheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2, Download, Flag } from "lucide-react";
+import { ArrowLeft, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2, Download, Flag, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -191,10 +192,15 @@ const ReelsPage = () => {
     } catch { toast.error("Couldn't download this reel", { id: t }); }
   };
 
-  const reportReel = async (reel: any) => {
-    if (!user) return;
-    const { error } = await supabase.from("reports").insert({ reporter_id: user.id, target_type: "reel", target_id: reel.id, reason: "Reported from reels" } as any);
-    if (error) toast.error("Couldn't send the report"); else toast.success("Thanks — we'll review this reel");
+  const [reportReelId, setReportReelId] = useState<string | undefined>();
+  const reportReel = (reel: any) => { if (user) setReportReelId(reel.id); };
+  const deleteReel = async (reel: any) => {
+    if (!user || reel.user_id !== user.id) return;
+    if (!window.confirm("Delete this reel? This can't be undone.")) return;
+    const { error } = await supabase.from("reels").delete().eq("id", reel.id).eq("user_id", user.id);
+    if (error) { toast.error("Couldn't delete the reel"); return; }
+    setReels(prev => prev.filter(r => r.id !== reel.id));
+    toast.success("Reel deleted");
   };
 
   // Shake the phone to report the reel on screen.
@@ -208,7 +214,7 @@ const ReelsPage = () => {
       if (force > 38 && now - last > 400) {
         last = now;
         const reel = reels[currentIndex];
-        if (reel && now - lastReport > 8000 && window.confirm("Report this reel?")) { lastReport = Date.now(); void reportReel(reel); }
+        if (reel && reel.user_id !== user?.id && now - lastReport > 8000) { lastReport = Date.now(); reportReel(reel); }
         else lastReport = Date.now();
       }
     };
@@ -265,6 +271,7 @@ const ReelsPage = () => {
   const shareReel = (reel: any) => { setShareReelTarget(reel); };
   return (
     <div className="min-h-screen overflow-hidden bg-[#080b14] text-white [background-image:radial-gradient(ellipse_at_24%_16%,rgba(168,85,247,.2),transparent_35%),radial-gradient(ellipse_at_88%_22%,rgba(34,211,238,.18),transparent_33%),radial-gradient(ellipse_at_73%_88%,rgba(212,175,55,.16),transparent_36%)]">
+      <ReportDialog open={!!reportReelId} onClose={() => setReportReelId(undefined)} targetType="reel" targetId={reportReelId} />
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 safe-area-top">
         <div className="flex items-center justify-between px-5 py-4">
@@ -369,8 +376,13 @@ const ReelsPage = () => {
                     <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11"><Download className="h-5 w-5 text-amber-100" /></div>
                   </button>
                 )}
+                {reel.user_id === user?.id && (
+                  <button onClick={(e) => { e.stopPropagation(); void deleteReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Delete reel">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11"><Trash2 className="h-5 w-5 text-red-300" /></div>
+                  </button>
+                )}
                 {reel.user_id !== user?.id && (
-                  <button onClick={(e) => { e.stopPropagation(); if (window.confirm("Report this reel?")) void reportReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Report reel">
+                  <button onClick={(e) => { e.stopPropagation(); reportReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Report reel">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11"><Flag className="h-5 w-5 text-amber-100" /></div>
                   </button>
                 )}
