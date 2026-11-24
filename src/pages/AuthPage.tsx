@@ -10,7 +10,7 @@ import { Phone, Eye, EyeOff, Shield, ChevronDown, Clock, CheckCircle2, XCircle, 
 import { logSecurityEvent } from "@/utils/audit";
 import { validateEmail, validatePhone, validatePassword, sanitizeInput, sanitizeName, authRateLimiter, otpRateLimiter } from "@/utils/security";
 import { countryCodes, getCountryByCode, type CountryCode } from "@/utils/countryCodes";
-import AuthCinematic, { Figure } from "@/components/AuthCinematic";
+import AuthCinematic from "@/components/AuthCinematic";
 import PrimeLogo from "@/components/PrimeLogo";
 
 const PRIMEGRAM_SITE_ORIGIN = "https://primegram-extreme.vercel.app";
@@ -459,19 +459,6 @@ const AuthPage = () => {
 
       <div className="absolute top-1/4 left-1/3 w-80 h-80 rounded-full opacity-[0.05]" style={{ background: "radial-gradient(circle, hsl(210,100%,60%), transparent)" }} />
       <div className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full opacity-[0.04]" style={{ background: "radial-gradient(circle, hsl(280,70%,55%), transparent)" }} />
-
-      {/* the character casually leans against the edge of the form */}
-      {!showIntro && (
-        <motion.div
-          initial={{ opacity: 0, x: -40, rotate: 0 }}
-          animate={{ opacity: 1, x: 0, rotate: 8 }}
-          transition={{ delay: 0.55, duration: 1, ease: [0.16, 1, 0.3, 1] }}
-          className="pointer-events-none absolute bottom-[8%] left-[calc(50%-21rem)] hidden h-[46vh] max-h-[380px] origin-bottom-right lg:block"
-          style={{ filter: "drop-shadow(0 24px 40px hsla(0,0%,0%,0.6))" }}
-        >
-          <Figure variant="stand" />
-        </motion.div>
-      )}
 
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.97 }}
