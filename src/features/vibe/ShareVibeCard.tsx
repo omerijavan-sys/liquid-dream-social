@@ -4,7 +4,8 @@ import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { glass, table } from "../shared/ui";
-import { useReferral } from "../referrals/referral";
+import { shareWhatsApp } from "../shared/share";
+import { inviteLink, useReferral } from "../referrals/referral";
 import { fetchStreak } from "../drops/streaks";
 import { type Aesthetics } from "./aesthetics";
 import VibeCard, { type VibeProfile } from "./VibeCard";
@@ -63,6 +64,7 @@ const ShareVibeCard = ({ a, onClose }: { a: Aesthetics; onClose: () => void }) =
         {p ? <div style={{ maxWidth: "100%", transform: "scale(var(--s,1))" }}><VibeCard ref={ref} p={p} a={a} /></div> : <div className="flex h-[560px] w-[340px] items-center justify-center text-white/60"><Loader2 className="h-6 w-6 animate-spin" /></div>}
         <div className={`${glass} flex gap-2 rounded-2xl p-2`}>
           <button disabled={!p || busy} onClick={() => void share()} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}Share</button>
+          <button disabled={!p} onClick={() => shareWhatsApp("Check out my Primegram vibe card 🔥 Join me:", code ? inviteLink(code) : "https://primegramx.co.ke", "vibecard")} className="flex items-center gap-1.5 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-black disabled:opacity-50">WhatsApp</button>
           <button disabled={!p || busy} onClick={() => void download()} className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Download className="h-4 w-4" />Save</button>
         </div>
       </div>

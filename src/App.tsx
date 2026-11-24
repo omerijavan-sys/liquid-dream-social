@@ -11,6 +11,7 @@ import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
 import NativePush from "@/components/NativePush";
 import ReferralClaimer from "@/features/referrals/ReferralClaimer";
+import OnboardingGate from "@/features/onboarding/OnboardingGate";
 import UpdateChecker from "@/components/UpdateChecker";
 import BackButtonHandler from "@/components/BackButtonHandler";
 import MiniPlayer from "@/components/MiniPlayer";
@@ -111,6 +112,7 @@ const App = () => (
         <InAppBrowser />
         <AuthProvider>
           <ReferralClaimer />
+          <OnboardingGate />
           <MuteProvider>
           <OnlineProvider>
           <ConsentGate />

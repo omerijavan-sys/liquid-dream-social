@@ -70,6 +70,28 @@ const TeamPanel = ({ profiles, glass }: { profiles: any[]; glass: string }) => {
   );
 };
 
+/** Growth funnel (last 7 days): sign-ups, onboarding steps, shares and referrals. */
+const GrowthFunnel = ({ glass }: { glass: string }) => {
+  const { data } = useQuery({
+    queryKey: ["admin", "growth"],
+    queryFn: async () => { const { data, error } = await (supabase.rpc as any)("admin_growth_funnel"); if (error) throw error; return data as any; },
+  });
+  if (!data) return null;
+  const st = (k: string) => Number(data.steps?.[k] ?? 0);
+  const rows: [string, number][] = [
+    ["New sign-ups", data.signups], ["Finished welcome flow", data.onboarded], ["Started onboarding", st("onboarding_start")],
+    ["Followed people", st("onboarding_follow")], ["Posted a first Drop", st("onboarding_first_drop")], ["Reached invite step", st("onboarding_drop")],
+    ["Shared on WhatsApp", Object.entries(data.steps ?? {}).filter(([k]) => k.startsWith("share_whatsapp")).reduce((a, [, v]) => a + Number(v), 0)],
+    ["Joined via invite", data.referrals], ["Active people (24h)", data.dau],
+  ];
+  return (
+    <Card className={glass}><CardHeader className="pb-2"><CardTitle className="text-sm">Growth funnel · last 7 days</CardTitle></CardHeader>
+      <CardContent className="grid grid-cols-2 gap-2">
+        {rows.map(([l, v]) => <div key={l} className="rounded-xl bg-secondary/40 p-3"><p className="text-xl font-bold tabular-nums">{Number(v ?? 0).toLocaleString()}</p><p className="text-xs text-muted-foreground">{l}</p></div>)}
+      </CardContent></Card>
+  );
+};
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -566,6 +588,7 @@ const AdminPage = () => {
             </TabsContent>
 
             {full && <TabsContent value="health" className="mt-4 space-y-3">
+              <GrowthFunnel glass={glass} />
               {(() => {
                 const ev = events ?? [];
                 const errs = ev.filter((e) => e.kind === "error");
