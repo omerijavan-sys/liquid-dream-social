@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowUpRight, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
-import PrimeLogo from "@/components/PrimeLogo";
 
 const TrustPageLayout = ({ children }: { children: ReactNode }) => (
   <main
@@ -9,7 +8,7 @@ const TrustPageLayout = ({ children }: { children: ReactNode }) => (
     style={{
       "--background": "228 55% 4%",
       "--foreground": "0 0% 98%",
-      "--primary": "0 84% 60%",
+      "--primary": "270 90% 68%",
       "--primary-foreground": "0 0% 100%",
       "--muted-foreground": "220 9% 68%",
       "--glass-bg": "225 25% 8%",
@@ -18,13 +17,13 @@ const TrustPageLayout = ({ children }: { children: ReactNode }) => (
     } as CSSProperties}
   >
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -left-48 top-20 size-[34rem] rounded-full bg-red-600/[0.12] blur-[140px]" />
-      <div className="absolute -right-48 top-[28rem] size-[36rem] rounded-full bg-slate-300/[0.06] blur-[150px]" />
+      <div className="absolute -left-48 top-20 size-[34rem] rounded-full bg-violet-600/[0.18] blur-[140px]" />
+      <div className="absolute -right-48 top-[28rem] size-[36rem] rounded-full bg-fuchsia-500/[0.10] blur-[150px]" />
     </div>
 
     <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
       <Link to="/" className="flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Primegram X home">
-        <PrimeLogo size={42} glow={false} className="border-white/10" />
+        <img src="/icons/x-logo.png" alt="" width={42} height={42} className="h-[42px] w-[42px] rounded-xl shadow-[0_0_24px_rgba(168,85,247,.5)]" />
         <span className="text-sm font-extrabold tracking-[0.12em]">PRIMEGRAM <span className="text-primary">X</span></span>
       </Link>
       <nav aria-label="Main navigation" className="flex items-center gap-3 sm:gap-5">

@@ -57,7 +57,7 @@ const AboutPage = () => {
             <Sparkles className="size-4" aria-hidden="true" /> Created in Kisii, Kenya by Javan Omeri (MR. AURA)
           </p>
           <h1 className="text-5xl font-black leading-[1.02] tracking-[-0.055em] sm:text-6xl md:text-7xl">
-            Social, in<br /><span className="bg-gradient-to-r from-primary via-slate-200 to-white bg-clip-text text-transparent">full colour.</span>
+            Social, in<br /><span className="bg-gradient-to-r from-primary via-fuchsia-300 to-white bg-clip-text text-transparent">full colour.</span>
           </h1>
           <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
             Primegram X is a next-generation social, entertainment, and real-time connection platform for Gen Z. Created in Kisii, Kenya by founder Javan Omeri (MR. AURA), it brings real-time feeds, stories, live rooms, music, sports, and creator communities together at primegramx.co.ke.
