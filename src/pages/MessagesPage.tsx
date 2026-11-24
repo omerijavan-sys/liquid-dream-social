@@ -20,6 +20,7 @@ import { themeById } from "@/utils/chatThemes";
 import { Users } from "lucide-react";
 import { X, Globe } from "lucide-react";
 import GroupChats from "@/components/GroupChats";
+import { UPLOAD_CACHE } from "@/utils/media";
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
 type SpeechRecognitionLike = {
@@ -396,7 +397,7 @@ const MessagesPage = () => {
     setUploading(true);
     try {
       const path = `${user.id}/dm_${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined });
+      const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined, cacheControl: UPLOAD_CACHE });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
       const label = type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice message";

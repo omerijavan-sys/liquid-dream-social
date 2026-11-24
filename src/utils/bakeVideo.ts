@@ -1,3 +1,4 @@
+import { pickVideoMime } from "@/utils/media";
 /**
  * Burns a colour filter into a video by replaying it onto a canvas and recording the result (runs in real time).
  * Returns the original file if the browser can't do it or the clip is too long to wait for.
@@ -32,7 +33,7 @@ export async function bakeVideoFilter(src: File, css: string, onProgress?: (pct:
       dest.stream.getAudioTracks().forEach((t) => out.addTrack(t));
     } catch { /* no audio track available */ }
 
-    const mime = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
+    const mime = pickVideoMime();
     const rec = new MediaRecorder(out, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: opts.bitrate ?? 5_000_000, audioBitsPerSecond: 128000 });
     const chunks: Blob[] = [];
     rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };

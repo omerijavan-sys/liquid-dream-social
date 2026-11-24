@@ -21,6 +21,7 @@ import { captureVideoThumb } from "@/utils/videoThumb";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { suggestCaptions } from "@/utils/aiCaption";
 import { readContentPrefs } from "@/components/SettingsExtras";
+import { UPLOAD_CACHE } from "@/utils/media";
 
 const REEL_BATCH_SIZE = 20;
 
@@ -167,7 +168,7 @@ const ReelsPage = () => {
       progress("Uploading reel…");
       const ext = snap.file.name.split(".").pop();
       const path = `${snap.uid}/reel_${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("media").upload(path, snap.file);
+      const { error: uploadErr } = await supabase.storage.from("media").upload(path, snap.file, { cacheControl: UPLOAD_CACHE });
       if (uploadErr) throw uploadErr;
       const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
       const { error } = await supabase.from("reels").insert({ user_id: snap.uid, caption: snap.caption || null, music_title: snap.musicTitle || null, music_artist: snap.track?.artist ?? null, music_art_url: snap.track?.artUrl ?? null, music_url: snap.track?.streamUrl ?? null, ...(snap.track ? { music_start: snap.clip.start, music_len: snap.clip.len } : {}), video_url: publicUrl, thumbnail_url, ...snap.opts } as any);

@@ -30,7 +30,7 @@ import { readContentPrefs } from "@/components/SettingsExtras";
 import { runInBackground } from "@/utils/backgroundUpload";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { toast } from "sonner";
-import { CAMERA_CONSTRAINTS, VIDEO_BITRATE } from "@/utils/media";
+import { CAMERA_CONSTRAINTS, VIDEO_BITRATE, pickVideoMime, videoExt, UPLOAD_CACHE } from "@/utils/media";
 import MediaEditor from "@/components/MediaEditor";
 import FilterStrip from "@/components/FilterStrip";
 import { creatorShare, kes as fmtKes, priceError, uploadLocked } from "@/features/ppv/ppv";
@@ -368,7 +368,7 @@ const CreatePostPage = () => {
     if (!streamRef.current) return;
     if (typeof MediaRecorder === "undefined") { toast.error("Video recording is not supported in this browser."); return; }
     chunksRef.current = [];
-    const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/mp4", "video/webm"].find(value => MediaRecorder.isTypeSupported(value));
+    const mime = pickVideoMime();
     let captureStream = streamRef.current;
     const video = videoStreamRef.current;
     if (video?.videoWidth) {
@@ -401,7 +401,7 @@ const CreatePostPage = () => {
       if (captureStream !== streamRef.current) captureStream.getVideoTracks().forEach(track => track.stop());
       const type = rec.mimeType || mime || "video/webm";
       const blob = new Blob(chunksRef.current, { type });
-      const f = new File([blob], `video-${Date.now()}.${type.includes("mp4") ? "mp4" : "webm"}`, { type });
+      const f = new File([blob], `video-${Date.now()}.${videoExt(type)}`, { type });
       setFile(f);
       setPreview(URL.createObjectURL(blob));
       setMediaType("video");
@@ -504,7 +504,7 @@ const CreatePostPage = () => {
           thumbnailUrl = await uploadVideoCover(snap.uid, finalFile);
           progress("Uploading video…");
         }
-        const { error: uploadErr } = await supabase.storage.from("media").upload(path, finalFile);
+        const { error: uploadErr } = await supabase.storage.from("media").upload(path, finalFile, { cacheControl: UPLOAD_CACHE });
         if (uploadErr) throw uploadErr;
         publicUrl = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
       }

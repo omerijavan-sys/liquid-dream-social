@@ -12,6 +12,7 @@ import { isVideoMedia } from "@/utils/media";
 import { useNavigate } from "react-router-dom";
 import { searchGlobalMusic, type GlobalMusicTrack } from "@/services/GlobalMusicService";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
+import { UPLOAD_CACHE } from "@/utils/media";
 
 interface StoryBubbleProps {
   name: string;
@@ -287,7 +288,7 @@ const StoriesBar = () => {
       progress("Uploading story…");
       const ext = file.name.split(".").pop();
       const path = `${uid}/story_${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("media").upload(path, file);
+      const { error: uploadErr } = await supabase.storage.from("media").upload(path, file, { cacheControl: UPLOAD_CACHE });
       if (uploadErr) throw uploadErr;
       const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
       const { data: post, error } = await supabase.from("posts").insert({

@@ -1,3 +1,4 @@
+import { pickVideoMime, videoExt } from "@/utils/media";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -209,7 +210,7 @@ const LivePage = () => {
     setPhase("live");
     // Keep a copy of the broadcast on this phone so it can be posted afterwards.
     try {
-      const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
+      const mime = pickVideoMime();
       recChunks.current = [];
       const rec = new MediaRecorder(localRef.current, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 3_000_000 });
       rec.ondataavailable = (e) => { if (e.data.size) recChunks.current.push(e.data); };
@@ -226,8 +227,9 @@ const LivePage = () => {
     const rec = recRef.current;
     if (rec && rec.state !== "inactive") {
       await new Promise<void>((res) => { rec.onstop = () => res(); rec.stop(); });
-      const blob = new Blob(recChunks.current, { type: "video/webm" });
-      if (blob.size > 50_000) file = new File([blob], `live-${Date.now()}.webm`, { type: "video/webm" });
+      const t = (rec.mimeType || "video/webm").split(";")[0];
+      const blob = new Blob(recChunks.current, { type: t });
+      if (blob.size > 50_000) file = new File([blob], `live-${Date.now()}.${videoExt(t)}`, { type: t });
     }
     cleanup();
     if (file) { setRecording(file); return; }
