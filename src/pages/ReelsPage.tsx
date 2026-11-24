@@ -422,7 +422,7 @@ const ReelsPage = () => {
                   <video
                     ref={el => { if (el) { videoRefs.current.set(i, el); el.volume = Math.max(0, Math.min(1, (reel as { video_volume?: number }).video_volume ?? 1)); } else videoRefs.current.delete(i); }}
                     src={currentIndex >= 0 && (i === currentIndex || i === currentIndex + 1) ? reel.video_url : undefined}
-                    className="h-full w-full bg-black object-cover"
+                    className="h-full w-full bg-black object-contain"
                     loop
                     playsInline
                     muted={muted}
