@@ -127,6 +127,10 @@ const Index = () => {
       <TopNavBar />
 
       <main className="relative z-10 pt-14 pb-24">
+        <div className="mt-2 mb-4">
+          <StoriesBar />
+        </div>
+        <DailyDrops />
         <div className="mb-5 px-4">
           <div className="liquid-glass-elevated rounded-[2rem] p-4">
             <div className="relative z-10 mb-3 flex items-center justify-between">
@@ -152,10 +156,6 @@ const Index = () => {
             </div>
           </div>
         </div>
-        <div className="mt-2 mb-4">
-          <StoriesBar />
-        </div>
-        <DailyDrops />
         <div className="px-4">
           {posts.length === 0 && loading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>

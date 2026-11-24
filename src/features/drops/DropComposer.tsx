@@ -69,8 +69,8 @@ const DropComposer = ({ onClose, onPosted }: { onClose: () => void; onPosted: ()
     <button key={k} onClick={() => setKind(k)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold ${kind === k ? "bg-white/15 text-white" : "text-white/55"}`}><Icon className="h-3.5 w-3.5" />{label}</button>
   );
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`${glass} w-full max-w-md space-y-3 rounded-t-3xl bg-[#09090B]/90 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white`}>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className={`${glass} w-full max-w-md space-y-3 rounded-t-3xl bg-[#0b0b16]/92 backdrop-blur-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white`}>
         <div className="flex items-center justify-between"><div><p className="text-lg font-bold">Today's Drop</p><p className="text-xs text-white/60">{promptOfTheDay()}</p></div><button onClick={onClose} aria-label="Close"><X className="h-5 w-5" /></button></div>
         <div className="flex gap-1 rounded-2xl bg-white/5 p-1">{tab("photo", Camera, "Photo")}{tab("voice", Mic, "Voice 5s")}{tab("song", Music2, "Song")}</div>
 

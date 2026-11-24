@@ -12,12 +12,13 @@ import { Switch } from "@/components/ui/switch";
 import AdvancedDeveloperHub from "@/components/AdvancedDeveloperHub";
 import AndroidDownloadCard from "@/components/AndroidDownloadCard";
 import AccountManagement from "@/components/AccountManagement";
+import { Capacitor } from "@capacitor/core";
 import AppIconPicker from "@/components/AppIconPicker";
 import PayoutSetup from "@/components/PayoutSetup";
-import { enablePush, disablePush } from "@/utils/pushSubscribe";
+import { enablePush, disablePush, pushStatus, sendNativeTest } from "@/utils/pushSubscribe";
 import { PrivacyPanel, BlockedPanel, SecurityExtras, HelpPanel, WalletShortcut, ContentPanel, PrimeMembershipCard } from "@/components/SettingsExtras";
 
-type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions" | "blocked" | "content";
+type Panel = null | "profile" | "notifications" | "privacy" | "security" | "appearance" | "darkmode" | "help" | "accounts" | "creator" | "subscriptions" | "blocked" | "content" | "appicon";
 
 type CreatorSubscription = {
   id: string;
@@ -60,8 +61,10 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const { signOut, user, savedAccounts, switchAccount, removeSavedAccount, saveCurrentAccount } = useAuth();
   const currentUserId = user?.id;
-  const { isAdmin } = useRoles();
+  const { isAdmin, isModerator } = useRoles();
   const [activePanel, setActivePanel] = useState<Panel>(null);
+  const [pushState, setPushState] = useState("checking…");
+  useEffect(() => { if (activePanel !== "notifications") return; const r = () => void pushStatus().then(setPushState); r(); window.addEventListener("prime:push-enable", r); window.addEventListener("focus", r); return () => { window.removeEventListener("prime:push-enable", r); window.removeEventListener("focus", r); }; }, [activePanel]);
   const [q, setQ] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
@@ -270,6 +273,7 @@ const SettingsPage = () => {
     { icon: Shield, label: "Blocked Accounts", desc: "People you blocked", panel: "blocked" as Panel },
     { icon: Shield, label: "Security", desc: "Password & 2FA", panel: "security" as Panel },
     { icon: Palette, label: "Appearance", desc: "Theme & display", panel: "appearance" as Panel },
+    { icon: Palette, label: "Icons", desc: "Home-screen icons", panel: "appicon" as Panel },
     { icon: Moon, label: "Dark Mode", desc: darkMode ? "On" : "Off", panel: "darkmode" as Panel },
     { icon: HelpCircle, label: "Help & Support", desc: "FAQs and contact", panel: "help" as Panel },
     { icon: User, label: "Switch Accounts", desc: "Manage up to two saved accounts", panel: "accounts" as Panel },
@@ -306,7 +310,7 @@ const SettingsPage = () => {
               <p className="text-sm font-semibold text-foreground">Push notifications</p>
               <p className="text-xs text-muted-foreground">
                 Get messages, calls, tips and payments as phone alerts even when Primegram is closed.
-                Status: <span className="text-foreground">{typeof Notification === "undefined" ? "not supported here" : Notification.permission === "granted" ? "allowed" : Notification.permission === "denied" ? "blocked in browser settings" : "not enabled"}</span>
+                Status: <span className="text-foreground">{pushState}</span>
               </p>
               <div className="flex gap-2">
                 <button
@@ -324,6 +328,7 @@ const SettingsPage = () => {
                   className="depth-press rounded-xl liquid-glass-subtle px-4 py-2 text-xs font-semibold text-foreground"
                   onClick={async () => {
                     try {
+                      if (Capacitor.isNativePlatform()) { await sendNativeTest(); toast.success("Test notification sent"); return; }
                       if (typeof Notification === "undefined" || Notification.permission !== "granted") throw new Error("Enable notifications first.");
                       const reg = await navigator.serviceWorker.ready;
                       await reg.showNotification("Primegram", { body: "Push notifications are working 🎉", icon: "/favicon.ico" });
@@ -348,6 +353,8 @@ const SettingsPage = () => {
             ))}
           </div>
         );
+      case "appicon":
+        return <div className="space-y-3">{Capacitor.isNativePlatform() ? <AppIconPicker /> : <p className="liquid-glass relative z-10 rounded-2xl p-4 text-sm text-muted-foreground">Custom app icons are available in the Android app.</p>}</div>;
       case "privacy":
         return <PrivacyPanel />;
       case "blocked":
@@ -487,7 +494,6 @@ const SettingsPage = () => {
             <Button className="w-full" disabled={monetizationSaving} onClick={() => void saveCreatorProfile()}>
               {monetizationSaving ? "Saving..." : creatorActive ? "Save Creator Plan" : "Register as a Creator"}
             </Button>
-            <AppIconPicker />
             <PayoutSetup />
             {monetizationLoading ? <p className="text-sm text-muted-foreground">Loading dashboard...</p> : creatorActive && (
               <section className="liquid-glass rounded-2xl p-4 relative z-10">
@@ -593,7 +599,8 @@ const SettingsPage = () => {
                 ] },
                 { title: "Experience", items: [
                   { key: "notifications", icon: Bell, tint: "bg-red-500/20 text-red-300", label: "Notifications", desc: "Messages, calls and alerts", onClick: go("notifications") },
-                  { key: "appearance", icon: Palette, tint: "bg-fuchsia-500/20 text-fuchsia-300", label: "Appearance", desc: "Themes, colors and app icon", onClick: go("appearance") },
+                  { key: "appearance", icon: Palette, tint: "bg-fuchsia-500/20 text-fuchsia-300", label: "Appearance", desc: "Themes and colors", onClick: go("appearance") },
+                  ...(Capacitor.isNativePlatform() ? [{ key: "appicon", icon: Sparkles, tint: "bg-sky-500/20 text-sky-300", label: "Icons", desc: "Choose your home-screen icon", onClick: go("appicon") }] : []),
                   { key: "dark", icon: Moon, tint: "bg-violet-500/20 text-violet-300", label: "Dark mode", desc: darkMode ? "On" : "Off", right: <Switch checked={darkMode} onCheckedChange={setDarkMode} aria-label="Dark Mode" /> },
                   { key: "content", icon: Sparkles, tint: "bg-cyan-500/20 text-cyan-300", label: "Captions, search & reels", desc: "How content behaves for you", onClick: go("content") },
                 ] },
@@ -604,7 +611,7 @@ const SettingsPage = () => {
                 ] },
                 { title: "Support", items: [
                   { key: "help", icon: HelpCircle, tint: "bg-teal-500/20 text-teal-300", label: "Help & support", desc: "FAQs and contact", onClick: go("help") },
-                  ...(isAdmin ? [{ key: "admin", icon: Shield, tint: "bg-red-500/25 text-red-300", label: "Admin console", desc: "Moderation, users and reports", onClick: () => navigate("/admin") }] : []),
+                  ...(isAdmin || isModerator ? [{ key: "admin", icon: Shield, tint: "bg-red-500/25 text-red-300", label: "Admin console", desc: "Moderation, users and reports", onClick: () => navigate("/admin") }] : []),
                 ] },
               ];
               const needle = q.trim().toLowerCase();

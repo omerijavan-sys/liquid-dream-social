@@ -13,7 +13,7 @@ const SplashLoader = () => {
   };
   return (
     <div className="pg-splash">
-      <img src="/icons/p-default.png" alt="" width={132} height={132} />
+      <img src="/icons/x-logo.png" alt="" width={132} height={132} />
       <h1>Primegram</h1>
       <div className="pg-line"><i /></div>
       {slow && (

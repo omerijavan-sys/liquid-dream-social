@@ -1,6 +1,7 @@
-import { Copy, Gift, Lock, Share2 } from "lucide-react";
+import { Copy, Gift, Lock, MessageCircle, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { glass, glow } from "../shared/ui";
+import { shareWhatsApp } from "../shared/share";
 import { inviteLink, REWARD_AT, useReferral } from "./referral";
 
 /** Progress card for the profile: "Invite 2 more friends to unlock Obsidian Gold Theme" + the share link. */
@@ -38,6 +39,7 @@ const InviteProgress = () => {
       <div className="mt-3 flex items-center gap-2">
         <code className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] text-white/80">{link.replace("https://", "")}</code>
         <button onClick={() => { void navigator.clipboard.writeText(link); toast.success("Copied"); }} aria-label="Copy invite link" className="rounded-xl border border-white/10 bg-white/10 p-2"><Copy className="h-4 w-4" /></button>
+        <button onClick={() => shareWhatsApp("Join me on Primegram Extreme 🔥", link, "profile")} aria-label="Invite on WhatsApp" className="rounded-xl bg-[#25D366] p-2 text-black"><MessageCircle className="h-4 w-4" /></button>
         <button onClick={() => void share()} aria-label="Share invite link" className="rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 p-2"><Share2 className="h-4 w-4" /></button>
       </div>
     </section>

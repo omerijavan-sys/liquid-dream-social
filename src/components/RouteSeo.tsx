@@ -7,7 +7,7 @@ const PAGES: Record<string, { title: string; desc: string }> = {
   "/about": { title: "About Primegram Extreme (Primegram X) – Who We Are", desc: "Learn about Primegram X, the social network built by Java Prime in Kenya for creators, music lovers and friends." },
   "/help": { title: "Help Center – Primegram X", desc: "Get help with your Primegram X account, posting, messaging, wallet, safety and reporting." },
   "/privacy": { title: "Privacy Policy – Primegram X", desc: "How Primegram X collects, uses and protects your personal data, and your rights over it." },
-  "/terms": { title: "Terms of Service & Community Rules – Primegram X", desc: "The Primegram X terms of service, community rules, copyright and takedown policy, and 18+ requirements." },
+  "/terms": { title: "Terms of Service & Community Rules – Primegram X", desc: "The Primegram X terms of service, community rules, copyright and takedown policy, and Primempire requirements." },
 };
 const set = (sel: string, make: () => HTMLElement, attr: string, val: string) => {
   let el = document.head.querySelector<HTMLElement>(sel);

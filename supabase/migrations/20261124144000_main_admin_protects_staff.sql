@@ -1,0 +1,3 @@
+-- Main admin (official account) is the only one who can ban/unban admin accounts or manage minor admins.
+-- The main admin itself can never be banned. Applied to the project via the dashboard tooling.
+-- See functions: is_main_admin, guard_staff_bans (trigger on user_bans), admin_set_minor_admin.

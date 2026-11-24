@@ -1,3 +1,4 @@
+import { UPLOAD_CACHE } from "@/utils/media";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -130,7 +131,7 @@ const MediaEditor = ({ files, mode: initialMode, onClose }: { files: File[]; mod
       const upload = async (f: File, prefix: string) => {
         const ext = f.name.split(".").pop() || "bin";
         const path = `${uid}/${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
-        const { error } = await supabase.storage.from("media").upload(path, f);
+        const { error } = await supabase.storage.from("media").upload(path, f, { cacheControl: UPLOAD_CACHE });
         if (error) throw error;
         return supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
       };

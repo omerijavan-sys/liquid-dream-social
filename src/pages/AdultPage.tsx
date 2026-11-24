@@ -16,7 +16,7 @@ const AdultPage = () => {
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </button>
           <ShieldAlert className="h-5 w-5 text-primary" />
-          <h1 className="text-headline text-foreground">Verified 18+</h1>
+          <h1 className="text-headline text-foreground">Verified Primempire</h1>
         </div>
       </header>
       <main className="mx-auto max-w-lg p-4 pt-5">

@@ -9,6 +9,10 @@
       "destination": "/api/download"
     },
     {
+      "source": "/invite/:code",
+      "destination": "/api/invite?code=:code"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "@/integrations/supabase/client";
 
 const VAPID_PUBLIC_KEY = "BIxoIal8OTWjGhelc6tzx29-pYEDFuU1ubHRvkiX7g7BrffCe0_fCPzMxt5aeDnwSTP-VY0Dy1yMrWQJaL-sBUY";
@@ -13,6 +15,12 @@ export const pushSupported = () =>
 
 /** Asks permission, subscribes this device to Web Push and stores it for the signed-in user. */
 export async function enablePush(userId: string): Promise<void> {
+  if (Capacitor.isNativePlatform()) { // Android app: Firebase push; NativePush registers the token once permission is granted
+    const r = await PushNotifications.requestPermissions();
+    if (r.receive !== "granted") throw new Error("Allow notifications for Primegram in your phone's settings.");
+    window.dispatchEvent(new Event("prime:push-enable"));
+    return;
+  }
   if (!pushSupported()) throw new Error("Push notifications aren't supported on this browser.");
   if ((await Notification.requestPermission()) !== "granted") throw new Error("Allow notifications in your browser settings.");
   const reg = await navigator.serviceWorker.ready;
@@ -28,10 +36,31 @@ export async function enablePush(userId: string): Promise<void> {
 }
 
 export async function disablePush(): Promise<void> {
+  if (Capacitor.isNativePlatform()) { await PushNotifications.unregister().catch(() => undefined); return; }
   if (!pushSupported()) return;
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
   if (!sub) return;
   await supabase.from("push_subscriptions" as never).delete().eq("endpoint", sub.endpoint);
   await sub.unsubscribe();
+}
+
+/** Human-readable push status for the current device (Android app or browser). */
+export async function pushStatus(): Promise<string> {
+  if (Capacitor.isNativePlatform()) {
+    const r = await PushNotifications.checkPermissions().catch(() => null);
+    return !r ? "unavailable" : r.receive === "granted" ? "allowed" : r.receive === "denied" ? "blocked in phone settings" : "not enabled";
+  }
+  if (!pushSupported()) return "not supported here";
+  return Notification.permission === "granted" ? "allowed" : Notification.permission === "denied" ? "blocked in browser settings" : "not enabled";
+}
+
+/** Asks the server to push a test alert to this account's registered phones. */
+export async function sendNativeTest(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Sign in first.");
+  const { data, error } = await supabase.functions.invoke("notify-message", { body: { test: user.id } });
+  if (error) throw error;
+  const d = data as { sent?: number; skipped?: string };
+  if (!d?.sent) throw new Error(d?.skipped === "no devices" ? "This phone isn't registered yet. Enable notifications and reopen the app." : "Nothing was sent");
 }

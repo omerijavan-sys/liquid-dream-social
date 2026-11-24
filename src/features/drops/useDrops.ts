@@ -28,6 +28,7 @@ export const useDrops = () => {
 
   const load = useCallback(async () => {
     if (!user) return;
+    try {
     const [{ data: friends }, { data: latest }, st] = await Promise.all([
       rpc<Drop[]>("get_friend_drops", { _limit: 40 }),
       table("daily_drops").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1),
@@ -46,7 +47,7 @@ export const useDrops = () => {
       const { data: ps } = await table("profiles").select("user_id, username, display_name, avatar_url").in("user_id", ids);
       setPeople(Object.fromEntries(((ps ?? []) as Person[]).map((p) => [p.user_id, p])));
     }
-    setLoading(false);
+    } catch { /* keep the card usable even if a lookup fails */ } finally { setLoading(false); }
   }, [user]);
 
   // Keep the profile's timezone in sync with the device so streak days roll over at the user's own midnight.

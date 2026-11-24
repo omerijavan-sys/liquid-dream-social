@@ -1,3 +1,4 @@
+import { pickVideoMime, videoExt } from "@/utils/media";
 /**
  * In-browser video composer: plays photos and videos one after another onto a canvas (with filters, trims and silent-part cuts)
  * and records the result as a single video. Runs in real time, so progress is reported while it works.
@@ -64,7 +65,7 @@ export async function composeVideo(segs: Seg[], opts: { width: number; height: n
   const dest = ac.createMediaStreamDestination();
   const out = canvas.captureStream(30);
   dest.stream.getAudioTracks().forEach((t) => out.addTrack(t));
-  const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
+  const mime = pickVideoMime();
   const rec = new MediaRecorder(out, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 128000 });
   const chunks: Blob[] = [];
   rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
@@ -120,9 +121,10 @@ export async function composeVideo(segs: Seg[], opts: { width: number; height: n
       }
     }
     rec.stop(); await stopped;
-    const blob = new Blob(chunks, { type: "video/webm" });
+    const outType = (rec.mimeType || mime || "video/webm").split(";")[0];
+    const blob = new Blob(chunks, { type: outType });
     if (blob.size < 1000) throw new Error("Editing produced an empty video.");
-    return new File([blob], `edit-${Date.now()}.webm`, { type: "video/webm" });
+    return new File([blob], `edit-${Date.now()}.${videoExt(outType)}`, { type: outType });
   } finally {
     if (rec.state !== "inactive") { try { rec.stop(); } catch { /* ignore */ } }
     urls.forEach((u) => URL.revokeObjectURL(u));

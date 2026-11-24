@@ -82,14 +82,14 @@ const AdultHubVerified = () => {
     if (!d || !m || !y || date.getUTCFullYear() !== Number(y) || date.getUTCMonth() !== Number(m) - 1 || date.getUTCDate() !== Number(d)) {
       toast.error("Enter a valid date of birth"); return;
     }
-    if (!consent) { toast.error("Confirm you are 18 or older to continue"); return; }
+    if (!consent) { toast.error("Confirm you are of legal age to continue"); return; }
     setChecking(true);
     try {
       const { data, error } = await supabase.rpc("verify_adult", { _dob: `${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(2, "0")}` });
       if (error) throw error;
-      if (!data) { toast.error("You must be 18 or older to enter"); return; }
+      if (!data) { toast.error("You must be of legal age to enter"); return; }
       setVerified(true);
-      toast.success("18+ access verified");
+      toast.success("Primempire access verified");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Age verification failed"); }
     finally { setChecking(false); }
   };
@@ -101,9 +101,9 @@ const AdultHubVerified = () => {
   if (verified === null) return <div className="p-8 text-center text-sm text-muted-foreground">Checking secure access…</div>;
   if (!verified) return (
     <div className="overflow-hidden rounded-3xl border border-rose-400/30 bg-black/70 p-6 shadow-[0_0_50px_rgba(255,0,51,.16)] backdrop-blur-2xl">
-      <div className="mb-5 flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/15"><ShieldCheck className="h-6 w-6 text-rose-300" /></div><div><p className="font-bold text-white">18+ Verified Access Only</p><p className="text-xs text-white/55">Confirm your age before viewing mature creator content.</p></div></div>
+      <div className="mb-5 flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/15"><ShieldCheck className="h-6 w-6 text-rose-300" /></div><div><p className="font-bold text-white">Primempire Verified Access Only</p><p className="text-xs text-white/55">Confirm your age before viewing Primempire creator content.</p></div></div>
       <div className="mb-3 flex gap-2">{[["d", "Day"], ["m", "Month"], ["y", "Year"]].map(([key, label]) => <select key={key} className={selectClass} value={dob[key as keyof typeof dob]} onChange={e => setDob({ ...dob, [key]: e.target.value })} aria-label={label}><option value="">{label}</option>{(key === "y" ? years : Array.from({ length: key === "d" ? 31 : 12 }, (_, i) => String(i + 1))).map(value => <option key={value} value={value}>{value}</option>)}</select>)}</div>
-      <label className="mb-4 flex gap-2 text-xs text-white/60"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 accent-rose-500" /> I confirm I am 18 or older and want to access mature content.</label>
+      <label className="mb-4 flex gap-2 text-xs text-white/60"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 accent-rose-500" /> I confirm I am of legal age and want to access Primempire content.</label>
       <Button onClick={verify} disabled={checking} className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-500"><Lock className="h-4 w-4" />{checking ? "Checking…" : "Verify & Enter"}</Button>
       <p className="mt-3 text-center text-[11px] text-white/40">Verification is stored on your account. No face image is collected by this screen.</p>
     </div>
@@ -119,7 +119,7 @@ const AdultHubVerified = () => {
       <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] text-white/55"><div className="rounded-2xl bg-white/5 p-3"><Heart className="mx-auto mb-1 h-4 w-4 text-rose-300" />Tips from wallet</div><div className="rounded-2xl bg-white/5 p-3"><Users className="mx-auto mb-1 h-4 w-4 text-rose-300" />Fan clubs</div><div className="rounded-2xl bg-white/5 p-3"><Lock className="mx-auto mb-1 h-4 w-4 text-rose-300" />Private access</div></div>
     </section>
     <Button onClick={() => navigate("/adult/video")} className="w-full gap-2 bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 font-bold text-black shadow-[0_8px_30px_rgba(244,63,94,.4)] hover:opacity-90"><Video className="h-4 w-4" />Random Video Chat · meet someone now</Button>
-    <Button onClick={() => navigate("/create?adult=1")} className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-500"><PlusSquare className="h-4 w-4" />Post to 18+</Button>
+    <Button onClick={() => navigate("/create?adult=1")} className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-500"><PlusSquare className="h-4 w-4" />Post to Primempire</Button>
     <div className="flex gap-2">{(["all", "photo", "video"] as const).map(value => <Button key={value} size="sm" variant={filter === value ? "default" : "secondary"} onClick={() => setFilter(value)}>{value === "all" ? "All" : value === "photo" ? "Photos" : "Videos"}</Button>)}</div>
     {visiblePosts.length === 0 ? <div className="rounded-2xl border border-white/10 bg-black/30 p-8 text-center text-sm text-white/50">No verified creator posts yet.</div> : <div className="grid grid-cols-2 gap-2">{visiblePosts.map((post, index) => <motion.article key={post.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .03 }} className="overflow-hidden rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl">
       <div className="relative aspect-square bg-black/50">{post.media_url && (post.media_type === "video" ? <VideoThumb src={post.media_url} poster={post.thumbnail_url} className={`h-full w-full object-cover ${blurSensitive ? "blur-lg" : ""}`} /> : <img src={post.media_url} alt="Verified creator content" loading="lazy" className={`h-full w-full object-cover ${blurSensitive ? "blur-lg" : ""}`} />)}<div className="absolute inset-0 flex items-center justify-center bg-black/10">{post.media_type === "video" && <Play className="h-8 w-8 text-white" />}</div></div>

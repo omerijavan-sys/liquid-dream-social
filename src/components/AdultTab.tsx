@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import LockedMedia from "@/features/ppv/LockedMedia";
+import { fetchItems, kes } from "@/features/ppv/ppv";
 import VideoThumb from "@/components/VideoThumb";
 import { motion } from "framer-motion";
-import { Check, Eye, Loader2, MessageCircle, Mic, Play, PlusSquare, ShieldAlert, Video, X } from "lucide-react";
+import { Check, Eye, Loader2, Lock, MessageCircle, Mic, Play, PlusSquare, ShieldAlert, Video, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +15,7 @@ import { AdultMeetTab, AdultMessagesTab, AdultMeTab } from "@/components/AdultEx
 
 interface AdultPost {
   id: string;
+  ppv_item_id?: string | null;
   caption: string | null;
   media_url: string | null;
   media_type: string | null;
@@ -34,6 +37,7 @@ const AdultTab = () => {
   const [consent, setConsent] = useState(false);
   const [checking, setChecking] = useState(false);
   const [posts, setPosts] = useState<AdultPost[]>([]);
+  const [prices, setPrices] = useState<Record<string, number>>({});
   const [open, setOpen] = useState<AdultPost | null>(null);
   const [filter, setFilter] = useState<"all" | "photo" | "video">("all");
   const [sub, setSub] = useState<"feed" | "meet" | "messages" | "me">("feed");
@@ -88,6 +92,8 @@ const AdultTab = () => {
           return;
         }
         setPosts(data ?? []);
+        const ids = ((data ?? []) as { ppv_item_id?: string | null }[]).map((x) => x.ppv_item_id).filter(Boolean) as string[];
+        void fetchItems(ids).then((m) => { if (!cancelled) setPrices(Object.fromEntries(Object.values(m).map((i) => [i.id, i.price_kes]))); });
       });
     return () => { cancelled = true; };
   }, [user, verified]);
@@ -128,7 +134,7 @@ const AdultTab = () => {
       return;
     }
     if (!consent) {
-      toast.error("Confirm you're 18+ to continue");
+      toast.error("Confirm you're of legal age to continue");
       return;
     }
     setChecking(true);
@@ -141,7 +147,7 @@ const AdultTab = () => {
         return;
       }
       if (!data) {
-        toast.error("That date of birth shows you're under 18");
+        toast.error("That date of birth shows you're below the age of majority");
         return;
       }
       toast.success("Verified — welcome");
@@ -173,8 +179,8 @@ const AdultTab = () => {
             <ShieldAlert className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <p className="font-bold">18+ Only · Age Verification</p>
-            <p className="text-xs text-muted-foreground">Mature content. Confirm your date of birth to enter.</p>
+            <p className="font-bold">Primempire · Age Verification</p>
+            <p className="text-xs text-muted-foreground">Primempire content. Confirm your date of birth to enter.</p>
           </div>
         </div>
         <div className="flex gap-2 mb-3">
@@ -198,7 +204,7 @@ const AdultTab = () => {
             onChange={(e) => setConsent(e.target.checked)}
             className="mt-0.5 accent-primary"
           />
-          I confirm I am 18 years or older and I want to see mature content. My confirmation is stored securely on the server.
+          I confirm I am 18 years or older and I want to see Primempire content. My confirmation is stored securely on the server.
         </label>
         <p className="mb-3 text-[11px] text-muted-foreground">Age is checked from your date of birth. This flow does not scan or store face images.</p>
         <Button className="w-full gap-2" onClick={verify} disabled={checking}>
@@ -221,11 +227,11 @@ const AdultTab = () => {
       {sub === "me" && <AdultMeTab />}
       {sub === "feed" && <>
       <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
-        <Check className="w-3.5 h-3.5 text-primary" /> Verified 18+ · access stays active on your account
+        <Check className="w-3.5 h-3.5 text-primary" /> Verified Primempire · access stays active on your account
       </div>
       <button onClick={() => navigate("/adult/video")} className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 py-3.5 text-sm font-extrabold text-black shadow-[0_8px_30px_rgba(244,63,94,.4)] active:scale-[0.98]"><Video className="h-5 w-5" />Random Video Chat · meet someone online now</button>
-      <Button className="mb-4 w-full gap-2" variant="secondary" onClick={() => navigate("/create?adult=1")}><PlusSquare className="h-4 w-4" />Post to 18+</Button>
-      <div className="mb-4 flex gap-2" role="group" aria-label="Filter mature posts">
+      <Button className="mb-4 w-full gap-2" variant="secondary" onClick={() => navigate("/create?adult=1")}><PlusSquare className="h-4 w-4" />Post to Primempire</Button>
+      <div className="mb-4 flex gap-2" role="group" aria-label="Filter Primempire posts">
         {(["all", "photo", "video"] as const).map((value) => (
           <Button key={value} size="sm" variant={filter === value ? "default" : "secondary"} onClick={() => setFilter(value)}>
             {value === "all" ? "All" : value === "photo" ? "Photos" : "Videos"}
@@ -234,7 +240,7 @@ const AdultTab = () => {
       </div>
       {visiblePosts.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-10">
-          {posts.length === 0 ? "No 18+ posts yet. Creators can mark a post as 18+ from the post composer." : "No posts match this filter."}
+          {posts.length === 0 ? "No Primempire posts yet. Creators can mark a post as Primempire from the post composer." : "No posts match this filter."}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -247,7 +253,13 @@ const AdultTab = () => {
               onClick={() => setOpen(p)}
               className="relative aspect-square rounded-2xl overflow-hidden bg-secondary liquid-glass"
             >
-              {p.media_url ? (
+              {p.ppv_item_id ? (
+                <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[radial-gradient(ellipse_at_30%_20%,#7c3aed66,transparent_60%),radial-gradient(ellipse_at_80%_80%,#ec489966,transparent_60%),#0b0b16]">
+                  <Lock className="h-6 w-6 text-white" />
+                  <span className="rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white">{prices[p.ppv_item_id] !== undefined ? kes(prices[p.ppv_item_id]) : "Paid"}</span>
+                  {p.caption && <span className="max-w-full truncate px-2 text-[10px] text-white/70">{p.caption}</span>}
+                </span>
+              ) : p.media_url ? (
                 p.media_type === "video" ? (
                   <>
                     <VideoThumb src={p.media_url} poster={p.thumbnail_url} />
@@ -275,9 +287,9 @@ const AdultTab = () => {
 
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
         <DialogContent className="max-w-none w-screen h-dvh p-0 border-0 rounded-none bg-background flex flex-col [&>button]:hidden">
-          <DialogTitle className="sr-only">18+ post</DialogTitle>
+          <DialogTitle className="sr-only">Primempire post</DialogTitle>
           <div className="flex items-center justify-between p-4">
-            <span className="text-xs font-semibold text-muted-foreground">18+ · Mature content</span>
+            <span className="text-xs font-semibold text-muted-foreground">Primempire</span>
             <button
               onClick={() => setOpen(null)}
               aria-label="Close"
@@ -287,7 +299,9 @@ const AdultTab = () => {
             </button>
           </div>
           <div className="flex-1 min-h-0 flex items-center justify-center px-2">
-            {open?.media_type === "video" ? (
+            {open?.ppv_item_id ? (
+              <div className="w-full max-w-md"><LockedMedia itemId={open.ppv_item_id} /></div>
+            ) : open?.media_type === "video" ? (
               <video src={open?.media_url || ""} controls autoPlay playsInline className="max-w-full max-h-full object-contain" />
             ) : (
               <img src={open?.media_url || ""} alt="" className="max-w-full max-h-full object-contain" />

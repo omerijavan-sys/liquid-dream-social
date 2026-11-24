@@ -18,14 +18,89 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+/** Admin-only: add or remove minor admins (they manage users and their posts; no badges, revenue or payouts). */
+const TeamPanel = ({ profiles, glass }: { profiles: any[]; glass: string }) => {
+  const qc = useQueryClient();
+  const [term, setTerm] = useState("");
+  const { data: team } = useQuery({
+    queryKey: ["admin", "team"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("admin_list_minor_admins");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  const ids = new Set((team ?? []).map((t: any) => t.user_id));
+  const results = term.trim().length < 2 ? [] : profiles.filter((p) => !ids.has(p.user_id) && `${p.username ?? ""} ${p.display_name ?? ""}`.toLowerCase().includes(term.trim().toLowerCase())).slice(0, 8);
+  const setOn = async (userId: string, on: boolean, name: string) => {
+    if (on && !window.confirm(`Make @${name} a minor admin? They will be able to ban users and remove posts, but not grant badges or see revenue.`)) return;
+    const { error } = await (supabase.rpc as any)("admin_set_minor_admin", { _user: userId, _on: on });
+    if (error) return toast.error(error.message);
+    toast.success(on ? `@${name} is now a minor admin` : `@${name} removed from the team`);
+    setTerm("");
+    qc.invalidateQueries({ queryKey: ["admin", "team"] });
+  };
+  return (
+    <div className="space-y-4">
+      <Card className={glass}><CardContent className="space-y-2 p-4 text-sm text-muted-foreground">
+        <p className="font-semibold text-foreground">Minor admins</p>
+        <p>Can manage users (ban / unban) and remove their posts, reels, comments and reports. Cannot grant badges, see revenue, withdrawals, health, audit logs or support tickets, and cannot act on admins or other minor admins.</p>
+      </CardContent></Card>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search a username to promote" className="pl-9" />
+      </div>
+      {results.map((p: any) => (
+        <Card key={p.user_id} className={glass}><CardContent className="flex items-center gap-3 p-3">
+          <Avatar className="h-9 w-9"><AvatarImage src={p.avatar_url || undefined} /><AvatarFallback>{(p.username || "U")[0].toUpperCase()}</AvatarFallback></Avatar>
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">@{p.username || "unknown"}</p><p className="truncate text-xs text-muted-foreground">{p.display_name || "—"}</p></div>
+          <Button size="sm" onClick={() => void setOn(p.user_id, true, p.username || "user")}>Make minor admin</Button>
+        </CardContent></Card>
+      ))}
+      <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current minor admins ({(team ?? []).length})</p>
+      {(team ?? []).length === 0 && <p className="text-sm text-muted-foreground">No minor admins yet.</p>}
+      {(team ?? []).map((t: any) => (
+        <Card key={t.user_id} className={glass}><CardContent className="flex items-center gap-3 p-3">
+          <Avatar className="h-9 w-9"><AvatarImage src={t.avatar_url || undefined} /><AvatarFallback>{(t.username || "U")[0].toUpperCase()}</AvatarFallback></Avatar>
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">@{t.username || "unknown"}</p><p className="text-xs text-muted-foreground">Since {new Date(t.since).toLocaleDateString()}</p></div>
+          <Button size="sm" variant="destructive" onClick={() => void setOn(t.user_id, false, t.username || "user")}>Remove</Button>
+        </CardContent></Card>
+      ))}
+    </div>
+  );
+};
+
+/** Growth funnel (last 7 days): sign-ups, onboarding steps, shares and referrals. */
+const GrowthFunnel = ({ glass }: { glass: string }) => {
+  const { data } = useQuery({
+    queryKey: ["admin", "growth"],
+    queryFn: async () => { const { data, error } = await (supabase.rpc as any)("admin_growth_funnel"); if (error) throw error; return data as any; },
+  });
+  if (!data) return null;
+  const st = (k: string) => Number(data.steps?.[k] ?? 0);
+  const rows: [string, number][] = [
+    ["New sign-ups", data.signups], ["Finished welcome flow", data.onboarded], ["Started onboarding", st("onboarding_start")],
+    ["Followed people", st("onboarding_follow")], ["Posted a first Drop", st("onboarding_first_drop")], ["Reached invite step", st("onboarding_drop")],
+    ["Shared on WhatsApp", Object.entries(data.steps ?? {}).filter(([k]) => k.startsWith("share_whatsapp")).reduce((a, [, v]) => a + Number(v), 0)],
+    ["Joined via invite", data.referrals], ["Active people (24h)", data.dau],
+  ];
+  return (
+    <Card className={glass}><CardHeader className="pb-2"><CardTitle className="text-sm">Growth funnel · last 7 days</CardTitle></CardHeader>
+      <CardContent className="grid grid-cols-2 gap-2">
+        {rows.map(([l, v]) => <div key={l} className="rounded-xl bg-secondary/40 p-3"><p className="text-xl font-bold tabular-nums">{Number(v ?? 0).toLocaleString()}</p><p className="text-xs text-muted-foreground">{l}</p></div>)}
+      </CardContent></Card>
+  );
+};
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isAdmin, loading } = useRoles();
+  const { isAdmin, isModerator, isMinorAdmin, loading } = useRoles();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
 
-  const enabled = isAdmin;
+  const enabled = isModerator; // admins and minor admins
+  const full = isAdmin; // money, badges, health, audit and team are admin-only
 
   const { data: profiles } = useQuery({
     queryKey: ["admin", "profiles"],
@@ -80,7 +155,7 @@ const AdminPage = () => {
   });
   const { data: events } = useQuery({
     queryKey: ["admin", "events"],
-    enabled,
+    enabled: full,
     queryFn: async () => {
       const since = new Date(Date.now() - 7 * 864e5).toISOString();
       const { data, error } = await supabase.from("client_events" as never).select("kind,name,message,path,platform,app_version,created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(3000);
@@ -114,7 +189,7 @@ const AdminPage = () => {
 
   const { data: withdrawals } = useQuery({
     queryKey: ["admin", "withdrawals"],
-    enabled,
+    enabled: full,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("withdrawal_requests" as any)
@@ -128,7 +203,7 @@ const AdminPage = () => {
 
   const { data: revenue } = useQuery({
     queryKey: ["admin", "revenue"],
-    enabled,
+    enabled: full,
     refetchInterval: 30000,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("admin_revenue");
@@ -140,7 +215,7 @@ const AdminPage = () => {
 
   const { data: tickets } = useQuery({
     queryKey: ["admin", "tickets"],
-    enabled,
+    enabled: full,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_tickets" as any)
@@ -161,7 +236,7 @@ const AdminPage = () => {
 
   const { data: audit } = useQuery({
     queryKey: ["admin", "audit"],
-    enabled,
+    enabled: full,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("security_audit_log")
@@ -181,7 +256,7 @@ const AdminPage = () => {
     );
   }
 
-  if (!isAdmin) {
+  if (!isModerator) {
     return (
       <div className="min-h-screen relative flex items-center justify-center p-6">
         <LiquidBackground />
@@ -286,7 +361,7 @@ const AdminPage = () => {
       : true,
   );
 
-  const stats = [
+  const allStats = [
     { label: "Primegram revenue", value: kes(revenue?.total), icon: TrendingUp },
     { label: "Revenue (30d)", value: kes(revenue?.last30), icon: TrendingUp },
     { label: "Users", value: profiles?.length ?? 0, icon: Users },
@@ -298,6 +373,9 @@ const AdminPage = () => {
     { label: "New users (7d)", value: (profiles ?? []).filter((p: any) => p.created_at && Date.now() - new Date(p.created_at).getTime() < 7 * 864e5).length, icon: Users },
     { label: "Open tickets", value: ((tickets ?? []) as any[]).filter((t: any) => t.status !== "resolved").length, icon: Flag },
   ];
+  const MONEY = ["Primegram revenue", "Revenue (30d)", "Pending withdrawals", "Payout queue (KES)", "Open tickets"];
+  const stats = full ? allStats : allStats.filter((x) => !MONEY.includes(x.label));
+
 
   const glass = "border-white/10 bg-white/5 backdrop-blur-2xl";
 
@@ -309,7 +387,7 @@ const AdminPage = () => {
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
             <h1 className="font-semibold">Primegram Admin</h1>
-            <Badge variant="secondary" className="ml-1">official</Badge>
+            <Badge variant="secondary" className="ml-1">{full ? "official" : "minor admin"}</Badge>
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
             <ArrowLeft className="h-4 w-4 mr-1" /> App
@@ -340,11 +418,12 @@ const AdminPage = () => {
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="chat">Chat reports ({(chatReports ?? []).filter((r: any) => r.status === "open").length})</TabsTrigger>
               <TabsTrigger value="bans">Bans ({(bans ?? []).length})</TabsTrigger>
-              <TabsTrigger value="health">Health &amp; usage</TabsTrigger>
-              <TabsTrigger value="revenue">Revenue</TabsTrigger>
-              <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
-              <TabsTrigger value="tickets">Support ({(tickets ?? []).filter((t: any) => t.status === "open").length})</TabsTrigger>
-              <TabsTrigger value="audit">Audit log</TabsTrigger>
+              {full && <TabsTrigger value="health">Health &amp; usage</TabsTrigger>}
+              {full && <TabsTrigger value="revenue">Revenue</TabsTrigger>}
+              {full && <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>}
+              {full && <TabsTrigger value="tickets">Support ({(tickets ?? []).filter((t: any) => t.status === "open").length})</TabsTrigger>}
+              {full && <TabsTrigger value="audit">Audit log</TabsTrigger>}
+              {full && <TabsTrigger value="team">Team</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="users" className="mt-4 space-y-3">
@@ -373,7 +452,7 @@ const AdminPage = () => {
                         {p.display_name || "—"}
                       </p>
                     </div>
-                    <select
+                    {full && (                    <select
                       aria-label="Badge"
                       value={p.is_official ? "official" : p.badge ?? (p.is_verified ? "verified" : "")}
                       onChange={(e) => {
@@ -390,7 +469,7 @@ const AdminPage = () => {
                       <option value="gold">Prime Gold</option>
                       <option value="black">Founder Black</option>
                       <option value="all_access">All Access</option>
-                    </select>
+                    </select>)}
                     {(bans ?? []).some((b: any) => b.user_id === p.user_id)
                       ? <Button size="sm" variant="secondary" onClick={() => unbanUser(p.user_id)}>Unban</Button>
                       : <Button size="sm" variant="destructive" onClick={() => { const r = window.prompt("Reason for ban:", "Violated community rules"); if (r) void banUser(p.user_id, r); }}>Ban</Button>}
@@ -450,7 +529,8 @@ const AdminPage = () => {
                       <span className="text-sm font-medium capitalize">{r.target_type}</span>
                       <Badge variant="secondary" className="capitalize">{r.status}</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground break-words">{r.reason}</p>
+                    <p className="text-sm font-medium break-words">{r.reason}</p>
+                    {r.details && <p className="rounded-lg bg-secondary/50 p-2 text-sm text-muted-foreground break-words">“{r.details}”</p>}
                     <div className="flex gap-2">
                       <Button size="sm" variant="secondary" onClick={() => setReportStatus(r.id, "resolved")}>
                         Resolve
@@ -507,7 +587,8 @@ const AdminPage = () => {
               <p className="text-xs text-muted-foreground">To ban someone from anywhere, find them in the Users tab. Banned accounts are locked out on their next app load.</p>
             </TabsContent>
 
-            <TabsContent value="health" className="mt-4 space-y-3">
+            {full && <TabsContent value="health" className="mt-4 space-y-3">
+              <GrowthFunnel glass={glass} />
               {(() => {
                 const ev = events ?? [];
                 const errs = ev.filter((e) => e.kind === "error");
@@ -534,9 +615,9 @@ const AdminPage = () => {
                   </>
                 );
               })()}
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="revenue" className="mt-4 space-y-3">
+            {full && <TabsContent value="revenue" className="mt-4 space-y-3">
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {[
                   ["Total profit", revenue?.total],
@@ -568,9 +649,9 @@ const AdminPage = () => {
                   </div>
                 ))}
               </CardContent></Card>
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="withdrawals" className="mt-4 space-y-3">
+            {full && <TabsContent value="withdrawals" className="mt-4 space-y-3">
               {(withdrawals ?? []).length === 0 && (
                 <p className="text-sm text-muted-foreground">No withdrawal requests yet.</p>
               )}
@@ -604,9 +685,9 @@ const AdminPage = () => {
                   </CardContent>
                 </Card>
               ))}
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="tickets" className="mt-4 space-y-3">
+            {full && <TabsContent value="tickets" className="mt-4 space-y-3">
               {(tickets ?? []).map((t: any) => (
                 <Card key={t.id} className={glass}>
                   <CardContent className="p-3 space-y-2">
@@ -626,9 +707,9 @@ const AdminPage = () => {
                 </Card>
               ))}
               {(tickets ?? []).length === 0 && <p className="text-sm text-muted-foreground">No support tickets.</p>}
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="audit" className="mt-4 space-y-2">
+            {full && <TabsContent value="audit" className="mt-4 space-y-2">
               {(audit ?? []).map((a: any) => (
                 <div
                   key={a.id}
@@ -647,7 +728,9 @@ const AdminPage = () => {
                   <MessageCircle className="h-4 w-4" /> No audit events yet.
                 </p>
               )}
-            </TabsContent>
+            </TabsContent>}
+
+            {full && <TabsContent value="team" className="mt-4 space-y-3"><TeamPanel profiles={profiles ?? []} glass={glass} /></TabsContent>}
           </Tabs>
         </main>
       </div>

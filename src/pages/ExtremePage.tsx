@@ -360,15 +360,15 @@ const SoundsTab = () => {
 };
 
 const tabs = [
-  { v: "verified", l: "Verified", i: BadgeCheck }, { v: "tips", l: "Tips", i: Coins },
-  { v: "crush", l: "Crush", i: Heart }, { v: "adult", l: "18+", i: ShieldAlert }, { v: "bots", l: "AI Bots", i: Bot },
+  { v: "adult", l: "Primempire", i: ShieldAlert }, { v: "verified", l: "Verified", i: BadgeCheck }, { v: "tips", l: "Tips", i: Coins },
+  { v: "crush", l: "Crush", i: Heart }, { v: "bots", l: "AI Bots", i: Bot },
   { v: "garage", l: "Garage", i: Store }, { v: "bounty", l: "Bounty", i: Target }, { v: "sounds", l: "Sounds", i: Music2 },
 ];
 
 export default function ExtremePage() {
   const navigate = useNavigate(); const { bal, refresh } = useBalance();
   const requestedTab = new URLSearchParams(location.search).get("tab");
-  const defaultTab = tabs.some(({ v }) => v === requestedTab) ? requestedTab! : "verified";
+  const defaultTab = tabs.some(({ v }) => v === requestedTab) ? requestedTab! : "adult";
   return (
     <div className="prime-extreme min-h-screen pb-28">
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-amber-200/20 bg-[#070809]/90 px-3 py-2.5 backdrop-blur-xl">

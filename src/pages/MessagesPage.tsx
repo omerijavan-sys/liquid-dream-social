@@ -1,5 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2, Paperclip, Square, Play as PlayIcon } from "lucide-react";
+import LockedMedia from "@/features/ppv/LockedMedia";
+import { creatorShare, kes as fmtKes, priceError, uploadLocked } from "@/features/ppv/ppv";
+import { rpc as ppvRpc } from "@/features/shared/ui";
+import { ArrowLeft, Lock, Phone, Video, Send, Sparkles, Search, Mic, MicOff, PenLine, Loader2, Paperclip, Square, Play as PlayIcon } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +21,7 @@ import { Users } from "lucide-react";
 import { X, Globe } from "lucide-react";
 import GroupChats from "@/components/GroupChats";
 import VideoThumb from "@/components/VideoThumb";
+import { UPLOAD_CACHE } from "@/utils/media";
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
 type SpeechRecognitionLike = {
@@ -53,7 +57,8 @@ interface Message {
   created_at: string;
   read?: boolean;
   media_url?: string | null;
-  media_type?: "image" | "video" | "audio" | "post" | "reel" | null;
+  media_type?: "image" | "video" | "audio" | "post" | "reel" | "ppv" | null;
+  ppv_item_id?: string | null;
   shared_ref?: string | null;
   reply_to?: string | null;
   edited_at?: string | null;
@@ -62,7 +67,7 @@ interface Message {
   hidden_by?: string[] | null;
 }
 
-const MSG_COLS = "id, sender_id, receiver_id, content, created_at, read, media_url, media_type, shared_ref, reply_to, edited_at, deleted_at, reactions, hidden_by";
+const MSG_COLS = "id, sender_id, receiver_id, content, created_at, read, media_url, media_type, shared_ref, reply_to, edited_at, deleted_at, reactions, hidden_by, ppv_item_id";
 
 const MessagesPage = () => {
   const navigate = useNavigate();
@@ -393,7 +398,7 @@ const MessagesPage = () => {
     setUploading(true);
     try {
       const path = `${user.id}/dm_${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined });
+      const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined, cacheControl: UPLOAD_CACHE });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
       const label = type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice message";
@@ -407,6 +412,31 @@ const MessagesPage = () => {
     } finally {
       setUploading(false);
     }
+  };
+
+  // Paid media: the receiver must pay (wallet) to see it; Primegram keeps 15%.
+  const lockRef = useRef<HTMLInputElement>(null);
+  const [paidDraft, setPaidDraft] = useState<{ file: File; price: string } | null>(null);
+  const sendPaid = async () => {
+    if (!paidDraft || !activeChat || !user) return;
+    const pe = priceError(paidDraft.price); if (pe) { toast.error(pe); return; }
+    if (paidDraft.file.size > 50 * 1024 * 1024) { toast.error("File is too large (50 MB max)."); return; }
+    setUploading(true);
+    try {
+      const path = await uploadLocked(user.id, paidDraft.file, paidDraft.file.name);
+      const { data: newId, error } = await ppvRpc<string>("ppv_send_message", { _receiver: activeChat.user_id, _price: Number(paidDraft.price), _path: path, _type: paidDraft.file.type.startsWith("video/") ? "video" : "image", _teaser: null });
+      if (error) throw new Error(error.message);
+      setPaidDraft(null); toast.success("Paid message sent");
+      const { data: row } = await supabase.from("messages").select(MSG_COLS).eq("id", newId as string).maybeSingle();
+      if (row) setMessages(prev => prev.some(m => m.id === (row as unknown as Message).id) ? prev : [...prev, row as unknown as Message]);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't send. Try again."); }
+    finally { setUploading(false); }
+  };
+  const onPickLocked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("video/") && !file.type.startsWith("image/")) { toast.error("Choose a photo or video."); return; }
+    setPaidDraft({ file, price: "" });
   };
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -590,6 +620,7 @@ const MessagesPage = () => {
                     )}
                     {m.media_type === "image" && m.media_url && <button type="button" onClick={() => openLink(m.media_url!)}><img src={m.media_url} alt="Photo" className="mb-1 max-h-64 rounded-xl object-cover" /></button>}
                     {m.media_type === "video" && m.media_url && <video src={m.media_url} controls playsInline preload="none" className="mb-1 max-h-64 rounded-xl" />}
+                    {m.media_type === "ppv" && m.ppv_item_id && <div className="mb-1 w-56"><LockedMedia itemId={m.ppv_item_id} compact /></div>}
                     {m.media_type === "audio" && m.media_url && <audio src={m.media_url} controls className="h-10 max-w-full" />}
                     {(m.media_type === "post" || m.media_type === "reel") && (
                       <button
@@ -662,6 +693,8 @@ const MessagesPage = () => {
                 <button onClick={() => fileRef.current?.click()} disabled={uploading || recording} aria-label="Attach photo or video" className="depth-press flex h-10 w-10 items-center justify-center rounded-xl text-amber-200 hover:bg-amber-300/10 disabled:opacity-40">
                   {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                 </button>
+                <input ref={lockRef} type="file" accept="image/*,video/*" className="hidden" onChange={onPickLocked} />
+                <button onClick={() => lockRef.current?.click()} disabled={uploading || recording} aria-label="Send paid photo or video" className="depth-press flex h-10 w-10 items-center justify-center rounded-xl text-amber-200"><Lock className="h-4 w-4" /></button>
                 <button onClick={() => void toggleVoiceNote()} disabled={uploading} aria-label={recording ? "Stop and send voice message" : "Record voice message"} className={`depth-press flex h-10 w-10 items-center justify-center rounded-xl ${recording ? "bg-red-500 text-white animate-pulse" : "text-amber-200 hover:bg-amber-300/10"}`}>
                   {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </button>
@@ -767,6 +800,20 @@ const MessagesPage = () => {
       >
         <PenLine className="h-5 w-5 drop-shadow-[0_0_7px_rgba(252,211,77,.9)]" />
       </button>
+      {paidDraft && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setPaidDraft(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md space-y-3 rounded-t-3xl border border-white/15 bg-[#0b0b16]/95 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white backdrop-blur-2xl">
+            <div className="flex items-center gap-2"><Lock className="h-5 w-5 text-amber-300" /><p className="text-lg font-bold">Send as paid {paidDraft.file.type.startsWith("video/") ? "video" : "photo"}</p></div>
+            <p className="text-xs text-white/65">{activeChat?.display_name || "They"} will see it blurred and must pay from their wallet to unlock it.</p>
+            <input value={paidDraft.price} onChange={(e) => setPaidDraft({ ...paidDraft, price: e.target.value.replace(/[^\d.]/g, "").slice(0, 7) })} inputMode="decimal" autoFocus placeholder="Price in KES (20 – 20,000)" aria-label="Price in KES" className="w-full rounded-2xl bg-white/10 px-4 py-3 text-sm outline-none ring-1 ring-white/15" />
+            {Number(paidDraft.price) >= 20 && <p className="text-xs text-white/70">You earn <b className="text-white">{fmtKes(creatorShare(Number(paidDraft.price)))}</b> if they unlock it. Primegram keeps 15%.</p>}
+            <div className="flex gap-2">
+              <button onClick={() => setPaidDraft(null)} className="flex-1 rounded-2xl bg-white/10 py-3 text-sm font-semibold">Cancel</button>
+              <button onClick={() => void sendPaid()} disabled={uploading} className="flex-1 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 py-3 text-sm font-bold disabled:opacity-50">{uploading ? "Sending…" : "Send"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

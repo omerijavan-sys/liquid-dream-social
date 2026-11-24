@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
@@ -11,9 +11,11 @@ const NotifyConfig = registerPlugin<{ set(o: { token?: string; url?: string; key
 const NativePush = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const f = () => setTick(t => t + 1); window.addEventListener("prime:push-enable", f); return () => window.removeEventListener("prime:push-enable", f); }, []);
   useEffect(() => {
     if (Capacitor.isNativePlatform() && !user) void NotifyConfig.clear().catch(() => undefined);
-    if (!Capacitor.isNativePlatform() || !user || import.meta.env.VITE_PUSH_ENABLED !== "true") return; // only builds that include a valid google-services.json register for push
+    if (!Capacitor.isNativePlatform() || !user) return;
     let cleanup: Array<() => void> = [];
     void (async () => {
       try {
@@ -36,7 +38,7 @@ const NativePush = () => {
       } catch { /* Firebase not configured in this build */ }
     })();
     return () => cleanup.forEach((f) => f());
-  }, [user?.id, navigate]);
+  }, [user?.id, navigate, tick]);
   return null;
 };
 export default NativePush;

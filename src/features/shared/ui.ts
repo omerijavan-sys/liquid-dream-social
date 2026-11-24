@@ -1,3 +1,4 @@
+import { UPLOAD_CACHE } from "@/utils/media";
 import { supabase } from "@/integrations/supabase/client";
 
 /** Obsidian + frosted-glass design tokens shared by every growth feature. */
@@ -22,8 +23,8 @@ export const table = (name: string) => (supabase.from as unknown as (t: string) 
 export const deviceTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Nairobi"; } catch { return "Africa/Nairobi"; } };
 
 export const uploadMedia = async (userId: string, folder: string, blob: Blob, ext: string): Promise<string> => {
-  const path = `${folder}/${userId}/${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined });
+  const path = `${userId}/${folder}/${Date.now()}.${ext}`; // storage policy: first folder must be the user id
+  const { error } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined, cacheControl: UPLOAD_CACHE });
   if (error) throw error;
   return supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
 };
