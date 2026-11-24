@@ -1,0 +1,1 @@
+-- Applied via MCP (referral_bonus_virtual): referral bonuses are virtual credits in referral_bonuses only; no wallet_transactions credit.

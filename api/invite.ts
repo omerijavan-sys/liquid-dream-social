@@ -33,7 +33,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const title = name ? `${name} invited you to Primegram X` : "You're invited to Primegram X";
-  const desc = "Post, go live, send Drops and earn. Tap to join with this invite.";
+  const desc = "Come earn at Primegram. Post, go live, send Drops and get rewarded. Tap to join with this invite.";
   const image = `${origin}/og-invite.png`;
   const swap = (re: RegExp, v: string) => { html = html.replace(re, v); };
   swap(/<title>[\s\S]*?<\/title>/i, `<title>${esc(title)}</title>`);
