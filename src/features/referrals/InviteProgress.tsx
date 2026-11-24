@@ -54,19 +54,19 @@ const InviteProgress = () => {
       <div className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-200"><Sparkles className="h-3.5 w-3.5" />Referral credits: {Number(earn?.available ?? 0).toLocaleString()}</p>
-            {earn && earn.pending > 0 && <p className="mt-0.5 text-[10px] text-white/60">{Number(earn.pending).toLocaleString()} pending withdrawal</p>}
+            <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-200"><Sparkles className="h-3.5 w-3.5" />Referral earnings: KES {Number(earn?.available ?? 0).toLocaleString()}</p>
+            {earn && earn.pending > 0 && <p className="mt-0.5 text-[10px] text-white/60">KES {Number(earn.pending).toLocaleString()} pending withdrawal</p>}
           </div>
-          <button onClick={() => { if ((earn?.available ?? 0) < (earn?.min_withdraw ?? 5000)) { toast.info(`You can withdraw once you reach ${(earn?.min_withdraw ?? 5000).toLocaleString()} credits`); return; } setWd("phone"); }}
+          <button onClick={() => { if ((earn?.available ?? 0) < (earn?.min_withdraw ?? 5000)) { toast.info(`You can withdraw once you reach KES ${(earn?.min_withdraw ?? 5000).toLocaleString()}`); return; } setWd("phone"); }}
             className="rounded-lg bg-emerald-400 px-3 py-1.5 text-xs font-bold text-black">Withdraw</button>
         </div>
-        <p className="mt-1.5 text-[11px] text-white/70">Earn credits when friends you invite pay or earn on Primegram, for their first 90 days. Withdraw from {(earn?.min_withdraw ?? 5000).toLocaleString()} credits.</p>
-        {earn && earn.last30 > 0 && <p className="mt-1 text-[11px] text-emerald-200">{Number(earn.last30).toLocaleString()} cr in the last 30 days from {earn.friends_earning} friend{earn.friends_earning === 1 ? "" : "s"}</p>}
+        <p className="mt-1.5 text-[11px] text-white/70">Earn real money when friends you invite pay or earn on Primegram, for their first 90 days. Withdraw to M-Pesa from KES {(earn?.min_withdraw ?? 5000).toLocaleString()}.</p>
+        {earn && earn.last30 > 0 && <p className="mt-1 text-[11px] text-emerald-200">KES {Number(earn.last30).toLocaleString()} in the last 30 days from {earn.friends_earning} friend{earn.friends_earning === 1 ? "" : "s"}</p>}
         {wd === "phone" && (
           <div className="mt-2 space-y-2">
             <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="M-Pesa number, e.g. 0712345678" className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none" />
             <div className="flex gap-2">
-              <button disabled={busyWd || phone.trim().length < 9} onClick={() => void submitWithdraw()} className="flex-1 rounded-lg bg-emerald-400 py-2 text-xs font-bold text-black disabled:opacity-50">{busyWd ? "Sending…" : `Withdraw ${Number(earn?.available ?? 0).toLocaleString()}`}</button>
+              <button disabled={busyWd || phone.trim().length < 9} onClick={() => void submitWithdraw()} className="flex-1 rounded-lg bg-emerald-400 py-2 text-xs font-bold text-black disabled:opacity-50">{busyWd ? "Sending…" : `Withdraw KES ${Number(earn?.available ?? 0).toLocaleString()}`}</button>
               <button onClick={() => setWd("closed")} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white">Cancel</button>
             </div>
           </div>

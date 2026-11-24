@@ -102,7 +102,7 @@ const ReferralPayouts = ({ glass }: { glass: string }) => {
   const mark = async (id: string, status: "paid" | "rejected") => {
     const { error } = await (supabase.rpc as any)("admin_mark_referral_withdrawal", { _id: id, _status: status });
     if (error) { toast.error(error.message); return; }
-    toast.success(status === "paid" ? "Marked as paid" : "Rejected, credits returned");
+    toast.success(status === "paid" ? "Marked as paid" : "Rejected, money returned to their earnings");
     void qc.invalidateQueries({ queryKey: ["admin", "refwd"] });
   };
   if (!data?.length) return null;
