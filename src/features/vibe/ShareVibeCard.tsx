@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, Share2, X } from "lucide-react";
-import { toPng } from "html-to-image";
+import { createPortal } from "react-dom";
+import { deliverImage, renderCard } from "../shared/shareImage";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { glass, table } from "../shared/ui";
@@ -36,39 +37,31 @@ const ShareVibeCard = ({ a, onClose }: { a: Aesthetics; onClose: () => void }) =
     return () => { dead = true; };
   }, [user, code]);
 
-  const render = async () => {
-    if (!ref.current) return null;
-    await new Promise((r) => setTimeout(r, 150)); // let the QR image paint
-    return toPng(ref.current, { pixelRatio: 2, cacheBust: true, backgroundColor: "#09090B" });
-  };
-  const share = async () => {
+  const [shot, setShot] = useState<string | null>(null);
+  const make = async (mode: "share" | "save") => {
+    if (!ref.current) return;
     setBusy(true);
     try {
-      const png = await render(); if (!png) return;
-      const file = new File([await (await fetch(png)).blob()], "primegram-vibe-card.png", { type: "image/png" });
-      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: "My Primegram vibe", text: "Join me on Primegram 🔥" });
-      else { const l = document.createElement("a"); l.href = png; l.download = file.name; l.click(); toast.success("Saved to your device"); }
+      const png = await renderCard(ref.current);
+      const r = mode === "share" ? await deliverImage(png, "primegram-vibe-card.png", "Come earn at Primegram 🔥") : await deliverImage(png, "primegram-vibe-card.png", "");
+      if (r === "preview") setShot(png); else if (r === "saved") toast.success("Saved to your device");
     } catch (e) { if ((e as Error).name !== "AbortError") toast.error("Couldn't create the card. Try again."); }
     finally { setBusy(false); }
   };
-  const download = async () => {
-    setBusy(true);
-    try { const png = await render(); if (png) { const l = document.createElement("a"); l.href = png; l.download = "primegram-vibe-card.png"; l.click(); } }
-    catch { toast.error("Couldn't create the card. Try again."); } finally { setBusy(false); }
-  };
+  const share = () => make("share");
+  const download = () => make("save");
 
-  return (
-    <div className="fixed inset-0 z-[85] flex flex-col items-center justify-center gap-4 overflow-y-auto bg-black/85 p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[90] flex flex-col items-center justify-center gap-4 overflow-y-auto bg-black/85 p-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-4">
         <button onClick={onClose} aria-label="Close" className="self-end rounded-full bg-white/10 p-1.5 text-white"><X className="h-4 w-4" /></button>
-        {p ? <div style={{ maxWidth: "100%", transform: "scale(var(--s,1))" }}><VibeCard ref={ref} p={p} a={a} /></div> : <div className="flex h-[560px] w-[340px] items-center justify-center text-white/60"><Loader2 className="h-6 w-6 animate-spin" /></div>}
+        {shot ? <div className="flex flex-col items-center gap-2"><img src={shot} alt="Your Vibe Card" className="max-h-[70vh] rounded-2xl" /><p className="text-xs text-white/70">Press and hold the image to save or share it</p></div> : p ? <div style={{ maxWidth: "100%", transform: "scale(var(--s,1))" }}><VibeCard ref={ref} p={p} a={a} /></div> : <div className="flex h-[560px] w-[340px] items-center justify-center text-white/60"><Loader2 className="h-6 w-6 animate-spin" /></div>}
         <div className={`${glass} flex gap-2 rounded-2xl p-2`}>
           <button disabled={!p || busy} onClick={() => void share()} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}Share</button>
-          <button disabled={!p} onClick={() => shareWhatsApp("Check out my Primegram vibe card 🔥 Join me:", code ? inviteLink(code) : "https://primegramx.co.ke", "vibecard")} className="flex items-center gap-1.5 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-black disabled:opacity-50">WhatsApp</button>
+          <button disabled={!p} onClick={() => shareWhatsApp("Come earn at Primegram 🔥 Check out my vibe card:", code ? inviteLink(code) : "https://primegramx.co.ke", "vibecard")} className="flex items-center gap-1.5 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-black disabled:opacity-50">WhatsApp</button>
           <button disabled={!p || busy} onClick={() => void download()} className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Download className="h-4 w-4" />Save</button>
         </div>
       </div>
-    </div>
-  );
+    </div>, document.body);
 };
 export default ShareVibeCard;

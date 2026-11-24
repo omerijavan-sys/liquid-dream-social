@@ -92,6 +92,33 @@ const GrowthFunnel = ({ glass }: { glass: string }) => {
   );
 };
 
+/** Referral credit withdrawals: admins pay these out by M-Pesa by hand, then mark them paid. */
+const ReferralPayouts = ({ glass }: { glass: string }) => {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["admin", "refwd"],
+    queryFn: async () => { const { data, error } = await (supabase.rpc as any)("admin_referral_withdrawals"); if (error) throw error; return (data ?? []) as any[]; },
+  });
+  const mark = async (id: string, status: "paid" | "rejected") => {
+    const { error } = await (supabase.rpc as any)("admin_mark_referral_withdrawal", { _id: id, _status: status });
+    if (error) { toast.error(error.message); return; }
+    toast.success(status === "paid" ? "Marked as paid" : "Rejected, credits returned");
+    void qc.invalidateQueries({ queryKey: ["admin", "refwd"] });
+  };
+  if (!data?.length) return null;
+  return (
+    <Card className={glass}><CardHeader className="pb-2"><CardTitle className="text-sm">Referral withdrawals</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        {data.map((w) => (
+          <div key={w.id} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-xs">
+            <div className="min-w-0 flex-1"><p className="font-semibold">{w.display_name || w.username || "User"} · KES {Number(w.amount_kes).toLocaleString()}</p><p className="text-muted-foreground">{w.phone} · {new Date(w.created_at).toLocaleDateString()} · {w.status}</p></div>
+            {w.status === "pending" && <><Button size="sm" onClick={() => void mark(w.id, "paid")}>Paid</Button><Button size="sm" variant="outline" onClick={() => void mark(w.id, "rejected")}>Reject</Button></>}
+          </div>
+        ))}
+      </CardContent></Card>
+  );
+};
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -589,6 +616,7 @@ const AdminPage = () => {
 
             {full && <TabsContent value="health" className="mt-4 space-y-3">
               <GrowthFunnel glass={glass} />
+              <ReferralPayouts glass={glass} />
               {(() => {
                 const ev = events ?? [];
                 const errs = ev.filter((e) => e.kind === "error");

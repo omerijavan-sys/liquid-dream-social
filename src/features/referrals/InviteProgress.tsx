@@ -8,8 +8,20 @@ import { inviteLink, REWARD_AT, useReferral } from "./referral";
 /** Progress card for the profile: "Invite 2 more friends to unlock Obsidian Gold Theme" + the share link. */
 const InviteProgress = () => {
   const { code, count = 0, perks = [], loading } = useReferral();
-  const [earn, setEarn] = useState<{ total: number; last30: number; friends_earning: number } | null>(null);
-  useEffect(() => { void rpc<{ total: number; last30: number; friends_earning: number }>("my_referral_earnings").then(({ data }) => { if (data) setEarn(data); }); }, []);
+  type Earn = { total: number; last30: number; friends_earning: number; available: number; pending: number; min_withdraw: number };
+  const [earn, setEarn] = useState<Earn | null>(null);
+  const [wd, setWd] = useState<"closed" | "phone" | "done">("closed");
+  const [phone, setPhone] = useState("");
+  const [busyWd, setBusyWd] = useState(false);
+  const loadEarn = () => { void rpc<Earn>("my_referral_earnings").then(({ data }) => { if (data) setEarn(data); }); };
+  useEffect(loadEarn, []);
+  const submitWithdraw = async () => {
+    setBusyWd(true);
+    const { data, error } = await rpc<{ ok: boolean; error?: string }>("request_referral_withdrawal", { _phone: phone });
+    setBusyWd(false);
+    if (error || !data?.ok) { toast.error(data?.error ?? "Couldn't send your request. Try again."); return; }
+    setWd("done"); loadEarn();
+  };
   if (loading || !code) return null;
   const link = inviteLink(code);
   const left = Math.max(0, REWARD_AT - count);
@@ -40,9 +52,26 @@ const InviteProgress = () => {
         <span className="ml-auto tabular-nums">{count} joined</span>
       </div>
       <div className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3">
-        <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-200"><Sparkles className="h-3.5 w-3.5" />Virtual credits from friends: {Number(earn?.total ?? 0).toLocaleString()} cr</p>
-        <p className="mt-1 text-[11px] text-white/70">Earn virtual credits whenever a friend you invite pays or earns on Primegram, for their first 90 days. Credits are in-app rewards only, not real money and can't be withdrawn.</p>
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-200"><Sparkles className="h-3.5 w-3.5" />Referral credits: {Number(earn?.available ?? 0).toLocaleString()}</p>
+            {earn && earn.pending > 0 && <p className="mt-0.5 text-[10px] text-white/60">{Number(earn.pending).toLocaleString()} pending withdrawal</p>}
+          </div>
+          <button onClick={() => { if ((earn?.available ?? 0) < (earn?.min_withdraw ?? 5000)) { toast.info(`You can withdraw once you reach ${(earn?.min_withdraw ?? 5000).toLocaleString()} credits`); return; } setWd("phone"); }}
+            className="rounded-lg bg-emerald-400 px-3 py-1.5 text-xs font-bold text-black">Withdraw</button>
+        </div>
+        <p className="mt-1.5 text-[11px] text-white/70">Earn credits when friends you invite pay or earn on Primegram, for their first 90 days. Withdraw from {(earn?.min_withdraw ?? 5000).toLocaleString()} credits.</p>
         {earn && earn.last30 > 0 && <p className="mt-1 text-[11px] text-emerald-200">{Number(earn.last30).toLocaleString()} cr in the last 30 days from {earn.friends_earning} friend{earn.friends_earning === 1 ? "" : "s"}</p>}
+        {wd === "phone" && (
+          <div className="mt-2 space-y-2">
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="M-Pesa number, e.g. 0712345678" className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none" />
+            <div className="flex gap-2">
+              <button disabled={busyWd || phone.trim().length < 9} onClick={() => void submitWithdraw()} className="flex-1 rounded-lg bg-emerald-400 py-2 text-xs font-bold text-black disabled:opacity-50">{busyWd ? "Sending…" : `Withdraw ${Number(earn?.available ?? 0).toLocaleString()}`}</button>
+              <button onClick={() => setWd("closed")} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white">Cancel</button>
+            </div>
+          </div>
+        )}
+        {wd === "done" && <p className="mt-2 rounded-lg bg-black/30 p-2 text-[11px] text-emerald-100">Processing. This might take a day or 2. We'll send it to {phone}.</p>}
       </div>
       <div className="mt-3 flex items-center gap-2">
         <code className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] text-white/80">{link.replace("https://", "")}</code>

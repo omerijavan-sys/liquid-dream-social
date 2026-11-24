@@ -1,0 +1,2 @@
+-- Applied via MCP (referral_withdrawals): referral_withdrawals table (min 5,000, pending/paid/rejected), my_referral_earnings() with available/pending,
+-- request_referral_withdrawal(_phone), admin_referral_withdrawals(), admin_mark_referral_withdrawal(_id,_status). Separate from the real wallet.
