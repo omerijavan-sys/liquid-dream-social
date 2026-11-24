@@ -57,8 +57,14 @@ const ProfilePage = () => {
     if (!user || tab === "posts") return;
     const load = async () => {
       if (tab === "reels") {
-        const { data } = await supabase.from("reels").select("id, video_url, caption, thumbnail_url, views_count").eq("user_id", user.id).order("created_at", { ascending: false });
-        setTabPosts((data || []).map((reel) => ({ ...reel, media_url: reel.video_url, media_type: "video" })));
+        const tb = (n: string) => (supabase.from as unknown as (t: string) => any)(n); // eslint-disable-line @typescript-eslint/no-explicit-any
+        const cols = "id, video_url, caption, thumbnail_url, views_count";
+        const [{ data }, { data: rp }] = await Promise.all([supabase.from("reels").select(cols).eq("user_id", user.id).order("created_at", { ascending: false }), tb("reel_reposts").select("reel_id").eq("user_id", user.id)]);
+        const rids: string[] = (rp || []).map((r: { reel_id: string }) => r.reel_id);
+        const { data: reposted } = rids.length ? await supabase.from("reels").select(cols).in("id", rids) : { data: [] as typeof data };
+        const toItem = (reel: any) =>  // eslint-disable-line @typescript-eslint/no-explicit-any
+           ({ ...reel, media_url: reel.video_url, media_type: "video" });
+        setTabPosts([...(data || []).map(toItem), ...(reposted || []).map(toItem)]);
         return;
       }
       let ids: string[] = [];
@@ -68,9 +74,16 @@ const ProfilePage = () => {
         const { data } = await supabase.from("post_likes").select("post_id").eq("user_id", user.id).order("created_at", { ascending: false });
         ids = (data || []).map(d => d.post_id);
       }
-      if (ids.length === 0) { setTabPosts([]); return; }
+      let savedReels: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (tab === "saved") {
+        const { data: rs } = await (supabase.from as unknown as (t: string) => any)("reel_saves").select("reel_id").eq("user_id", user.id).order("created_at", { ascending: false });
+        const rids: string[] = (rs || []).map((r: { reel_id: string }) => r.reel_id);
+        if (rids.length) { const { data: rr } = await supabase.from("reels").select("id, video_url, caption, thumbnail_url, views_count").in("id", rids); savedReels = ((rr || []) as any[]).map(reel => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+           ...reel, media_url: reel.video_url, media_type: "video" })); }
+      }
+      if (ids.length === 0) { setTabPosts(savedReels); return; }
       const { data: p } = await supabase.from("posts").select("*").in("id", ids.slice(0, 200));
-      setTabPosts(p || []);
+      setTabPosts([...(p || []), ...savedReels]);
     };
     load();
   }, [user, tab]);

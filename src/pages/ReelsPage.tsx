@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { trackEvent } from "@/utils/telemetry";
 import ReportDialog from "@/components/ReportDialog";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import PostMusicPlayer from "@/components/PostMusicPlayer";
@@ -7,7 +9,7 @@ import { useMute } from "@/contexts/MuteContext";
 import ShareSheet from "@/components/ShareSheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2, Download, Flag, Play, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2, Download, Flag, Play, Trash2, Repeat2, Bookmark, MoreVertical, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -250,6 +252,13 @@ const ReelsPage = () => {
       (data || []).forEach(d => { c[d.reel_id] = (c[d.reel_id] || 0) + 1; });
       setCommentCounts(c);
     });
+    const q = (name: string) => (supabase.from as unknown as (t: string) => any)(name); // eslint-disable-line @typescript-eslint/no-explicit-any
+    void q("reel_saves").select("reel_id").eq("user_id", user.id).in("reel_id", reelIds).then(({ data }: { data: { reel_id: string }[] | null }) => setSaved(new Set((data || []).map(d => d.reel_id))));
+    void q("reel_reposts").select("reel_id, user_id").in("reel_id", reelIds).then(({ data }: { data: { reel_id: string; user_id: string }[] | null }) => {
+      const c: Record<string, number> = {}; const mine = new Set<string>();
+      (data || []).forEach(d => { c[d.reel_id] = (c[d.reel_id] || 0) + 1; if (d.user_id === user.id) mine.add(d.reel_id); });
+      setRepostCounts(c); setReposted(mine);
+    });
   }, [user, reelIdKey]);
 
   const toggleLike = async (id: string) => {
@@ -299,11 +308,66 @@ const ReelsPage = () => {
     }
   };
 
+
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [reposted, setReposted] = useState<Set<string>>(new Set());
+  const [repostCounts, setRepostCounts] = useState<Record<string, number>>({});
+  const [menuReel, setMenuReel] = useState<any | null>(null);
+  const tbl = (name: string) => (supabase.from as unknown as (t: string) => any)(name); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const toggleSave = async (id: string) => {
+    if (!user) { toast.error("Sign in to save"); return; }
+    const on = saved.has(id);
+    setSaved(prev => { const n = new Set(prev); if (on) n.delete(id); else n.add(id); return n; });
+    const { error } = on ? await tbl("reel_saves").delete().eq("reel_id", id).eq("user_id", user.id) : await tbl("reel_saves").insert({ reel_id: id, user_id: user.id });
+    if (error) { toast.error("Couldn't update saved"); return; }
+    toast.success(on ? "Removed from saved" : "Saved. Find it in your profile's saved tab");
+  };
+  const toggleRepost = async (reel: any) => {
+    if (!user) { toast.error("Sign in to repost"); return; }
+    if (reel.user_id === user.id) { toast.info("That's your own reel"); return; }
+    const on = reposted.has(reel.id);
+    setReposted(prev => { const n = new Set(prev); if (on) n.delete(reel.id); else n.add(reel.id); return n; });
+    setRepostCounts(c => ({ ...c, [reel.id]: Math.max(0, (c[reel.id] || 0) + (on ? -1 : 1)) }));
+    const { error } = on ? await tbl("reel_reposts").delete().eq("reel_id", reel.id).eq("user_id", user.id) : await tbl("reel_reposts").insert({ reel_id: reel.id, user_id: user.id });
+    if (error) { toast.error("Couldn't repost"); return; }
+    toast.success(on ? "Repost removed" : "Reposted to your profile");
+  };
+  const reelFeedback = (reel: any, kind: "interested" | "not_interested") => {
+    try {
+      const k = "primegram:reelFeedback"; const cur = JSON.parse(localStorage.getItem(k) || "{}");
+      cur[reel.id] = kind; localStorage.setItem(k, JSON.stringify(cur));
+    } catch { /* storage unavailable */ }
+    trackEvent(`reel_${kind}`);
+    setMenuReel(null);
+    if (kind === "not_interested") { setReels(prev => prev.filter(r => r.id !== reel.id)); toast.success("Got it. You'll see fewer reels like this"); }
+    else toast.success("Great, we'll show you more like this");
+  };
+
   const [shareReelTarget, setShareReelTarget] = useState<any | null>(null);
   const shareReel = (reel: any) => { setShareReelTarget(reel); };
   return (
     <div className="min-h-screen overflow-hidden bg-[#080b14] text-white [background-image:radial-gradient(ellipse_at_24%_16%,rgba(168,85,247,.2),transparent_35%),radial-gradient(ellipse_at_88%_22%,rgba(34,211,238,.18),transparent_33%),radial-gradient(ellipse_at_73%_88%,rgba(212,175,55,.16),transparent_36%)]">
       <ReportDialog open={!!reportReelId} onClose={() => setReportReelId(undefined)} targetType="reel" targetId={reportReelId} />
+
+      {menuReel && createPortal(
+        <div className="fixed inset-0 z-[95] flex items-end bg-black/60" onClick={() => setMenuReel(null)}>
+          <div onClick={e => e.stopPropagation()} className="w-full rounded-t-3xl border-t border-white/10 bg-[#11131c]/95 p-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-white backdrop-blur-xl">
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/20" />
+            {([
+              ...(menuReel.user_id !== user?.id ? [
+                { k: "int", icon: ThumbsUp, label: "Interested", run: () => reelFeedback(menuReel, "interested") },
+                { k: "not", icon: ThumbsDown, label: "Not interested", run: () => reelFeedback(menuReel, "not_interested") },
+              ] : []),
+              ...((menuReel.allow_download !== false || menuReel.user_id === user?.id) ? [{ k: "dl", icon: Download, label: "Download", run: () => { setMenuReel(null); void downloadReel(menuReel); } }] : []),
+              ...(menuReel.user_id === user?.id
+                ? [{ k: "del", icon: Trash2, label: "Delete reel", danger: true, run: () => { const r = menuReel; setMenuReel(null); void deleteReel(r); } }]
+                : [{ k: "rep", icon: Flag, label: "Report", danger: true, run: () => { const r = menuReel; setMenuReel(null); reportReel(r); } }]),
+            ] as { k: string; icon: typeof Flag; label: string; danger?: boolean; run: () => void }[]).map(o => (
+              <button key={o.k} onClick={o.run} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-semibold active:bg-white/10 ${o.danger ? "text-red-300" : ""}`}><o.icon className="h-5 w-5" />{o.label}</button>
+            ))}
+            <button onClick={() => setMenuReel(null)} className="mt-1 w-full rounded-xl bg-white/10 py-3 text-sm font-semibold">Cancel</button>
+          </div>
+        </div>, document.body)}
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 safe-area-top">
         <div className="flex items-center justify-between px-5 py-4">
@@ -331,161 +395,141 @@ const ReelsPage = () => {
           <button onClick={() => setCreating(true)} className="depth-press px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm">Create Reel</button>
         </div>
       ) : (
-        <div ref={containerRef} className="relative h-[100dvh] snap-y snap-mandatory overflow-y-auto scrollbar-none pb-24 pt-14">
+        <div ref={containerRef} className="relative h-[100dvh] snap-y snap-mandatory overflow-y-auto scrollbar-none">
           {reels.map((reel, i) => (
             <section
               key={reel.id}
               data-index={i}
               aria-label={`Reel ${i + 1}`}
-              className="relative mx-auto flex min-h-[100dvh] w-full snap-start snap-always items-center justify-center px-3 pb-20 pt-14"
+              className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black"
             >
-              <div className="flex items-center gap-2.5 sm:gap-4">
-                <div
-                  style={{ width: "min(43.875dvh, calc(100vw - 5rem), 420px)" }}
-                  className="relative aspect-[9/16] overflow-hidden rounded-[1.5rem] border border-white/10 bg-black shadow-[0_16px_48px_rgba(0,0,0,.3)] sm:rounded-[2rem]"
-                  onClick={() => {
-                    const now = Date.now();
-                    if (prefs.doubleTapLike && lastTap.current.id === reel.id && now - lastTap.current.t < 320) {
-                      lastTap.current = { t: 0, id: "" };
-                      if (!liked.has(reel.id)) void toggleLike(reel.id);
-                      setHeartBurst({ id: reel.id, k: now });
-                      setTimeout(() => setHeartBurst(h => (h && h.k === now ? null : h)), 800);
-                      return;
-                    }
-                    lastTap.current = { t: now, id: reel.id };
-                    toggleReelPlayback(i);
-                  }}
-                >
-                  {reel.video_url && (
-                    <video
-                      ref={el => { if (el) { videoRefs.current.set(i, el); el.volume = Math.max(0, Math.min(1, (reel as { video_volume?: number }).video_volume ?? 1)); } else videoRefs.current.delete(i); }}
-                      src={currentIndex >= 0 && (i === currentIndex || i === currentIndex + 1) ? reel.video_url : undefined}
-                      className="h-full w-full bg-black object-contain"
-                      loop
-                      playsInline
-                      muted={muted}
-                      poster={reel.thumbnail_url || BLANK_POSTER}
-                      preload={i === currentIndex ? "auto" : i === currentIndex + 1 ? "metadata" : "none"}
-                      aria-label={`Video by ${reel.profile?.display_name || "user"}; press Enter or Space to play or pause`}
-                      tabIndex={0}
-                      onKeyDown={event => {
-                        if (event.key !== "Enter" && event.key !== " ") return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        toggleReelPlayback(i);
-                      }}
-                      onWaiting={() => { if (i === currentIndex) setVideoBuffering(true); }}
-                      onCanPlay={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoError(false); } }}
-                      onPlaying={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoPaused(false); setVideoError(false); } }}
-                      onPause={() => { if (i === currentIndex) setVideoPaused(true); }}
-                      onError={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoError(true); } }}
-                    />
-                  )}
-                  {heartBurst?.id === reel.id && (
-                    <motion.div key={heartBurst.k} initial={{ scale: 0.3, opacity: 1 }} animate={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.8 }} className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                      <Heart className="h-24 w-24 fill-rose-500 text-rose-500 drop-shadow-[0_0_20px_rgba(244,63,94,.8)]" />
-                    </motion.div>
-                  )}
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/20" />
-                  {i === currentIndex && videoBuffering && (
-                    <div role="status" aria-label="Buffering video" className="absolute inset-0 z-10 flex items-center justify-center text-white">
-                      <Loader2 className="size-7 animate-spin" />
-                    </div>
-                  )}
-                  {i === currentIndex && videoError && (
-                    <button
-                      type="button"
-                      onClick={event => {
-                        event.stopPropagation();
-                        const video = videoRefs.current.get(i);
-                        if (!video) return;
-                        setVideoError(false);
-                        setVideoBuffering(true);
-                        video.load();
-                        void video.play().catch(() => { setVideoBuffering(false); setVideoError(true); });
-                      }}
-                      className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 text-sm font-semibold text-white"
-                    >
-                      Tap to retry video
-                    </button>
-                  )}
-                  {i === currentIndex && videoPaused && !videoBuffering && !videoError && (
-                    <button
-                      type="button"
-                      aria-label="Play video"
-                      onClick={event => { event.stopPropagation(); toggleReelPlayback(i); }}
-                      className="absolute inset-0 z-10 flex items-center justify-center text-white"
-                    >
-                      <span className="flex size-14 items-center justify-center rounded-full bg-black/50"><Play className="ml-1 size-6 fill-current" /></span>
-                    </button>
-                  )}
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-4 pt-16">
-                    <div className="pointer-events-auto flex items-center gap-2">
-                      <button
-                        onClick={event => { event.stopPropagation(); if (reel.profile?.user_id) navigate(`/profile/${reel.profile.user_id}`); }}
-                        aria-label={`Open ${reel.profile?.display_name || "user"}'s profile`}
-                        className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-black/50 text-sm font-bold text-white"
-                      >
-                        {reel.profile?.avatar_url ? <img src={reel.profile.avatar_url} alt="" className="h-full w-full object-cover" loading="lazy" /> : (reel.profile?.display_name || "U")[0]}
-                      </button>
-                      <div className="min-w-0">
-                        <button onClick={event => { event.stopPropagation(); if (reel.profile?.user_id) navigate(`/profile/${reel.profile.user_id}`); }} className="text-sm font-semibold text-white">
-                          {reel.profile?.display_name || "User"} <span className="text-amber-300">●</span>
-                        </button>
-                        {reel.caption && <p className="line-clamp-2 text-xs text-white/75">{reel.caption}</p>}
-                      </div>
-                    </div>
-                    {reel.music_title && <div className="pointer-events-auto mt-2 truncate text-xs text-white/80"><PostMusicPlayer music={{ title: reel.music_title, artist: reel.music_artist, art_url: reel.music_art_url, stream_url: reel.music_url, start: reel.music_start, len: reel.music_len, volume: (reel as { music_volume?: number }).music_volume }} /></div>}
+              <div
+                className="absolute inset-0"
+                onClick={() => {
+                  const now = Date.now();
+                  if (prefs.doubleTapLike && lastTap.current.id === reel.id && now - lastTap.current.t < 320) {
+                    lastTap.current = { t: 0, id: "" };
+                    if (!liked.has(reel.id)) void toggleLike(reel.id);
+                    setHeartBurst({ id: reel.id, k: now });
+                    setTimeout(() => setHeartBurst(h => (h && h.k === now ? null : h)), 800);
+                    return;
+                  }
+                  lastTap.current = { t: now, id: reel.id };
+                  toggleReelPlayback(i);
+                }}
+              >
+                {reel.video_url && (
+                  <video
+                    ref={el => { if (el) { videoRefs.current.set(i, el); el.volume = Math.max(0, Math.min(1, (reel as { video_volume?: number }).video_volume ?? 1)); } else videoRefs.current.delete(i); }}
+                    src={currentIndex >= 0 && (i === currentIndex || i === currentIndex + 1) ? reel.video_url : undefined}
+                    className="h-full w-full bg-black object-cover"
+                    loop
+                    playsInline
+                    muted={muted}
+                    poster={reel.thumbnail_url || BLANK_POSTER}
+                    preload={i === currentIndex ? "auto" : i === currentIndex + 1 ? "metadata" : "none"}
+                    aria-label={`Video by ${reel.profile?.display_name || "user"}; press Enter or Space to play or pause`}
+                    tabIndex={0}
+                    onKeyDown={event => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      toggleReelPlayback(i);
+                    }}
+                    onWaiting={() => { if (i === currentIndex) setVideoBuffering(true); }}
+                    onCanPlay={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoError(false); } }}
+                    onPlaying={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoPaused(false); setVideoError(false); } }}
+                    onPause={() => { if (i === currentIndex) setVideoPaused(true); }}
+                    onError={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoError(true); } }}
+                  />
+                )}
+                {heartBurst?.id === reel.id && (
+                  <motion.div key={heartBurst.k} initial={{ scale: 0.3, opacity: 1 }} animate={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.8 }} className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <Heart className="h-24 w-24 fill-rose-500 text-rose-500 drop-shadow-[0_0_20px_rgba(244,63,94,.8)]" />
+                  </motion.div>
+                )}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+                {i === currentIndex && videoBuffering && (
+                  <div role="status" aria-label="Buffering video" className="absolute inset-0 z-10 flex items-center justify-center text-white">
+                    <Loader2 className="size-8 animate-spin" />
                   </div>
-                  {reel.user_id === user?.id && (
-                    <button
-                      onClick={event => { event.stopPropagation(); navigate("/profile?tab=reels"); }}
-                      className="absolute right-3 top-3 z-10 rounded-lg border border-white/20 bg-black/60 px-2.5 py-1.5 text-xs font-semibold text-white"
-                    >
-                      Insights
-                    </button>
-                  )}
-                </div>
-                <div className="relative z-10 flex shrink-0 flex-col items-center gap-2 md:gap-3">
-                <button onClick={(e) => { e.stopPropagation(); toggleLike(reel.id); }} className="depth-press flex flex-col items-center gap-1" aria-label="Like">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/70 md:h-11 md:w-11">
-                    <Heart className={`h-5 w-5 ${liked.has(reel.id) ? "fill-rose-400 text-rose-400" : "text-amber-100"}`} />
-                  </div>
-                  <span className="text-[11px] text-amber-100">{reel.hide_likes && reel.user_id !== user?.id ? "" : (reel.likes_count ?? 0)}</span>
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); if (reel.allow_comments === false) { toast.info("Comments are turned off for this reel"); return; } loadComments(reel.id); }} className={`depth-press flex flex-col items-center gap-1 ${reel.allow_comments === false ? "opacity-50" : ""}`} aria-label="Comments">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/70 md:h-11 md:w-11">
-                    <MessageCircle className="h-5 w-5 text-amber-100" />
-                  </div>
-                  <span className="text-[11px] text-amber-100">{commentCounts[reel.id] || 0}</span>
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); shareReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Share">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/70 md:h-11 md:w-11">
-                    <Share2 className="h-5 w-5 text-amber-100" />
-                  </div>
-                </button>
-                {(reel.allow_download !== false || reel.user_id === user?.id) && (
-                  <button onClick={(e) => { e.stopPropagation(); void downloadReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Download reel">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/70 md:h-11 md:w-11"><Download className="h-5 w-5 text-amber-100" /></div>
+                )}
+                {i === currentIndex && videoError && (
+                  <button
+                    type="button"
+                    onClick={event => {
+                      event.stopPropagation();
+                      const video = videoRefs.current.get(i);
+                      if (!video) return;
+                      setVideoError(false);
+                      setVideoBuffering(true);
+                      video.load();
+                      void video.play().catch(() => { setVideoBuffering(false); setVideoError(true); });
+                    }}
+                    className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 text-sm font-semibold text-white"
+                  >
+                    Tap to retry video
                   </button>
                 )}
-                {reel.user_id === user?.id && (
-                  <button onClick={(e) => { e.stopPropagation(); void deleteReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Delete reel">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11"><Trash2 className="h-5 w-5 text-red-300" /></div>
-                  </button>
-                )}
-                {reel.user_id !== user?.id && (
-                  <button onClick={(e) => { e.stopPropagation(); reportReel(reel); }} className="depth-press flex flex-col items-center gap-1" aria-label="Report reel">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_4px_18px_rgba(0,0,0,.35)] backdrop-blur-xl md:h-11 md:w-11"><Flag className="h-5 w-5 text-amber-100" /></div>
-                  </button>
-                )}
-                <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
-                <button onClick={(e) => { e.stopPropagation(); toggleMuted(); }} aria-label={muted ? "Unmute videos" : "Mute videos"} className="depth-press">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/70 md:h-11 md:w-11">
-                    {muted ? <VolumeX className="h-5 w-5 text-amber-100" /> : <Volume2 className="h-5 w-5 text-amber-100" />}
+                {i === currentIndex && videoPaused && !videoBuffering && !videoError && (
+                  <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-white">
+                    <button type="button" aria-label="Play video" onClick={event => { event.stopPropagation(); toggleReelPlayback(i); }} className="pointer-events-auto flex size-16 items-center justify-center rounded-full bg-black/50 backdrop-blur-md">
+                      <Play className="ml-1 size-7 fill-current" />
+                    </button>
+                    <button type="button" onClick={event => { event.stopPropagation(); toggleMuted(); }} aria-label={muted ? "Unmute videos" : "Mute videos"} className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm font-semibold backdrop-blur-md">
+                      {muted ? <><VolumeX className="size-5" />Unmute</> : <><Volume2 className="size-5" />Mute</>}
+                    </button>
                   </div>
-                </button>
+                )}
               </div>
+
+              {/* Creator + caption, bottom-left */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pr-20 pt-24">
+                <div className="pointer-events-auto flex items-center gap-2">
+                  <button
+                    onClick={event => { event.stopPropagation(); if (reel.profile?.user_id) navigate(`/profile/${reel.profile.user_id}`); }}
+                    aria-label={`Open ${reel.profile?.display_name || "user"}'s profile`}
+                    className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-black/50 text-sm font-bold text-white"
+                  >
+                    {reel.profile?.avatar_url ? <img src={reel.profile.avatar_url} alt="" className="h-full w-full object-cover" loading="lazy" /> : (reel.profile?.display_name || "U")[0]}
+                  </button>
+                  <div className="min-w-0">
+                    <button onClick={event => { event.stopPropagation(); if (reel.profile?.user_id) navigate(`/profile/${reel.profile.user_id}`); }} className="text-sm font-semibold text-white">
+                      {reel.profile?.display_name || "User"} <span className="text-amber-300">●</span>
+                    </button>
+                    {reel.caption && <p className="line-clamp-2 text-xs text-white/85">{reel.caption}</p>}
+                  </div>
+                </div>
+                {reel.music_title && <div className="pointer-events-auto mt-2 truncate text-xs text-white/80"><PostMusicPlayer music={{ title: reel.music_title, artist: reel.music_artist, art_url: reel.music_art_url, stream_url: reel.music_url, start: reel.music_start, len: reel.music_len, volume: (reel as { music_volume?: number }).music_volume }} /></div>}
+              </div>
+
+              {/* Action rail, right */}
+              <div className="absolute bottom-[max(6rem,calc(env(safe-area-inset-bottom)+4.5rem))] right-2.5 z-20 flex flex-col items-center gap-3.5">
+                {reel.user_id === user?.id && (
+                  <button onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=reels"); }} className="rounded-lg border border-white/20 bg-black/55 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-md">Insights</button>
+                )}
+                <button onClick={(e) => { e.stopPropagation(); toggleLike(reel.id); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="Like">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><Heart className={`h-6 w-6 ${liked.has(reel.id) ? "fill-rose-400 text-rose-400" : "text-white"}`} /></div>
+                  <span className="text-[11px] font-medium text-white">{reel.hide_likes && reel.user_id !== user?.id ? "" : (reel.likes_count ?? 0)}</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); if (reel.allow_comments === false) { toast.info("Comments are turned off for this reel"); return; } loadComments(reel.id); }} className={`depth-press flex flex-col items-center gap-0.5 ${reel.allow_comments === false ? "opacity-50" : ""}`} aria-label="Comments">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><MessageCircle className="h-6 w-6 text-white" /></div>
+                  <span className="text-[11px] font-medium text-white">{commentCounts[reel.id] || 0}</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); void toggleRepost(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label={reposted.has(reel.id) ? "Remove repost" : "Repost"}>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><Repeat2 className={`h-6 w-6 ${reposted.has(reel.id) ? "text-emerald-400" : "text-white"}`} /></div>
+                  <span className="text-[11px] font-medium text-white">{repostCounts[reel.id] || 0}</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); void toggleSave(reel.id); }} className="depth-press flex flex-col items-center gap-0.5" aria-label={saved.has(reel.id) ? "Unsave" : "Save"}>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><Bookmark className={`h-6 w-6 ${saved.has(reel.id) ? "fill-amber-300 text-amber-300" : "text-white"}`} /></div>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); shareReel(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="Share">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><Share2 className="h-6 w-6 text-white" /></div>
+                </button>
+                <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
+                <button onClick={(e) => { e.stopPropagation(); setMenuReel(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="More options">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><MoreVertical className="h-6 w-6 text-white" /></div>
+                </button>
               </div>
             </section>
           ))}
