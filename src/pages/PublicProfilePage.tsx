@@ -28,6 +28,7 @@ type Profile = {
   cover_url?: string | null;
   is_verified: boolean | null;
   is_official: boolean | null;
+  badge?: string | null;
 };
 
 type ProfilePost = {
@@ -217,8 +218,9 @@ const PublicProfilePage = () => {
           <button onClick={() => navigate(-1)} aria-label="Go back" className="depth-press">
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </button>
-          <h1 className="text-headline text-foreground">
+          <h1 className="flex items-center gap-1 text-headline text-foreground">
             {profile?.username ? `@${profile.username}` : "Profile"}
+            <VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={profile?.badge} />
           </h1>
           {userId && (
             <div className="ml-auto flex items-center gap-3">

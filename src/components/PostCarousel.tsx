@@ -13,7 +13,7 @@ const PostCarousel = ({ items, alt }: { items: CarouselItem[]; alt: string }) =>
         {items.map((m, n) => (
           <div key={n} className="flex w-full shrink-0 snap-center items-center justify-center bg-background/40">
             {m.type === "video"
-              ? <video src={m.url} poster={m.thumb || BLANK_POSTER} controls playsInline muted loop preload="metadata" className="h-auto max-h-[75vh] w-full object-contain" />
+              ? <video src={n === i ? m.url : undefined} poster={m.thumb || BLANK_POSTER} controls playsInline muted loop preload="none" className="h-auto max-h-[75vh] w-full object-contain" />
               : <img src={m.url} alt={`${alt} (${n + 1} of ${items.length})`} loading={n === 0 ? "eager" : "lazy"} decoding="async" className="h-auto max-h-[75vh] w-full object-contain" />}
           </div>
         ))}

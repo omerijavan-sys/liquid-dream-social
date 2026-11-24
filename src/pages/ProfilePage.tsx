@@ -25,6 +25,7 @@ interface Profile {
   cover_url?: string | null;
   is_verified?: boolean | null;
   is_official?: boolean | null;
+  badge?: string | null;
 }
 
 const ProfilePage = () => {
@@ -95,7 +96,7 @@ const ProfilePage = () => {
       const set = new Set((fl || []).map(r => r.following_id));
       setMyFollowing(set);
       setFollowingCount(set.size);
-      const { data: sug } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url").neq("user_id", user.id).limit(20);
+      const { data: sug } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, is_verified, is_official, badge").neq("user_id", user.id).limit(20);
       setSuggested((sug || []).filter(s => !set.has(s.user_id)));
 
       // Fetch user's actual posts
@@ -164,7 +165,7 @@ const ProfilePage = () => {
       <div className="sticky top-0 z-30 border-b border-amber-200/20 bg-[#08090d]/85 backdrop-blur-xl safe-area-top">
         <div className="relative z-10 flex items-center gap-3 px-3 py-2.5">
           <button onClick={() => navigate(-1)} aria-label="Back" className="depth-press text-amber-100"><ArrowLeft className="h-4 w-4" /></button>
-          <span className="flex flex-1 items-center gap-1 text-sm font-bold text-white">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={(profile as any)?.badge} /></span>
+          <span className="flex flex-1 items-center gap-1 text-sm font-bold text-white">{profile?.username || "Profile"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={profile?.badge} /></span>
           <button onClick={() => setAuraOpen(true)} aria-label="Aura dashboard" className={`depth-press text-amber-200 ${Object.keys(glow).length ? "aura-glow-icon" : ""}`}><Sparkles className="h-5 w-5" /></button>
           <button onClick={() => setPlanOpen(true)} aria-label="Fan subscription price" className="depth-press text-amber-200"><BadgeDollarSign className="h-5 w-5" /></button>
           <button onClick={() => setAnalyticsOpen(true)} aria-label="Analytics dashboard" className="depth-press text-amber-200"><BarChart3 className="h-5 w-5" /></button>
@@ -199,7 +200,7 @@ const ProfilePage = () => {
             <button onClick={() => setListMode("following")} className="depth-press"><p className="text-base font-bold text-white">{myFollowing.size}</p><p className="text-[10px] text-white/65">Following</p></button>
           </div>
         </div>
-        <p className="text-sm font-bold text-white">{profile?.display_name || "User"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={(profile as any)?.badge} /><StreakBadge userId={user?.id} /></p>
+        <p className="text-sm font-bold text-white">{profile?.display_name || "User"}<VerifiedBadge isVerified={profile?.is_verified} isOfficial={profile?.is_official} badge={profile?.badge} /><StreakBadge userId={user?.id} /></p>
         <p className="mt-1 text-xs text-white/60">{profile?.bio || "No bio yet"}</p>
         {user && <PublicVibe userId={user.id} />}
 
@@ -222,7 +223,7 @@ const ProfilePage = () => {
                 <button onClick={() => navigate(`/profile/${s.user_id}`)} aria-label={`Open ${s.username || "user"}'s profile`} className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-secondary font-bold">
                     {s.avatar_url ? <img src={s.avatar_url} alt="" className="w-full h-full object-cover" /> : (s.username || "U")[0].toUpperCase()}
                 </button>
-                <button onClick={() => navigate(`/profile/${s.user_id}`)} className="w-full truncate text-center text-[10px] text-white/85">{s.username || s.display_name}</button>
+                <button onClick={() => navigate(`/profile/${s.user_id}`)} className="flex w-full items-center justify-center gap-0.5 truncate text-center text-[10px] text-white/85">{s.username || s.display_name}<VerifiedBadge isVerified={s.is_verified} isOfficial={s.is_official} badge={s.badge} /></button>
                   <FollowButton targetId={s.user_id} following={myFollowing.has(s.user_id)} onChange={v => {
                     const n = new Set(myFollowing); v ? n.add(s.user_id) : n.delete(s.user_id); setMyFollowing(n);
                   }} />

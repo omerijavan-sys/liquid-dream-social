@@ -152,7 +152,7 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
                   {deleted ? "🚫 This message was deleted" : (<>
                     {parent && <div className="mb-1.5 overflow-hidden rounded-lg border-l-2 border-white/60 bg-black/25 px-2 py-1 text-[11px] text-white/75"><b>{nameOf(parent.sender_id)}</b><div className="truncate">{parent.deleted_at ? "Deleted message" : parent.content}</div></div>}
                     {m.media_type === "image" && m.media_url && <button type="button" onClick={() => openLink(m.media_url!)}><img src={m.media_url} alt="" className="mb-1 max-h-64 rounded-xl object-cover" /></button>}
-                    {m.media_type === "video" && m.media_url && <video src={m.media_url} controls playsInline className="mb-1 max-h-64 rounded-xl" />}
+                    {m.media_type === "video" && m.media_url && <video src={m.media_url} controls playsInline preload="none" className="mb-1 max-h-64 rounded-xl" />}
                     {!m.media_type && linkify(m.content)}
                     {m.edited_at && <span className="ml-2 text-[10px] text-white/50">edited</span>}
                   </>)}

@@ -20,6 +20,7 @@ import { themeById } from "@/utils/chatThemes";
 import { Users } from "lucide-react";
 import { X, Globe } from "lucide-react";
 import GroupChats from "@/components/GroupChats";
+import VideoThumb from "@/components/VideoThumb";
 import { UPLOAD_CACHE } from "@/utils/media";
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
@@ -618,7 +619,7 @@ const MessagesPage = () => {
                       </div>
                     )}
                     {m.media_type === "image" && m.media_url && <button type="button" onClick={() => openLink(m.media_url!)}><img src={m.media_url} alt="Photo" className="mb-1 max-h-64 rounded-xl object-cover" /></button>}
-                    {m.media_type === "video" && m.media_url && <video src={m.media_url} controls playsInline className="mb-1 max-h-64 rounded-xl" />}
+                    {m.media_type === "video" && m.media_url && <video src={m.media_url} controls playsInline preload="none" className="mb-1 max-h-64 rounded-xl" />}
                     {m.media_type === "ppv" && m.ppv_item_id && <div className="mb-1 w-56"><LockedMedia itemId={m.ppv_item_id} compact /></div>}
                     {m.media_type === "audio" && m.media_url && <audio src={m.media_url} controls className="h-10 max-w-full" />}
                     {(m.media_type === "post" || m.media_type === "reel") && (
@@ -627,7 +628,7 @@ const MessagesPage = () => {
                         className="mb-1 block w-56 overflow-hidden rounded-xl border border-white/10 bg-black/30 text-left"
                       >
                         {m.media_url && (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(m.media_url)
-                          ? <video src={m.media_url} className="h-36 w-full object-cover" muted playsInline />
+                          ? <VideoThumb src={m.media_url} className="h-36 w-full object-cover" showPlay />
                           : <img src={m.media_url} alt="" className="h-36 w-full object-cover" />)}
                         <span className="flex items-center gap-1 px-2 py-1.5 text-[11px] text-white/80"><PlayIcon className="h-3 w-3" />Open {m.media_type}</span>
                       </button>

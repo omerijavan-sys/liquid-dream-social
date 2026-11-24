@@ -341,7 +341,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
                   {msg.attachments?.map((a, k) => (
                     <div key={k} className="mt-2">
                       {a.kind === "image" ? <img src={a.url} alt={a.name} className="max-h-48 rounded-xl" />
-                        : a.kind === "video" ? <video src={a.url} controls className="max-h-48 rounded-xl" />
+                        : a.kind === "video" ? <video src={a.url} controls preload="none" className="max-h-48 rounded-xl" />
                         : a.kind === "audio" ? <audio src={a.url} controls className="max-w-full" />
                         : <a href={a.url} target="_blank" rel="noreferrer" className="underline text-xs">{a.name}</a>}
                     </div>
