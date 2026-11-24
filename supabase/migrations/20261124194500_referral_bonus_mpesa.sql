@@ -1,0 +1,3 @@
+-- Applied via MCP (referral_bonus_mpesa): referral_bonuses table, pay_referral_bonus trigger on transactions
+-- (20% of platform fee, 90 days after friend joins, KES 300/friend, KES 5000/inviter/30d, paid to wallet as 'Referral bonus'),
+-- my_referral_earnings() and admin_growth_funnel() with bonus_paid_7d.

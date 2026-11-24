@@ -1,12 +1,15 @@
-import { Copy, Gift, Lock, MessageCircle, Share2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, Gift, Lock, MessageCircle, Share2, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { glass, glow } from "../shared/ui";
+import { glass, glow, rpc } from "../shared/ui";
 import { shareWhatsApp } from "../shared/share";
 import { inviteLink, REWARD_AT, useReferral } from "./referral";
 
 /** Progress card for the profile: "Invite 2 more friends to unlock Obsidian Gold Theme" + the share link. */
 const InviteProgress = () => {
   const { code, count = 0, perks = [], loading } = useReferral();
+  const [earn, setEarn] = useState<{ total: number; last30: number; friends_earning: number } | null>(null);
+  useEffect(() => { void rpc<{ total: number; last30: number; friends_earning: number }>("my_referral_earnings").then(({ data }) => { if (data) setEarn(data); }); }, []);
   if (loading || !code) return null;
   const link = inviteLink(code);
   const left = Math.max(0, REWARD_AT - count);
@@ -35,6 +38,11 @@ const InviteProgress = () => {
           <span key={k} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${perks.includes(k) ? "bg-amber-300/20 text-amber-200" : "bg-white/5"}`}>{!perks.includes(k) && <Lock className="h-2.5 w-2.5" />}{label}</span>
         ))}
         <span className="ml-auto tabular-nums">{count} joined</span>
+      </div>
+      <div className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3">
+        <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-200"><Wallet className="h-3.5 w-3.5" />Earn M-Pesa from friends: KES {Number(earn?.total ?? 0).toLocaleString()}</p>
+        <p className="mt-1 text-[11px] text-white/70">Get 20% of Primegram's fee whenever a friend you invite pays or earns on Primegram, for their first 90 days. It lands in your wallet, ready to withdraw to M-Pesa. Up to KES 300 per friend.</p>
+        {earn && earn.last30 > 0 && <p className="mt-1 text-[11px] text-emerald-200">KES {Number(earn.last30).toLocaleString()} in the last 30 days from {earn.friends_earning} friend{earn.friends_earning === 1 ? "" : "s"}</p>}
       </div>
       <div className="mt-3 flex items-center gap-2">
         <code className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] text-white/80">{link.replace("https://", "")}</code>
