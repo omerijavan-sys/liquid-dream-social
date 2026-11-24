@@ -24,7 +24,7 @@ import { captureVideoThumb } from "@/utils/videoThumb";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { suggestCaptions } from "@/utils/aiCaption";
 import { readContentPrefs } from "@/components/SettingsExtras";
-import { UPLOAD_CACHE } from "@/utils/media";
+import { UPLOAD_CACHE, INLINE_VIDEO_ATTRS, validateVideoFile, checkUploadable } from "@/utils/media";
 
 const REEL_BATCH_SIZE = 20;
 
@@ -62,6 +62,10 @@ const ReelsPage = () => {
   const [videoBuffering, setVideoBuffering] = useState(false);
   const [videoPaused, setVideoPaused] = useState(true);
   const [videoError, setVideoError] = useState(false);
+  const lastIndex = useRef(0);
+  if (currentIndex >= 0) lastIndex.current = currentIndex;
+  const anchor = currentIndex >= 0 ? currentIndex : lastIndex.current;
+  const recover = useRef(false); // set when the active video stalled, so we resume it when data arrives
   const viewedReel = reels[currentIndex]?.id;
   useEffect(() => { if (!viewedReel) return; const t = window.setTimeout(() => countReelView(viewedReel), 1500); return () => window.clearTimeout(t); }, [viewedReel]);
 
@@ -164,11 +168,12 @@ const ReelsPage = () => {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type.startsWith("video/")) {
+    const problem = file ? validateVideoFile(file) : "Please select a video file";
+    if (file && !problem) {
       setVideoFile(file);
       setVideoPreview(URL.createObjectURL(file));
     } else {
-      toast.error("Please select a video file");
+      toast.error(problem ?? "Please select a video file");
     }
   };
 
@@ -179,6 +184,9 @@ const ReelsPage = () => {
     runInBackground("Uploading your reel", async (progress) => {
       if (snap.filter !== "none") { progress("Applying filter…"); snap.file = await bakeVideoFilter(snap.file, snap.filter, (p) => progress(`Applying filter… ${p}%`)); }
       progress("Optimizing video…"); snap.file = await compressVideo(snap.file, (p) => progress(`Optimizing video… ${p}%`));
+      const verdict = await checkUploadable(snap.file);
+      if (verdict.error) throw new Error(verdict.error);
+      if (verdict.warn) toast.info(verdict.warn);
       progress("Preparing cover…");
       const thumbnail_url = await uploadVideoCover(snap.uid, snap.file);
       progress("Uploading reel…");
@@ -351,7 +359,7 @@ const ReelsPage = () => {
 
       {menuReel && createPortal(
         <div className="fixed inset-0 z-[95] flex items-end bg-black/60" onClick={() => setMenuReel(null)}>
-          <div onClick={e => e.stopPropagation()} className="w-full rounded-t-3xl border-t border-white/10 bg-[#11131c]/95 p-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-white backdrop-blur-xl">
+          <div onClick={e => e.stopPropagation()} className="w-full rounded-t-3xl border-t border-white/10 bg-[#11131c] p-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-white">
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/20" />
             {([
               ...(menuReel.user_id !== user?.id ? [
@@ -371,7 +379,7 @@ const ReelsPage = () => {
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 safe-area-top">
         <div className="flex items-center justify-between px-5 py-4">
-          <button onClick={() => navigate("/")} className="depth-press w-9 h-9 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center">
+          <button onClick={() => navigate("/")} className="depth-press w-9 h-9 rounded-full bg-black/50 flex items-center justify-center">
             <ArrowLeft className="w-5 h-5 text-white" />
           </button>
           <span className="font-serif text-lg font-bold text-amber-100">Reels</span>
@@ -405,6 +413,7 @@ const ReelsPage = () => {
             >
               <div
                 className="absolute inset-0"
+                style={{ willChange: "transform", transform: "translateZ(0)" }}
                 onClick={() => {
                   const now = Date.now();
                   if (prefs.doubleTapLike && lastTap.current.id === reel.id && now - lastTap.current.t < 320) {
@@ -418,13 +427,13 @@ const ReelsPage = () => {
                   toggleReelPlayback(i);
                 }}
               >
-                {reel.video_url && (
+                {reel.video_url && Math.abs(i - anchor) <= 2 && (
                   <video
                     ref={el => { if (el) { videoRefs.current.set(i, el); el.volume = Math.max(0, Math.min(1, (reel as { video_volume?: number }).video_volume ?? 1)); } else videoRefs.current.delete(i); }}
                     src={currentIndex >= 0 && (i === currentIndex || i === currentIndex + 1) ? reel.video_url : undefined}
                     className="h-full w-full bg-black object-contain"
                     loop
-                    playsInline
+                    {...INLINE_VIDEO_ATTRS}
                     muted={muted}
                     poster={reel.thumbnail_url || BLANK_POSTER}
                     preload={i === currentIndex ? "auto" : i === currentIndex + 1 ? "metadata" : "none"}
@@ -436,19 +445,23 @@ const ReelsPage = () => {
                       event.stopPropagation();
                       toggleReelPlayback(i);
                     }}
-                    onWaiting={() => { if (i === currentIndex) setVideoBuffering(true); }}
-                    onCanPlay={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoError(false); } }}
+                    onWaiting={() => { if (i === currentIndex) { setVideoBuffering(true); recover.current = true; } }}
+                    onStalled={() => { if (i === currentIndex) { setVideoBuffering(true); recover.current = true; } }}
+                    onCanPlay={e => { if (i !== currentIndex) return; setVideoBuffering(false); setVideoError(false); if (recover.current) { recover.current = false; void e.currentTarget.play().catch(() => {}); } }}
                     onPlaying={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoPaused(false); setVideoError(false); } }}
                     onPause={() => { if (i === currentIndex) setVideoPaused(true); }}
                     onError={() => { if (i === currentIndex) { setVideoBuffering(false); setVideoError(true); } }}
                   />
+                )}
+                {Math.abs(i - anchor) > 2 && reel.video_url && (
+                  <img src={reel.thumbnail_url || BLANK_POSTER} alt="" loading="lazy" decoding="async" className="h-full w-full bg-black object-contain" />
                 )}
                 {heartBurst?.id === reel.id && (
                   <motion.div key={heartBurst.k} initial={{ scale: 0.3, opacity: 1 }} animate={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.8 }} className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <Heart className="h-24 w-24 fill-rose-500 text-rose-500 drop-shadow-[0_0_20px_rgba(244,63,94,.8)]" />
                   </motion.div>
                 )}
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+                <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(to top, rgba(6,9,20,0.88), transparent 45%), linear-gradient(to bottom, rgba(6,9,20,0.45), transparent 18%)" }} />
                 {i === currentIndex && videoBuffering && (
                   <div role="status" aria-label="Buffering video" className="absolute inset-0 z-10 flex items-center justify-center text-white">
                     <Loader2 className="size-8 animate-spin" />
@@ -473,10 +486,10 @@ const ReelsPage = () => {
                 )}
                 {i === currentIndex && videoPaused && !videoBuffering && !videoError && (
                   <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-white">
-                    <button type="button" aria-label="Play video" onClick={event => { event.stopPropagation(); toggleReelPlayback(i); }} className="pointer-events-auto flex size-16 items-center justify-center rounded-full bg-black/50 backdrop-blur-md">
+                    <button type="button" aria-label="Play video" onClick={event => { event.stopPropagation(); toggleReelPlayback(i); }} className="pointer-events-auto flex size-16 items-center justify-center rounded-full bg-black/60">
                       <Play className="ml-1 size-7 fill-current" />
                     </button>
-                    <button type="button" onClick={event => { event.stopPropagation(); toggleMuted(); }} aria-label={muted ? "Unmute videos" : "Mute videos"} className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm font-semibold backdrop-blur-md">
+                    <button type="button" onClick={event => { event.stopPropagation(); toggleMuted(); }} aria-label={muted ? "Unmute videos" : "Mute videos"} className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm font-semibold ">
                       {muted ? <><VolumeX className="size-5" />Unmute</> : <><Volume2 className="size-5" />Mute</>}
                     </button>
                   </div>
@@ -506,29 +519,29 @@ const ReelsPage = () => {
               {/* Action rail, right */}
               <div className="absolute bottom-[max(6rem,calc(env(safe-area-inset-bottom)+4.5rem))] right-2.5 z-20 flex flex-col items-center gap-3.5">
                 {reel.user_id === user?.id && (
-                  <button onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=reels"); }} className="rounded-lg border border-white/20 bg-black/55 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-md">Insights</button>
+                  <button onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=reels"); }} className="rounded-lg border border-white/20 bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">Insights</button>
                 )}
                 <button onClick={(e) => { e.stopPropagation(); toggleLike(reel.id); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="Like">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><Heart className={`h-6 w-6 ${liked.has(reel.id) ? "fill-rose-400 text-rose-400" : "text-white"}`} /></div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><Heart className={`h-6 w-6 ${liked.has(reel.id) ? "fill-rose-400 text-rose-400" : "text-white"}`} /></div>
                   <span className="text-[11px] font-medium text-white">{reel.hide_likes && reel.user_id !== user?.id ? "" : (reel.likes_count ?? 0)}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); if (reel.allow_comments === false) { toast.info("Comments are turned off for this reel"); return; } loadComments(reel.id); }} className={`depth-press flex flex-col items-center gap-0.5 ${reel.allow_comments === false ? "opacity-50" : ""}`} aria-label="Comments">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><MessageCircle className="h-6 w-6 text-white" /></div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><MessageCircle className="h-6 w-6 text-white" /></div>
                   <span className="text-[11px] font-medium text-white">{commentCounts[reel.id] || 0}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); void toggleRepost(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label={reposted.has(reel.id) ? "Remove repost" : "Repost"}>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><Repeat2 className={`h-6 w-6 ${reposted.has(reel.id) ? "text-emerald-400" : "text-white"}`} /></div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><Repeat2 className={`h-6 w-6 ${reposted.has(reel.id) ? "text-emerald-400" : "text-white"}`} /></div>
                   <span className="text-[11px] font-medium text-white">{repostCounts[reel.id] || 0}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); void toggleSave(reel.id); }} className="depth-press flex flex-col items-center gap-0.5" aria-label={saved.has(reel.id) ? "Unsave" : "Save"}>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><Bookmark className={`h-6 w-6 ${saved.has(reel.id) ? "fill-amber-300 text-amber-300" : "text-white"}`} /></div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><Bookmark className={`h-6 w-6 ${saved.has(reel.id) ? "fill-amber-300 text-amber-300" : "text-white"}`} /></div>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); shareReel(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="Share">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><Share2 className="h-6 w-6 text-white" /></div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><Share2 className="h-6 w-6 text-white" /></div>
                 </button>
                 <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
                 <button onClick={(e) => { e.stopPropagation(); setMenuReel(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="More options">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><MoreVertical className="h-6 w-6 text-white" /></div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><MoreVertical className="h-6 w-6 text-white" /></div>
                 </button>
               </div>
             </section>

@@ -25,6 +25,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { MuteProvider } from "@/contexts/MuteContext";
+import { installSingleVideoGuard } from "@/utils/videoManager";
+
+installSingleVideoGuard();
 import { OnlineProvider } from "@/contexts/OnlineContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";

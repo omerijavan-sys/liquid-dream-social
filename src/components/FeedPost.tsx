@@ -1,3 +1,4 @@
+import { INLINE_VIDEO_ATTRS } from "@/utils/media";
 import PostCarousel, { type CarouselItem } from "@/components/PostCarousel";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -193,6 +194,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
   // Autoplay when visible.
   // Only keep the <video> loaded while the post is near the screen — dozens of decoders at once is what made scrolling lag.
   const wrapRef = useRef<HTMLDivElement>(null);
+  const recoverRef = useRef(false);
   const [near, setNear] = useState(false);
   useEffect(() => {
     if (!isVideo || !wrapRef.current) return;
@@ -204,11 +206,11 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
     if (!isVideo || !autoPlay || !wrapRef.current) return;
     const obs = new IntersectionObserver(([entry]) => {
       const el = videoRef.current;
-      const active = entry.isIntersecting && entry.intersectionRatio >= 0.5;
+      const active = entry.isIntersecting && entry.intersectionRatio >= 0.65;
       setIsVisible(active);
       if (active) { setVideoLoading(true); el?.play().catch(() => setVideoLoading(false)); }
-      else { setVideoLoading(false); el?.pause(); }
-    }, { threshold: 0.5 });
+      else { setVideoLoading(false); if (el) { el.pause(); el.preload = "none"; } }
+    }, { threshold: [0, 0.65, 1] });
     obs.observe(wrapRef.current);
     return () => obs.disconnect();
   }, [isVideo, autoPlay, near]);
@@ -304,14 +306,15 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
                 src={image}
                 poster={coverImg || BLANK_POSTER}
                 className="w-full h-auto max-h-[75vh] object-contain bg-background"
-                playsInline
+                {...INLINE_VIDEO_ATTRS}
                 muted={muted}
                 loop
-                preload={isVisible ? "auto" : "none"}
-                onStalled={() => { if (isVisible) setVideoLoading(true); }}
-                onCanPlay={() => { setVideoLoading(false); setVideoError(false); }}
+                preload={isVisible ? "auto" : "metadata"}
+                style={{ willChange: "transform", transform: "translateZ(0)" }}
+                onStalled={() => { if (isVisible) { setVideoLoading(true); recoverRef.current = true; } }}
+                onCanPlay={e => { setVideoLoading(false); setVideoError(false); if (recoverRef.current) { recoverRef.current = false; void e.currentTarget.play().catch(() => {}); } }}
                 onLoadedData={() => setVideoLoading(false)}
-                onWaiting={() => { if (isVisible) setVideoLoading(true); }}
+                onWaiting={() => { if (isVisible) { setVideoLoading(true); recoverRef.current = true; } }}
                 onPlaying={() => { setVideoLoading(false); setVideoError(false); }}
                 onTimeUpdate={() => { if (videoLoading) setVideoLoading(false); }}
                 onError={() => { setVideoLoading(false); setVideoError(true); }}
@@ -341,14 +344,14 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); toggleMuted(); }}
-                className="absolute top-2 right-2 w-9 h-9 rounded-full liquid-glass flex items-center justify-center depth-press"
+                className="absolute top-2 right-2 w-9 h-9 rounded-full bg-black/55 flex items-center justify-center depth-press"
                 aria-label={muted ? "Unmute videos" : "Mute videos"}
               >
                 {muted ? <VolumeX className="w-4 h-4 text-foreground" /> : <Volume2 className="w-4 h-4 text-foreground" />}
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); setFullPost(true); }}
-                className="absolute bottom-2 left-2 w-8 h-8 rounded-full liquid-glass flex items-center justify-center depth-press"
+                className="absolute bottom-2 left-2 w-8 h-8 rounded-full bg-black/55 flex items-center justify-center depth-press"
                 aria-label="Full screen"
               >
                 <Maximize2 className="w-4 h-4 text-foreground" />
@@ -380,7 +383,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
               }}
               aria-label="Boost this post"
               title="Boost this post"
-              className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-background/80 text-primary shadow-lg backdrop-blur-md"
+              className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-background/90 text-primary shadow-lg"
             >
               <Rocket className="h-4 w-4" />
             </button>

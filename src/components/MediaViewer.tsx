@@ -1,3 +1,4 @@
+import { INLINE_VIDEO_ATTRS } from "@/utils/media";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useEffect, useRef, useState } from "react";
 import { Heart, MessageCircle, Send, X, Volume2, VolumeX, Eye, Play } from "lucide-react";
@@ -74,16 +75,16 @@ const MediaViewer = ({ post, onClose }: { post: ViewerPost | null; onClose: () =
           {post && (
             <>
               <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-                <span className="rounded-full bg-black/40 px-3 py-1 text-sm font-semibold backdrop-blur">{post.author ?? ""}</span>
+                <span className="rounded-full bg-black/40 px-3 py-1 text-sm font-semibold">{post.author ?? ""}</span>
                 <div className="flex gap-2">
-                  {isVideo && <button onClick={toggleMuted} aria-label={muted ? "Unmute" : "Mute"} className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 backdrop-blur">{muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>}
-                  <button onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 backdrop-blur"><X className="h-5 w-5" /></button>
+                  {isVideo && <button onClick={toggleMuted} aria-label={muted ? "Unmute" : "Mute"} className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50">{muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>}
+                  <button onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50"><X className="h-5 w-5" /></button>
                 </div>
               </div>
 
               <div className="relative flex min-h-0 flex-1 items-center justify-center" onClick={isVideo ? tapVideo : undefined}>
                 {isVideo
-                  ? <video ref={videoRef} poster={BLANK_POSTER} src={post.media_url ?? undefined} autoPlay loop playsInline muted={muted} className="h-full w-full object-contain" />
+                  ? <video ref={videoRef} poster={BLANK_POSTER} src={post.media_url ?? undefined} autoPlay loop {...INLINE_VIDEO_ATTRS} muted={muted} className="h-full w-full object-contain" />
                   : post.media_url ? <img src={post.media_url} alt="" className="max-h-full max-w-full object-contain" /> : <p className="p-8 text-center text-lg">{post.caption}</p>}
               </div>
 

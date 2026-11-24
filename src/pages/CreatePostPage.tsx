@@ -30,7 +30,7 @@ import { readContentPrefs } from "@/components/SettingsExtras";
 import { runInBackground } from "@/utils/backgroundUpload";
 import { uploadVideoCover } from "@/utils/videoThumb";
 import { toast } from "sonner";
-import { CAMERA_CONSTRAINTS, VIDEO_BITRATE, pickVideoMime, videoExt, UPLOAD_CACHE } from "@/utils/media";
+import { CAMERA_CONSTRAINTS, VIDEO_BITRATE, pickVideoMime, videoExt, UPLOAD_CACHE, validateVideoFile, checkUploadable } from "@/utils/media";
 import MediaEditor from "@/components/MediaEditor";
 import FilterStrip from "@/components/FilterStrip";
 import { creatorShare, kes as fmtKes, priceError, uploadLocked } from "@/features/ppv/ppv";
@@ -282,6 +282,7 @@ const CreatePostPage = () => {
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (f.type.startsWith("video")) { const problem = validateVideoFile(f); if (problem) { toast.error(problem); e.target.value = ""; return; } }
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setMediaType(f.type.startsWith("video") ? "video" : "image");
@@ -500,6 +501,9 @@ const CreatePostPage = () => {
         const ext = finalFile.name.split(".").pop();
         const path = `${snap.uid}/${Date.now()}.${ext}`;
         if (snap.mediaType === "video") {
+          const verdict = await checkUploadable(finalFile);
+          if (verdict.error) throw new Error(verdict.error);
+          if (verdict.warn) toast.info(verdict.warn);
           progress("Preparing cover…");
           thumbnailUrl = await uploadVideoCover(snap.uid, finalFile);
           progress("Uploading video…");

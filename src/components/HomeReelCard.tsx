@@ -1,3 +1,4 @@
+import { INLINE_VIDEO_ATTRS } from "@/utils/media";
 import { useEffect, useRef, useState } from "react";
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -18,6 +19,8 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [near, setNear] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const recover = useRef(false);
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState<number>(reel.likes_count ?? 0);
   const [shareOpen, setShareOpen] = useState(false);
@@ -28,16 +31,16 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
     let viewTimer = 0;
     const preloadObserver = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: "400px 0px" });
     const playbackObserver = new IntersectionObserver(([entry]) => {
-      const active = entry.isIntersecting && entry.intersectionRatio >= 0.6;
+      const active = entry.isIntersecting && entry.intersectionRatio >= 0.65;
       setVisible(active);
       if (active) {
         window.clearTimeout(viewTimer);
         viewTimer = window.setTimeout(() => countReelView(reel.id), 1500);
       } else {
         window.clearTimeout(viewTimer);
-        videoRef.current?.pause();
+        const v = videoRef.current; if (v) { v.pause(); v.preload = "none"; }
       }
-    }, { threshold: 0.6 });
+    }, { threshold: [0, 0.65, 1] });
     preloadObserver.observe(el);
     playbackObserver.observe(el);
     return () => { window.clearTimeout(viewTimer); preloadObserver.disconnect(); playbackObserver.disconnect(); };
@@ -80,9 +83,10 @@ const HomeReelCard = ({ reel, timeAgo }: { reel: any; timeAgo: string }) => {
         {!near && reel.thumbnail_url && <img src={reel.thumbnail_url} alt="" loading="lazy" decoding="async" className="h-auto max-h-[75vh] min-h-[30vh] w-full object-contain bg-background" />}
         {!near && !reel.thumbnail_url && <div aria-hidden="true" className="flex min-h-[30vh] w-full items-center justify-center bg-gradient-to-br from-muted via-background to-muted"><Play className="size-10 fill-current text-muted-foreground" /></div>}
         {near && (
-          <video ref={videoRef} src={reel.video_url} poster={reel.thumbnail_url || BLANK_POSTER} className="h-auto max-h-[75vh] w-full bg-background object-contain" muted={muted} loop playsInline preload={visible ? "auto" : "none"} />
+          <video ref={videoRef} src={reel.video_url} poster={reel.thumbnail_url || BLANK_POSTER} className="h-auto max-h-[75vh] w-full bg-background object-contain" muted={muted} loop {...INLINE_VIDEO_ATTRS} preload={visible ? "auto" : "metadata"} style={{ willChange: "transform", transform: "translateZ(0)" }} onWaiting={() => { recover.current = true; setBuffering(true); }} onStalled={() => { recover.current = true; setBuffering(true); }} onPlaying={() => setBuffering(false)} onCanPlay={e => { setBuffering(false); if (recover.current) { recover.current = false; void e.currentTarget.play().catch(() => {}); } }} />
         )}
-        <button aria-label={muted ? "Unmute" : "Mute"} onClick={event => { event.stopPropagation(); toggleMuted(); }} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 backdrop-blur">{muted ? <VolumeX className="h-4 w-4 text-white" /> : <Volume2 className="h-4 w-4 text-white" />}</button>
+        {buffering && visible && <div role="status" aria-label="Buffering video" className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 overflow-hidden"><div className="h-full w-1/3 animate-[loadbar_1s_ease-in-out_infinite] bg-primary" /></div>}
+        <button aria-label={muted ? "Unmute" : "Mute"} onClick={event => { event.stopPropagation(); toggleMuted(); }} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 ">{muted ? <VolumeX className="h-4 w-4 text-white" /> : <Volume2 className="h-4 w-4 text-white" />}</button>
       </div>
       <div className="relative z-10 flex items-center gap-4 p-4">
         <button onClick={() => void toggleLike()} aria-label="Like" className="flex items-center gap-1.5 text-sm text-foreground"><Heart className={`h-5 w-5 ${liked ? "fill-rose-500 text-rose-500" : ""}`} />{reel.hide_likes && reel.user_id !== user?.id ? "" : likes}</button>
