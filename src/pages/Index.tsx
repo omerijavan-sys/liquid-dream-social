@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import TopNavBar from "@/components/TopNavBar";
 import GlassTabBar from "@/components/GlassTabBar";
 import DailyDrops from "@/features/drops/DailyDrops";
+import { FeedSkeleton } from "@/components/PostSkeleton";
 import WrappedBanner from "@/features/vibe/WrappedBanner";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
@@ -160,7 +161,7 @@ const Index = () => {
         </div>
         <div className="px-4">
           {posts.length === 0 && loading ? (
-            <div className="flex items-center justify-center py-16 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
+            <FeedSkeleton />
           ) : posts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-16 h-16 rounded-3xl liquid-glass flex items-center justify-center mb-4">
