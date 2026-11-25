@@ -4,6 +4,7 @@ import StreakBadge from "@/features/drops/StreakBadge";
 import { useState, useEffect, useRef } from "react";
 import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
+import ProfileReelsViewer from "@/components/ProfileReelsViewer";
 import { motion } from "framer-motion";
 import { ArrowLeft, Settings, Sparkles, BarChart3, BadgeDollarSign, Grid3X3, Bookmark, Heart, Camera, Film, X, Eye } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -52,6 +53,7 @@ const ProfilePage = () => {
   const [planOpen, setPlanOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
+  const [selectedReelId, setSelectedReelId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || tab === "posts") return;
@@ -289,7 +291,7 @@ const ProfilePage = () => {
       ) : (
         <div className="prime-profile-grid grid grid-cols-3 gap-0.5 p-0.5">
           {shown.map((post, i) => (
-            <motion.button type="button" key={post.id} onClick={() => (tab === "reels" ? navigate(`/reels?r=${post.id}`) : setSelectedMedia(post))} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
+            <motion.button type="button" key={post.id} onClick={() => (tab === "reels" ? setSelectedReelId(post.id) : setSelectedMedia(post))} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
               {post.media_type === "video" ? (
                 <VideoThumb src={post.media_url} poster={post.thumbnail_url} />
               ) : (
@@ -310,6 +312,13 @@ const ProfilePage = () => {
           {profile?.avatar_url ? <img src={profile.avatar_url} alt="Profile picture" className="max-h-full max-w-full object-contain" /> : <p className="text-white">No profile picture</p>}
         </DialogContent>
       </Dialog>
+      <ProfileReelsViewer
+        open={selectedReelId !== null}
+        reels={tabPosts.filter((item) => item.media_type === "video" && item.video_url)}
+        initialReelId={selectedReelId}
+        username={profile?.username}
+        onClose={() => setSelectedReelId(null)}
+      />
       <MediaViewer onClose={() => setSelectedMedia(null)} post={selectedMedia ? {
         id: selectedMedia.id, media_url: selectedMedia.media_url ?? selectedMedia.video_url ?? null, media_type: selectedMedia.media_type ?? (selectedMedia.video_url ? "video" : "image"),
         caption: selectedMedia.caption, author: profile?.display_name || profile?.username, likes_count: selectedMedia.likes_count ?? 0, views_count: selectedMedia.views_count ?? 0,
