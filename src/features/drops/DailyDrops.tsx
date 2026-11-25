@@ -14,6 +14,8 @@ const Avatar = ({ p, size = 56, blur = false }: { p?: Person; size?: number; blu
   </div>
 );
 
+const nextGoal = (n: number) => [3, 7, 30].find((g) => n < g) ?? null;
+
 /** Feed module: today's prompt, my streak, and friends' drops (blurred until I post mine). */
 const DailyDrops = () => {
   const { drops, people, mine, streak, loading, afterPost } = useDrops();
@@ -30,7 +32,8 @@ const DailyDrops = () => {
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: accent }}>Daily Drop</p>
           <p className="truncate text-sm font-semibold">{promptOfTheDay()}</p>
-          {streak && streak.current > 0 && <p className="mt-0.5 text-[11px] text-foreground/60">{streak.current}-day streak{streak.atRisk && !mine ? " · post today to keep it 🔥" : ""}</p>}
+          {streak && streak.current > 0 && <p className="mt-0.5 text-[11px] text-foreground/60">{streak.current}-day streak{streak.atRisk && !mine ? " · post today to keep it 🔥" : ""}{nextGoal(streak.current) ? ` · ${nextGoal(streak.current)! - streak.current} to ${nextGoal(streak.current)}-day badge` : " · max badge 🏆"}</p>}
+          {streak && streak.current > 0 && nextGoal(streak.current) && <div className="mt-1.5 h-1 w-40 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full" style={{ width: `${Math.min(100, (streak.current / nextGoal(streak.current)!) * 100)}%`, background: accent }} /></div>}
         </div>
         <button onClick={() => setComposer(true)} disabled={!!mine} className="flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-3.5 py-2 text-xs font-bold text-white disabled:opacity-50" style={!mine ? { boxShadow: glow("#a78bfa", 0.6, 18) } : undefined}>
           {mine ? "Dropped ✓" : <><Plus className="h-3.5 w-3.5" />Drop</>}

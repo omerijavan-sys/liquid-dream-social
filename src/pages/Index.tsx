@@ -5,6 +5,7 @@ import GlassTabBar from "@/components/GlassTabBar";
 import DailyDrops from "@/features/drops/DailyDrops";
 import { FeedSkeleton } from "@/components/PostSkeleton";
 import WrappedBanner from "@/features/vibe/WrappedBanner";
+import TrendingStrip from "@/components/TrendingStrip";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
 import UploadStrip from "@/components/UploadStrip";
@@ -134,6 +135,7 @@ const Index = () => {
         </div>
         <DailyDrops />
         <WrappedBanner />
+        <TrendingStrip />
         <div className="mb-5 px-4">
           <div className="liquid-glass-elevated rounded-[2rem] p-4">
             <div className="relative z-10 mb-3 flex items-center justify-between">
