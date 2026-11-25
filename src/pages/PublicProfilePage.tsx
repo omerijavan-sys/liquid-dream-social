@@ -3,9 +3,9 @@ import { invalidateBlocked } from "@/utils/blocks";
 import StreakBadge from "@/features/drops/StreakBadge";
 import { useEffect, useState } from "react";
 import VideoThumb from "@/components/VideoThumb";
-import MediaViewer from "@/components/MediaViewer";
 import ProfileAvatarPreview from "@/components/ProfileAvatarPreview";
 import ProfileReelsViewer from "@/components/ProfileReelsViewer";
+import ProfilePostsViewer from "@/components/ProfilePostsViewer";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Film, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2, X } from "lucide-react";
@@ -78,7 +78,6 @@ const PublicProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
   const [selectedReelId, setSelectedReelId] = useState<string | null>(null);
-  const [selectedViews, setSelectedViews] = useState(0);
   const [creatorPrice, setCreatorPrice] = useState<number | null>(null);
   const [subscribedUntil, setSubscribedUntil] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState(false);
@@ -192,28 +191,6 @@ const PublicProfilePage = () => {
     void load();
     return () => { cancelled = true; };
   }, [user, userId]);
-
-  useEffect(() => {
-    if (!selectedPost) return;
-    setSelectedViews(selectedPost.views_count);
-    let cancelled = false;
-    supabase.rpc("register_post_view", { _post_id: selectedPost.id }).then(({ data, error }) => {
-      if (cancelled) return;
-      if (error) {
-        toast.error("Couldn't record this view");
-        return;
-      }
-      setSelectedViews(data);
-      setPosts((current) =>
-        current.map((post) => post.id === selectedPost.id ? { ...post, views_count: data } : post),
-      );
-    });
-    return () => { cancelled = true; };
-  }, [selectedPost]);
-
-  const closePost = (open: boolean) => {
-    if (!open) setSelectedPost(null);
-  };
 
   return (
     <div className="min-h-screen bg-background pb-28">
@@ -396,11 +373,23 @@ const PublicProfilePage = () => {
         username={profile?.username}
         onClose={() => setSelectedReelId(null)}
       />
-      <MediaViewer onClose={() => setSelectedPost(null)} post={selectedPost ? {
-        id: selectedPost.id, media_url: selectedPost.media_url, media_type: selectedPost.media_type, caption: selectedPost.caption,
-        author: profile?.display_name || profile?.username, likes_count: selectedPost.likes_count, views_count: selectedViews,
-        music: selectedPost.music_title ? { title: selectedPost.music_title, artist: selectedPost.music_artist, art_url: selectedPost.music_art_url, stream_url: selectedPost.music_url, youtube_id: selectedPost.music_youtube_id, start: (selectedPost as any).music_start, len: (selectedPost as any).music_len } : null,
-      } : null} />
+      <ProfilePostsViewer
+        open={selectedPost !== null}
+        posts={posts.map((post) => ({
+          id: post.id,
+          media_url: post.media_url,
+          media_type: post.media_type,
+          caption: post.caption,
+          author: profile?.display_name || profile?.username,
+          likes_count: post.likes_count,
+          views_count: post.views_count,
+          thumbnail_url: (post as any).thumbnail_url,
+          music: post.music_title ? { title: post.music_title, artist: post.music_artist, art_url: post.music_art_url, stream_url: post.music_url, youtube_id: post.music_youtube_id, start: (post as any).music_start, len: (post as any).music_len } : null,
+        }))}
+        initialPostId={selectedPost?.id ?? null}
+        username={profile?.username}
+        onClose={() => setSelectedPost(null)}
+      />
       <GlassTabBar />
       {creatorPrice !== null && userId && (
         <TipAndSubscribeModal open={subModalOpen} onOpenChange={setSubModalOpen} mode="subscription" creatorId={userId} creatorName={profile?.display_name || profile?.username || "creator"} price={creatorPrice}
