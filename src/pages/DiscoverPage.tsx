@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Search, UserPlus, UserCheck, Users } from "lucide-react";
+import { ArrowLeft, Search, Trophy, UserPlus, UserCheck, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -89,6 +89,7 @@ const DiscoverPage = () => {
           </button>
           <Users className="w-5 h-5 text-primary" />
           <span className="text-headline text-foreground text-base">Discover People</span>
+          <button onClick={() => navigate("/top")} className="ml-auto flex items-center gap-1 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300"><Trophy className="h-3.5 w-3.5" /> Top creators</button>
         </div>
 
         <div className="px-5 pb-4 relative z-10">

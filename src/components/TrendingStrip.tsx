@@ -43,7 +43,7 @@ const TrendingStrip = () => {
       <div className="mx-4 mb-2 flex items-center gap-1.5">
         <Flame className="h-4 w-4 text-orange-400" />
         <h2 className="text-sm font-bold">Trending in Kenya</h2>
-        <button onClick={() => navigate("/reels")} className="ml-auto text-xs font-semibold text-primary">See all</button>
+        <button onClick={() => navigate("/top")} className="ml-auto text-xs font-semibold text-amber-300">Top creators</button><button onClick={() => navigate("/reels")} className="ml-3 text-xs font-semibold text-primary">See all</button>
       </div>
       <div className="flex gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-none">
         {items.map((r) => (

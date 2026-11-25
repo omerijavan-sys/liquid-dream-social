@@ -51,6 +51,7 @@ const CreatePostPage = lazy(() => import("./pages/CreatePostPage"));
 const SportsPage = lazy(() => import("./pages/SportsPage"));
 const MoviesPage = lazy(() => import("./pages/MoviesPage"));
 const DiscoverPage = lazy(() => import("./pages/DiscoverPage"));
+const TopCreatorsPage = lazy(() => import("./pages/TopCreatorsPage"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const ExtremePage = lazy(() => import("./pages/ExtremePage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
@@ -148,6 +149,7 @@ const App = () => (
             <Route path="/sports" element={<ProtectedRoute><SportsPage /></ProtectedRoute>} />
             <Route path="/movies" element={<ProtectedRoute><MoviesPage /></ProtectedRoute>} />
             <Route path="/discover" element={<ProtectedRoute><DiscoverPage /></ProtectedRoute>} />
+            <Route path="/top" element={<ProtectedRoute><TopCreatorsPage /></ProtectedRoute>} />
             <Route path="/extreme" element={<ProtectedRoute><ExtremePage /></ProtectedRoute>} />
             <Route path="/crush" element={<ProtectedRoute><CrushPage /></ProtectedRoute>} />
             <Route path="/meet" element={<ProtectedRoute><MeetPage /></ProtectedRoute>} />
