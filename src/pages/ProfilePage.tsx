@@ -4,9 +4,10 @@ import StreakBadge from "@/features/drops/StreakBadge";
 import { useState, useEffect, useRef } from "react";
 import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
+import ProfileAvatarPreview from "@/components/ProfileAvatarPreview";
 import ProfileReelsViewer from "@/components/ProfileReelsViewer";
 import { motion } from "framer-motion";
-import { ArrowLeft, Settings, Sparkles, BarChart3, BadgeDollarSign, Grid3X3, Bookmark, Heart, Camera, Film, X, Eye } from "lucide-react";
+import { ArrowLeft, Settings, Sparkles, BarChart3, BadgeDollarSign, Grid3X3, Bookmark, Heart, Camera, Film, Eye } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +16,6 @@ import GlassTabBar from "@/components/GlassTabBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import ProfileCover from "@/components/ProfileCover";
 import FollowListDialog, { FollowButton } from "@/components/FollowListDialog";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AuraDialog, AnalyticsDialog, CreatorPlanDialog, auraGlowStyle, useAuraRank } from "@/components/ProfileDashboards";
 
 interface Profile {
@@ -303,15 +303,7 @@ const ProfilePage = () => {
           ))}
         </div>
       )}
-      <Dialog open={avatarOpen} onOpenChange={setAvatarOpen}>
-        <DialogContent className="flex h-dvh w-screen max-w-none items-center justify-center rounded-none border-0 bg-black p-0 [&>button]:hidden">
-          <DialogTitle className="sr-only">Profile picture</DialogTitle>
-          <button onClick={() => setAvatarOpen(false)} aria-label="Close profile picture" className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white">
-            <X className="h-5 w-5" />
-          </button>
-          {profile?.avatar_url ? <img src={profile.avatar_url} alt="Profile picture" className="max-h-full max-w-full object-contain" /> : <p className="text-white">No profile picture</p>}
-        </DialogContent>
-      </Dialog>
+      <ProfileAvatarPreview open={avatarOpen} onOpenChange={setAvatarOpen} src={profile?.avatar_url} name={profile?.display_name || profile?.username} glowStyle={glow} />
       <ProfileReelsViewer
         open={selectedReelId !== null}
         reels={tabPosts.filter((item) => item.media_type === "video" && item.video_url)}

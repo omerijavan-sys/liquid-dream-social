@@ -15,7 +15,7 @@ import FeedPost from "@/components/FeedPost";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { timeAgo } from "@/utils/timeAgo";
-import { Compass, Film, Heart, Loader2, MessageCircle, Play, Plus, WalletCards } from "lucide-react";
+import { Film, Heart, Loader2, MessageCircle, Play, Plus, RefreshCw, WalletCards } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -31,11 +31,16 @@ const Index = () => {
   useCoverBackfill(currentUserId);
   const pageRef = useRef(0);
   const loadingRef = useRef(false);
+  const pendingRefreshRef = useRef(false);
   const hasMoreRef = useRef(true);
   const endRef = useRef<HTMLDivElement>(null);
 
   const fetchPosts = useCallback(async (reset = false) => {
-    if (loadingRef.current || (!reset && !hasMoreRef.current)) return;
+    if (loadingRef.current) {
+      if (reset) pendingRefreshRef.current = true;
+      return;
+    }
+    if (!reset && !hasMoreRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     if (reset) {
@@ -64,8 +69,14 @@ const Index = () => {
 
       if (error) throw error;
       if (followsError) throw followsError;
+      const followedIds = [...new Set((follows ?? []).map(follow => follow.following_id))];
+      const followedPostResult = page === 0 && followedIds.length
+        ? await supabase.from("posts").select("*").in("user_id", followedIds).neq("media_type", "story").eq("is_adult", false).order("created_at", { ascending: false }).limit(FEED_PAGE_SIZE)
+        : { data: [] as typeof data, error: null };
+      if (followedPostResult.error) throw followedPostResult.error;
       const blockedIds = await getBlockedIds();
-      const postRows = (data ?? []).filter(p => !blockedIds.has(p.user_id));
+      const uniquePostRows = [...new Map([...(data ?? []), ...(followedPostResult.data ?? [])].map(post => [post.id, post])).values()];
+      const postRows = uniquePostRows.filter(post => !blockedIds.has(post.user_id));
       const rows = [
         ...postRows,
         ...((reelRows ?? []) as any[]).map(r => ({ ...r, _reel: true, media_url: r.video_url, media_type: "video" })),
@@ -76,9 +87,8 @@ const Index = () => {
       if (rows.length) {
         const followed = new Set((follows || []).map(f => f.following_id));
         const sorted = [...rows].sort((a, b) => {
-          const af = followed.has(a.user_id) ? 0 : 1;
-          const bf = followed.has(b.user_id) ? 0 : 1;
-          return af - bf;
+          const followedDifference = Number(!followed.has(a.user_id)) - Number(!followed.has(b.user_id));
+          return followedDifference || Date.parse(b.created_at) - Date.parse(a.created_at);
         });
         const userIds = [...new Set(sorted.map(p => p.user_id))];
         const { data: profiles } = await supabase
@@ -102,6 +112,10 @@ const Index = () => {
     } finally {
       loadingRef.current = false;
       setLoading(false);
+      if (pendingRefreshRef.current) {
+        pendingRefreshRef.current = false;
+        void fetchPosts(true);
+      }
     }
   }, [currentUserId]);
 
@@ -116,7 +130,25 @@ const Index = () => {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "reels" }, refresh)
       .subscribe();
     window.addEventListener("prime:posted", refresh);
-    return () => { clearTimeout(timer); window.removeEventListener("prime:posted", refresh); void supabase.removeChannel(channel); };
+    let lastReturnRefreshAt = Date.now();
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastReturnRefreshAt < 1200) return;
+      lastReturnRefreshAt = now;
+      void fetchPosts(true);
+    };
+    window.addEventListener("pageshow", refreshOnReturn);
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("prime:posted", refresh);
+      window.removeEventListener("pageshow", refreshOnReturn);
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+      void supabase.removeChannel(channel);
+    };
   }, [fetchPosts]);
 
   useEffect(() => {
@@ -147,7 +179,9 @@ const Index = () => {
                 <p className="text-[10px] uppercase tracking-[0.2em] text-primary/70">Primegram now</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">Your world, in one liquid space</p>
               </div>
-              <Compass className="h-5 w-5 text-primary" />
+              <button type="button" onClick={() => void fetchPosts(true)} aria-label="Refresh feed" title="Refresh feed" className="depth-press rounded-full p-2 text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
+              </button>
             </div>
             <div className="-mx-1 mb-2"><UploadStrip /></div>
             <div className="relative z-10 grid grid-cols-4 gap-2">
