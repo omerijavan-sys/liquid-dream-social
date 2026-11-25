@@ -6,6 +6,7 @@ const PAGES: Record<string, { title: string; desc: string }> = {
   "/": { title: "Primegram Extreme (Primegram X) – Social Network for Reels, Music & Chat", desc: "Primegram Extreme, also written Primegram X, is a social network for Reels, photos, messaging, music discovery and creator communities. Join free on web and Android." },
   "/about": { title: "About Primegram Extreme (Primegram X) – Who We Are", desc: "Learn about Primegram X, the social network built by Java Prime in Kenya for creators, music lovers and friends." },
   "/help": { title: "Help Center – Primegram X", desc: "Get help with your Primegram X account, posting, messaging, wallet, safety and reporting." },
+  "/delete-account": { title: "Delete your account – Primegram X", desc: "How to delete your Primegram X account and what happens to your data." },
   "/privacy": { title: "Privacy Policy – Primegram X", desc: "How Primegram X collects, uses and protects your personal data, and your rights over it." },
   "/terms": { title: "Terms of Service & Community Rules – Primegram X", desc: "The Primegram X terms of service, community rules, copyright and takedown policy." },
 };
