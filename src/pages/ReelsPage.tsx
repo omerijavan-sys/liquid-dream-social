@@ -28,6 +28,25 @@ import { readContentPrefs } from "@/components/SettingsExtras";
 import { UPLOAD_CACHE, INLINE_VIDEO_ATTRS, validateVideoFile, checkUploadable } from "@/utils/media";
 
 const REEL_BATCH_SIZE = 20;
+const REEL_AFFINITY_KEY = "primegram:reelCreatorAffinity";
+
+const readCreatorAffinity = (): Record<string, number> => {
+  try {
+    const value = JSON.parse(localStorage.getItem(REEL_AFFINITY_KEY) || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+};
+
+const shuffleReels = <T,>(items: T[]): T[] => {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
 
 const ReelsPage = () => {
   const navigate = useNavigate();
@@ -145,7 +164,9 @@ const ReelsPage = () => {
         : { data: [], error: null };
       if (profileError) throw profileError;
       const profileMap = new Map((profiles ?? []).map(profile => [profile.user_id, profile] as const));
-      const mapped = batch.map(reel => ({ ...reel, profile: profileMap.get(reel.user_id) ?? null }));
+      const affinity = readCreatorAffinity();
+      const mapped = shuffleReels(batch.map(reel => ({ ...reel, profile: profileMap.get(reel.user_id) ?? null })))
+        .sort((a, b) => (affinity[b.user_id] ?? 0) - (affinity[a.user_id] ?? 0));
       setReels(current => reset ? mapped : [...current, ...mapped]);
       pageRef.current = page + 1;
       hasMoreRef.current = rawBatch.length === REEL_BATCH_SIZE;
@@ -360,6 +381,9 @@ const ReelsPage = () => {
     try {
       const k = "primegram:reelFeedback"; const cur = JSON.parse(localStorage.getItem(k) || "{}");
       cur[reel.id] = kind; localStorage.setItem(k, JSON.stringify(cur));
+      const affinity = readCreatorAffinity();
+      affinity[reel.user_id] = Math.max(-5, Math.min(5, (affinity[reel.user_id] ?? 0) + (kind === "interested" ? 1 : -1)));
+      localStorage.setItem(REEL_AFFINITY_KEY, JSON.stringify(affinity));
     } catch { /* storage unavailable */ }
     trackEvent(`reel_${kind}`);
     setMenuReel(null);
