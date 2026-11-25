@@ -427,6 +427,9 @@ const ReelsPage = () => {
                   toggleReelPlayback(i);
                 }}
               >
+                {reel.thumbnail_url && Math.abs(i - anchor) <= 1 && (
+                  <img src={reel.thumbnail_url} alt="" aria-hidden="true" decoding="async" className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-50 blur-2xl" />
+                )}
                 {reel.video_url && Math.abs(i - anchor) <= 2 && (
                   <video
                     ref={el => { if (el) { videoRefs.current.set(i, el); el.volume = Math.max(0, Math.min(1, (reel as { video_volume?: number }).video_volume ?? 1)); } else videoRefs.current.delete(i); }}
