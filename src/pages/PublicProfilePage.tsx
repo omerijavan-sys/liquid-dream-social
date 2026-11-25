@@ -4,11 +4,11 @@ import StreakBadge from "@/features/drops/StreakBadge";
 import { useEffect, useState } from "react";
 import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
+import ProfileAvatarPreview from "@/components/ProfileAvatarPreview";
 import ProfileReelsViewer from "@/components/ProfileReelsViewer";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Film, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2, X } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import ProfileCover from "@/components/ProfileCover";
 import { FollowButton } from "@/components/FollowListDialog";
 import CommentsSection from "@/components/CommentsSection";
@@ -55,6 +55,7 @@ const PublicProfilePage = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [auraOpen, setAuraOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const aura = useAuraRank(userId);
   const glow = auraGlowStyle(aura?.aura ?? 0);
   const [reelTotal, setReelTotal] = useState(0);
@@ -239,6 +240,7 @@ const PublicProfilePage = () => {
         </div>
       </header>
 
+      <ProfileAvatarPreview open={avatarOpen} onOpenChange={setAvatarOpen} src={profile?.avatar_url} name={profile?.display_name || profile?.username} glowStyle={glow} />
       {userId && <AuraDialog userId={userId} open={auraOpen} onOpenChange={setAuraOpen} />}
       {userId && <AnalyticsDialog userId={userId} isOwner={user?.id === userId} open={analyticsOpen} onOpenChange={setAnalyticsOpen} />}
       <main className="mx-auto max-w-3xl">
@@ -253,15 +255,13 @@ const PublicProfilePage = () => {
             <section className="relative p-5" style={profile.cover_url ? { paddingTop: 130 } : undefined}>
               <ProfileCover url={profile.cover_url} />
               <div className="relative z-10 flex items-center gap-5">
-                <div style={glow} className={`h-20 w-20 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-primary to-accent p-0.5 ${Object.keys(glow).length ? "aura-glow" : ""}`}>
-                  <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-background text-2xl font-bold text-primary">
-                    {profile.avatar_url ? (
-                      <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      (profile.display_name || profile.username || "U")[0].toUpperCase()
-                    )}
+                <button type="button" onClick={() => setAvatarOpen(true)} aria-label="View profile picture" className="depth-press shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <div style={glow} className={`h-20 w-20 overflow-hidden rounded-full bg-gradient-to-br from-primary to-accent p-0.5 ${Object.keys(glow).length ? "aura-glow" : ""}`}>
+                    <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-background text-2xl font-bold text-primary">
+                      {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : (profile.display_name || profile.username || "U")[0].toUpperCase()}
+                    </div>
                   </div>
-                </div>
+                </button>
                 <div className="grid flex-1 grid-cols-3 text-center">
                   <div><p className="text-lg font-bold text-foreground">{(postTotal ?? posts.length) + reelTotal}</p><p className="text-caption text-muted-foreground">Posts</p></div>
                   <div><p className="text-lg font-bold text-foreground">{followers.toLocaleString()}</p><p className="text-caption text-muted-foreground">Followers</p></div>
