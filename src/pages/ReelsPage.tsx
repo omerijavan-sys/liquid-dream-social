@@ -14,7 +14,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import GlassTabBar from "@/components/GlassTabBar";
 import CreatorTipButton from "@/components/CreatorTipButton";
 import { runInBackground } from "@/utils/backgroundUpload";
 import { countReelView } from "@/utils/reelViews";
@@ -379,7 +378,7 @@ const ReelsPage = () => {
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 safe-area-top">
         <div className="flex items-center justify-between px-5 py-4">
-          <button onClick={() => navigate("/")} className="depth-press w-9 h-9 rounded-full bg-black/50 flex items-center justify-center">
+          <button onClick={() => navigate("/")} className="depth-press reel-glass w-9 h-9 rounded-full flex items-center justify-center">
             <ArrowLeft className="w-5 h-5 text-white" />
           </button>
           <span className="font-serif text-lg font-bold text-amber-100">Reels</span>
@@ -489,7 +488,7 @@ const ReelsPage = () => {
                 )}
                 {i === currentIndex && videoPaused && !videoBuffering && !videoError && (
                   <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-white">
-                    <button type="button" aria-label="Play video" onClick={event => { event.stopPropagation(); toggleReelPlayback(i); }} className="pointer-events-auto flex size-16 items-center justify-center rounded-full bg-black/60">
+                    <button type="button" aria-label="Play video" onClick={event => { event.stopPropagation(); toggleReelPlayback(i); }} className="reel-glass pointer-events-auto flex size-16 items-center justify-center rounded-full">
                       <Play className="ml-1 size-7 fill-current" />
                     </button>
                     <button type="button" onClick={event => { event.stopPropagation(); toggleMuted(); }} aria-label={muted ? "Unmute videos" : "Mute videos"} className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm font-semibold ">
@@ -520,31 +519,31 @@ const ReelsPage = () => {
               </div>
 
               {/* Action rail, right */}
-              <div className="absolute bottom-[max(6rem,calc(env(safe-area-inset-bottom)+4.5rem))] right-2.5 z-20 flex flex-col items-center gap-3.5">
+              <div className="absolute bottom-[max(2.5rem,calc(env(safe-area-inset-bottom)+1.5rem))] right-2.5 z-20 flex flex-col items-center gap-3.5">
                 {reel.user_id === user?.id && (
-                  <button onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=reels"); }} className="rounded-lg border border-white/20 bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">Insights</button>
+                  <button onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=reels"); }} className="reel-glass rounded-xl px-2.5 py-1 text-[10px] font-semibold text-white">Insights</button>
                 )}
                 <button onClick={(e) => { e.stopPropagation(); toggleLike(reel.id); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="Like">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><Heart className={`h-6 w-6 ${liked.has(reel.id) ? "fill-rose-400 text-rose-400" : "text-white"}`} /></div>
+                  <div className="reel-glass flex h-11 w-11 items-center justify-center rounded-full"><Heart className={`h-6 w-6 ${liked.has(reel.id) ? "fill-rose-400 text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,.9)]" : "text-white"}`} /></div>
                   <span className="text-[11px] font-medium text-white">{reel.hide_likes && reel.user_id !== user?.id ? "" : (reel.likes_count ?? 0)}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); if (reel.allow_comments === false) { toast.info("Comments are turned off for this reel"); return; } loadComments(reel.id); }} className={`depth-press flex flex-col items-center gap-0.5 ${reel.allow_comments === false ? "opacity-50" : ""}`} aria-label="Comments">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><MessageCircle className="h-6 w-6 text-white" /></div>
+                  <div className="reel-glass flex h-11 w-11 items-center justify-center rounded-full"><MessageCircle className="h-6 w-6 text-white" /></div>
                   <span className="text-[11px] font-medium text-white">{commentCounts[reel.id] || 0}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); void toggleRepost(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label={reposted.has(reel.id) ? "Remove repost" : "Repost"}>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><Repeat2 className={`h-6 w-6 ${reposted.has(reel.id) ? "text-emerald-400" : "text-white"}`} /></div>
+                  <div className="reel-glass flex h-11 w-11 items-center justify-center rounded-full"><Repeat2 className={`h-6 w-6 ${reposted.has(reel.id) ? "text-emerald-400" : "text-white"}`} /></div>
                   <span className="text-[11px] font-medium text-white">{repostCounts[reel.id] || 0}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); void toggleSave(reel.id); }} className="depth-press flex flex-col items-center gap-0.5" aria-label={saved.has(reel.id) ? "Unsave" : "Save"}>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><Bookmark className={`h-6 w-6 ${saved.has(reel.id) ? "fill-amber-300 text-amber-300" : "text-white"}`} /></div>
+                  <div className="reel-glass flex h-11 w-11 items-center justify-center rounded-full"><Bookmark className={`h-6 w-6 ${saved.has(reel.id) ? "fill-amber-300 text-amber-300" : "text-white"}`} /></div>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); shareReel(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="Share">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><Share2 className="h-6 w-6 text-white" /></div>
+                  <div className="reel-glass flex h-11 w-11 items-center justify-center rounded-full"><Share2 className="h-6 w-6 text-white" /></div>
                 </button>
                 <CreatorTipButton creatorId={reel.user_id} creatorName={reel.profile?.display_name || "creator"} compact />
                 <button onClick={(e) => { e.stopPropagation(); setMenuReel(reel); }} className="depth-press flex flex-col items-center gap-0.5" aria-label="More options">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/50"><MoreVertical className="h-6 w-6 text-white" /></div>
+                  <div className="reel-glass flex h-11 w-11 items-center justify-center rounded-full"><MoreVertical className="h-6 w-6 text-white" /></div>
                 </button>
               </div>
             </section>
@@ -644,7 +643,6 @@ const ReelsPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      <GlassTabBar />
       {shareReelTarget && (
         <ShareSheet
           open

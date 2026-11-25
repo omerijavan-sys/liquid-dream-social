@@ -20,7 +20,7 @@ const CreatorTipButton = ({ creatorId, creatorName, compact = false, trackId }: 
           setOpen(true);
         }}
         className={compact
-          ? "flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur disabled:opacity-40"
+          ? "reel-glass flex h-11 w-11 items-center justify-center rounded-full text-white disabled:opacity-40"
           : "depth-press flex items-center gap-1.5 text-muted-foreground disabled:opacity-40"}
       >
         <HandCoins className="h-5 w-5" />
