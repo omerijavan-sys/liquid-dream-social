@@ -6,6 +6,7 @@ import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
 import ProfileAvatarPreview from "@/components/ProfileAvatarPreview";
 import ProfileReelsViewer from "@/components/ProfileReelsViewer";
+import ProfilePostsViewer from "@/components/ProfilePostsViewer";
 import { motion } from "framer-motion";
 import { ArrowLeft, Settings, Sparkles, BarChart3, BadgeDollarSign, Grid3X3, Bookmark, Heart, Camera, Film, Eye } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -53,6 +54,7 @@ const ProfilePage = () => {
   const [planOpen, setPlanOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedReelId, setSelectedReelId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -291,7 +293,7 @@ const ProfilePage = () => {
       ) : (
         <div className="prime-profile-grid grid grid-cols-3 gap-0.5 p-0.5">
           {shown.map((post, i) => (
-            <motion.button type="button" key={post.id} onClick={() => (tab === "reels" ? setSelectedReelId(post.id) : setSelectedMedia(post))} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
+            <motion.button type="button" key={post.id} onClick={() => (tab === "reels" ? setSelectedReelId(post.id) : tab === "posts" ? setSelectedPostId(post.id) : setSelectedMedia(post))} aria-label={`View ${post.media_type === "video" ? "reel" : "post"}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="aspect-square relative overflow-hidden">
               {post.media_type === "video" ? (
                 <VideoThumb src={post.media_url} poster={post.thumbnail_url} />
               ) : (
@@ -310,6 +312,23 @@ const ProfilePage = () => {
         initialReelId={selectedReelId}
         username={profile?.username}
         onClose={() => setSelectedReelId(null)}
+      />
+      <ProfilePostsViewer
+        open={selectedPostId !== null}
+        posts={posts.map((post) => ({
+          id: post.id,
+          media_url: post.media_url ?? post.video_url ?? null,
+          media_type: post.media_type ?? (post.video_url ? "video" : "image"),
+          caption: post.caption ?? null,
+          author: profile?.display_name || profile?.username,
+          likes_count: post.likes_count ?? 0,
+          views_count: post.views_count ?? 0,
+          thumbnail_url: post.thumbnail_url ?? null,
+          music: post.music_title ? { title: post.music_title, artist: post.music_artist, art_url: post.music_art_url, stream_url: post.music_url, youtube_id: post.music_youtube_id, start: post.music_start, len: post.music_len } : null,
+        }))}
+        initialPostId={selectedPostId}
+        username={profile?.username}
+        onClose={() => setSelectedPostId(null)}
       />
       <MediaViewer onClose={() => setSelectedMedia(null)} post={selectedMedia ? {
         id: selectedMedia.id, media_url: selectedMedia.media_url ?? selectedMedia.video_url ?? null, media_type: selectedMedia.media_type ?? (selectedMedia.video_url ? "video" : "image"),
