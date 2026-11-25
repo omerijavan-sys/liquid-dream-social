@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useState } from "react";
 import { toPng } from "html-to-image";
 
 /**
@@ -39,7 +39,7 @@ export const deliverImage = async (png: string, name: string, text: string): Pro
  * Renders the card as soon as it is on screen, so Share/Save are instant. That keeps the tap's "user gesture" alive,
  * which phones require before they will open the share sheet (an export that runs after the tap can lose it).
  */
-export const usePrerender = (ref: RefObject<HTMLElement>, ready: boolean) => {
+export const usePrerender = (render: () => Promise<string>, ready: boolean) => {
   const [png, setPng] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -48,14 +48,14 @@ export const usePrerender = (ref: RefObject<HTMLElement>, ready: boolean) => {
     setPng(null); setError(null);
     const t = window.setTimeout(async () => {
       try {
-        if (!ref.current) throw new Error("card not ready");
-        const r = await renderCard(ref.current);
+        const r = await render();
         if (!dead) setPng(r);
       } catch (e) {
         if (!dead) setError(e instanceof Event ? "an image on the card failed to load" : (e as Error)?.message || "unknown error");
       }
     }, 400);
     return () => { dead = true; window.clearTimeout(t); };
-  }, [ready, ref]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
   return { png, error };
 };

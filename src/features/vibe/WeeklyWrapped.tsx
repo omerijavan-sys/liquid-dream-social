@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, Flame, Loader2, Share2, X } from "lucide-react";
 import { deliverImage, usePrerender } from "../shared/shareImage";
+import { drawWrappedCard } from "../shared/cardCanvas";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { glass, glow, rpc, table } from "../shared/ui";
@@ -41,7 +42,7 @@ const WeeklyWrapped = ({ onClose }: { onClose: () => void }) => {
 
   const link = code ? inviteLink(code) : "https://primegramx.co.ke";
   const [shot, setShot] = useState<string | null>(null);
-  const { png, error } = usePrerender(ref, !!w);
+  const { png, error } = usePrerender(() => drawWrappedCard(w!, name, streak, link), !!w);
   const make = async (mode: "share" | "save") => {
     if (!png) { toast.info(error ? "The card couldn't be built. See the note below." : "Still preparing your card, one moment…"); return; }
     setBusy(true);
