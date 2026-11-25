@@ -1,0 +1,2 @@
+-- Applied via MCP (lock_down_function_grants): anon can no longer execute wallet/gift/ban-check functions; trigger functions are not callable via RPC;
+-- transactions_immutable has a fixed search_path.

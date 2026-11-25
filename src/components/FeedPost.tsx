@@ -1,3 +1,4 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { INLINE_VIDEO_ATTRS } from "@/utils/media";
 import PostCarousel, { type CarouselItem } from "@/components/PostCarousel";
 import { BLANK_POSTER } from "@/lib/blankPoster";
@@ -61,6 +62,7 @@ const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string
   );
 
 const FeedPost = ({ image, poster, mediaType = "image", username, avatar, caption, likes, comments, timeAgo, index, autoPlay = true, postId, isVerified, isOfficial, badge, authorId, music, views = 0, mediaItems, allowComments = true, hideLikes = false, location = null }: FeedPostProps) => {
+  const { user: authUser } = useAuth();
   const coverImg = poster || undefined;
   const navigate = useNavigate();
   const { muted, toggleMuted } = useMute();
@@ -102,7 +104,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
     if (!postId) return;
     let cancelled = false;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = authUser; // from the app-wide session: no extra auth-server call (and no auth lock) per post
       if (cancelled) return;
       setMe(user?.id ?? null);
       const [likeRes, countRes, followRes] = await Promise.all([
@@ -116,7 +118,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
       setFollowing(!!followRes.data);
     })();
     return () => { cancelled = true; };
-  }, [postId, authorId]);
+  }, [postId, authorId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => setViewCount(views), [views]);
 

@@ -1,3 +1,4 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { INLINE_VIDEO_ATTRS } from "@/utils/media";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +24,7 @@ export interface ViewerPost {
 
 /** Full-screen viewer: videos open like a reel (tap to pause, global mute, side actions), photos open like a post. */
 const MediaViewer = ({ post, onClose }: { post: ViewerPost | null; onClose: () => void }) => {
+  const { user: authUser } = useAuth();
   const { muted, toggleMuted } = useMute();
   const [me, setMe] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
@@ -40,7 +42,7 @@ const MediaViewer = ({ post, onClose }: { post: ViewerPost | null; onClose: () =
     let dead = false;
     setLikes(post.likes_count ?? 0); setViews(post.views_count ?? 0); setLiked(false); setShowComments(false); setPaused(false);
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = authUser; // from the app-wide session: no extra auth-server call (and no auth lock) per post
       if (dead) return;
       setMe(user?.id ?? null);
       const [l, c] = await Promise.all([
@@ -53,7 +55,7 @@ const MediaViewer = ({ post, onClose }: { post: ViewerPost | null; onClose: () =
       if (!dead && typeof v.data === "number") setViews(v.data);
     })();
     return () => { dead = true; };
-  }, [post?.id]);
+  }, [post?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleLike = async () => {
     if (!post) return;

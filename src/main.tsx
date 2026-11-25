@@ -33,6 +33,13 @@ const showFatal = (err: unknown) => {
 };
 const root = document.getElementById("root");
 if (root) {
+  // After a deploy, a phone with the old page open asks for chunk files that no longer exist. Reload once to pick up the new build.
+  window.addEventListener("vite:preloadError", (e) => {
+    e.preventDefault();
+    try { if (sessionStorage.getItem("chunkReload") === "1") return; sessionStorage.setItem("chunkReload", "1"); } catch { /* storage blocked */ }
+    window.location.reload();
+  });
+  setTimeout(() => { try { sessionStorage.removeItem("chunkReload"); } catch { /* ignore */ } }, 15000);
   import("./App.tsx").then(({ default: App }) => createRoot(root).render(<ErrorBoundary><App /></ErrorBoundary>)).catch(showFatal);
   window.addEventListener("error", (e) => { if (!root.hasChildNodes() || root.querySelector(".pg-splash")) showFatal(e.error ?? e.message); });
 }
