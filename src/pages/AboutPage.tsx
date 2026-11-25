@@ -131,7 +131,7 @@ const AboutPage = () => {
             <div className="relative flex flex-col justify-between gap-10 border-b border-white/[0.09] bg-gradient-to-br from-amber-300/[0.07] via-transparent to-primary/[0.06] p-7 sm:p-10 md:border-b-0 md:border-r">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-200"><UserRound className="size-4" aria-hidden="true" /> Founder profile</div>
               <div>
-                <div className="mb-6 flex size-24 items-center justify-center rounded-[1.8rem] border border-amber-200/25 bg-black/30 text-3xl font-black tracking-tight text-amber-100 shadow-[0_0_70px_hsla(45,90%,55%,.12)] sm:size-28 sm:text-4xl">JO</div>
+                <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/received_40112289315053478-VuqRS1IRIjnBXo3iIYNhyyJ3Q3E3D4.jpeg" alt="Javan Omeri at his gaming and development setup" className="mb-6 size-24 rounded-[1.8rem] border border-amber-200/25 object-cover shadow-[0_0_70px_hsla(45,90%,55%,.12)] sm:size-28" />
                 <p className="text-2xl font-bold tracking-tight sm:text-3xl">Javan Omeri</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">MR. AURA <span className="px-1 text-amber-200">•</span> JAVA PRIME ULTRA <span className="px-1 text-amber-200">•</span> JP7 ULTRA</p>
                 <p className="mt-5 inline-flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="size-4 text-amber-200" aria-hidden="true" /> Kisii, Kenya</p>
