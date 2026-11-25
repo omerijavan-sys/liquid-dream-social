@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Heart, Loader2, RefreshCw, Sparkles, Upload } from "lucide-react";
+import { Camera, Heart, Loader2, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -26,13 +26,94 @@ const MatchTab = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<MatchResult | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
 
   useEffect(() => () => {
     if (photo) URL.revokeObjectURL(photo);
   }, [photo]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const stream = cameraStreamRef.current;
+    if (!cameraOpen || !video || !stream) return;
+    video.srcObject = stream;
+    void video.play().catch(() => toast.error("Could not start the camera preview. Check camera permissions and try again."));
+    return () => {
+      video.pause();
+      video.srcObject = null;
+    };
+  }, [cameraOpen]);
+
+  useEffect(() => () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
+
+  const closeCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    setCameraOpen(false);
+    setCameraStarting(false);
+    setCameraReady(false);
+  };
+
+  const openCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error("Camera access is unavailable here. Open the app over HTTPS or use From gallery.");
+      return;
+    }
+    setCameraStarting(true);
+    try {
+      cameraStreamRef.current = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: "user" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      setCameraOpen(true);
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : "";
+      const message = name === "NotAllowedError" || name === "PermissionDeniedError"
+        ? "Camera permission was denied. Allow camera access in your browser or device settings, then try again."
+        : name === "NotFoundError" || name === "DevicesNotFoundError"
+          ? "No camera was found. You can choose a photo from your gallery instead."
+          : name === "NotReadableError" || name === "TrackStartError"
+            ? "The camera is already in use by another app. Close it and try again."
+            : error instanceof Error ? error.message : "Could not access the camera. Try choosing a photo from your gallery.";
+      toast.error(message);
+    } finally {
+      setCameraStarting(false);
+    }
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      toast.error("Camera is still starting. Try again in a moment.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      toast.error("Could not capture the photo. Please try again.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        toast.error("Could not capture the photo. Please try again.");
+        return;
+      }
+      closeCamera();
+      void analyze(new File([blob], `crush-match-${Date.now()}.jpg`, { type: "image/jpeg" }));
+    }, "image/jpeg", 0.92);
+  };
 
   const analyze = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -104,7 +185,6 @@ const MatchTab = () => {
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="user"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -114,8 +194,9 @@ const MatchTab = () => {
         />
         {!photo && !scanning && (
           <div className="grid grid-cols-2 gap-3">
-            <Button onClick={() => fileRef.current?.click()} className="gap-2">
-              <Camera className="w-4 h-4" /> Snap photo
+            <Button onClick={() => void openCamera()} className="gap-2" disabled={cameraStarting}>
+              {cameraStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              {cameraStarting ? "Starting camera…" : "Snap photo"}
             </Button>
             <Button variant="secondary" onClick={() => fileRef.current?.click()} className="gap-2">
               <Upload className="w-4 h-4" /> From gallery
@@ -255,6 +336,25 @@ const MatchTab = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {cameraOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={(event) => { if (event.target === event.currentTarget) closeCamera(); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="crush-camera-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-center justify-between p-4">
+              <h2 id="crush-camera-title" className="font-semibold">Take a photo</h2>
+              <Button variant="ghost" size="icon" aria-label="Close camera" onClick={closeCamera}><X className="h-5 w-5" /></Button>
+            </div>
+            <div className="relative aspect-[3/4] bg-black">
+              <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" onLoadedMetadata={() => setCameraReady(true)} />
+              {!cameraReady && <div className="absolute inset-0 flex items-center justify-center text-sm text-white/75"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Starting camera…</div>}
+            </div>
+            <div className="p-4">
+              <Button className="w-full gap-2" onClick={capturePhoto} disabled={!cameraReady}><Camera className="h-4 w-4" /> Capture photo</Button>
+              <p className="mt-2 text-center text-xs text-muted-foreground">Your photo stays on this device and is not uploaded.</p>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

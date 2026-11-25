@@ -4,6 +4,7 @@ import StreakBadge from "@/features/drops/StreakBadge";
 import { useEffect, useState } from "react";
 import VideoThumb from "@/components/VideoThumb";
 import MediaViewer from "@/components/MediaViewer";
+import ProfileReelsViewer from "@/components/ProfileReelsViewer";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Film, Sparkles, BarChart3, BadgeDollarSign, Eye, Grid3X3, Loader2, X } from "lucide-react";
@@ -75,6 +76,7 @@ const PublicProfilePage = () => {
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
+  const [selectedReelId, setSelectedReelId] = useState<string | null>(null);
   const [selectedViews, setSelectedViews] = useState(0);
   const [creatorPrice, setCreatorPrice] = useState<number | null>(null);
   const [subscribedUntil, setSubscribedUntil] = useState<string | null>(null);
@@ -345,7 +347,7 @@ const PublicProfilePage = () => {
                 {reels.length ? (
                   <div className="grid grid-cols-3 gap-0.5 p-0.5">
                     {reels.map((r) => (
-                      <button key={r.id} onClick={() => navigate(`/reels?r=${r.id}`)} aria-label="Open reel" className="relative aspect-[3/4] overflow-hidden bg-secondary">
+                      <button key={r.id} onClick={() => setSelectedReelId(r.id)} aria-label="Open reel" className="relative aspect-[3/4] overflow-hidden bg-secondary">
                         <VideoThumb src={r.video_url} poster={r.thumbnail_url} />
                         <span className="absolute bottom-1 left-1.5 text-[10px] font-semibold text-white drop-shadow">▶ {(r.views_count ?? 0).toLocaleString()}</span>
                       </button>
@@ -387,6 +389,13 @@ const PublicProfilePage = () => {
         )}
       </main>
 
+      <ProfileReelsViewer
+        open={selectedReelId !== null}
+        reels={reels}
+        initialReelId={selectedReelId}
+        username={profile?.username}
+        onClose={() => setSelectedReelId(null)}
+      />
       <MediaViewer onClose={() => setSelectedPost(null)} post={selectedPost ? {
         id: selectedPost.id, media_url: selectedPost.media_url, media_type: selectedPost.media_type, caption: selectedPost.caption,
         author: profile?.display_name || profile?.username, likes_count: selectedPost.likes_count, views_count: selectedViews,
