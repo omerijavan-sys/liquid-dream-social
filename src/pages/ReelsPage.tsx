@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import type { Tables } from "@/integrations/supabase/types";
 import { trackEvent } from "@/utils/telemetry";
 import ReportDialog from "@/components/ReportDialog";
 import { BLANK_POSTER } from "@/lib/blankPoster";
@@ -9,7 +10,7 @@ import { useMute } from "@/contexts/MuteContext";
 import ShareSheet from "@/components/ShareSheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2, Download, Flag, Play, Trash2, Repeat2, Bookmark, MoreVertical, ThumbsUp, ThumbsDown } from "lucide-react";
+import { ArrowLeft, RefreshCw, Plus, X, Film, Upload, Heart, MessageCircle, Share2, Volume2, VolumeX, Loader2, Download, Flag, Play, Trash2, Repeat2, Bookmark, MoreVertical, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -107,6 +108,8 @@ const ReelsPage = () => {
     }
   }, [reels]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const seenRef = useRef<string[] | null>(null);
+  const refreshReels = () => { containerRef.current?.scrollTo({ top: 0 }); setCurrentIndex(0); void fetchReels(true); toast.success("Fresh reels for you"); };
   const fetchReels = useCallback(async (reset = false) => {
     if (loadingRef.current || (!reset && !hasMoreRef.current)) return;
     loadingRef.current = true;
@@ -119,11 +122,17 @@ const ReelsPage = () => {
     }
     const page = reset ? 0 : pageRef.current;
     try {
-      const { data, error } = await supabase.from("reels").select("*")
-        .order("created_at", { ascending: false })
-        .range(page * REEL_BATCH_SIZE, page * REEL_BATCH_SIZE + REEL_BATCH_SIZE - 1);
+      // Unwatched reels come first. The watched list is read once per refresh so paging order stays stable while you scroll.
+      if (reset || !seenRef.current) {
+        const { data: seen } = await (supabase.rpc as any)("my_seen_reel_ids"); // eslint-disable-line @typescript-eslint/no-explicit-any
+        seenRef.current = Array.isArray(seen) ? (seen as string[]) : [];
+      }
+      let { data, error } = await (supabase.rpc as any)("reels_feed", { _seen: seenRef.current, _limit: REEL_BATCH_SIZE, _offset: page * REEL_BATCH_SIZE }); // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (error) { // feed function unavailable: fall back to plain newest-first
+        ({ data, error } = await supabase.from("reels").select("*").order("created_at", { ascending: false }).range(page * REEL_BATCH_SIZE, page * REEL_BATCH_SIZE + REEL_BATCH_SIZE - 1));
+      }
       if (error) throw error;
-      const batch = data ?? [];
+      const batch = (data ?? []) as Tables<"reels">[];
       const userIds = [...new Set(batch.map(reel => reel.user_id))];
       const { data: profiles, error: profileError } = userIds.length
         ? await supabase.from("profiles").select("user_id, display_name, avatar_url").in("user_id", userIds)
@@ -382,9 +391,12 @@ const ReelsPage = () => {
             <ArrowLeft className="w-5 h-5 text-white" />
           </button>
           <span className="font-serif text-lg font-bold text-amber-100">Reels</span>
+          <div className="flex items-center gap-2">
+          <button onClick={refreshReels} aria-label="Refresh reels" className="depth-press reel-glass flex h-9 w-9 items-center justify-center rounded-full text-white"><RefreshCw className="h-4 w-4" /></button>
           <button onClick={() => setCreating(true)} aria-label="Create reel" className="depth-press flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white">
             <Plus className="w-5 h-5" />
           </button>
+          </div>
         </div>
       </div>
 

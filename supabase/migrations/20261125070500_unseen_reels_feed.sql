@@ -1,0 +1,2 @@
+-- Applied via MCP (unseen_reels_feed): my_seen_reel_ids() (definer, caller's own watched reels) and reels_feed(_seen, _limit, _offset)
+-- (invoker, unwatched and not-own reels first, newest first, then the rest).
