@@ -54,6 +54,7 @@ const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const ExtremePage = lazy(() => import("./pages/ExtremePage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const CrushPage = lazy(() => import("./pages/CrushPage"));
+const RandomVideoChatPage = lazy(() => import("./pages/RandomVideoChatPage"));
 const MeetPage = lazy(() => import("./pages/MeetPage"));
 const AIBotsPage = lazy(() => import("./pages/AIBotsPage"));
 const PublicProfilePage = lazy(() => import("./pages/PublicProfilePage"));
@@ -149,7 +150,8 @@ const App = () => (
             <Route path="/crush" element={<ProtectedRoute><CrushPage /></ProtectedRoute>} />
             <Route path="/meet" element={<ProtectedRoute><MeetPage /></ProtectedRoute>} />
             <Route path="/adult" element={<Navigate to="/" replace />} />
-            <Route path="/adult/video" element={<Navigate to="/meet" replace />} />
+            <Route path="/random" element={<ProtectedRoute><RandomVideoChatPage /></ProtectedRoute>} />
+            <Route path="/adult/video" element={<Navigate to="/random" replace />} />
             <Route path="/bots" element={<ProtectedRoute><AIBotsPage /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
             <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />

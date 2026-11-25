@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, Bot, Globe, Loader2, Search, X, Play, Pause, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Shuffle, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, Bot, Globe, Loader2, Search, X, Play, Pause, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -359,7 +359,7 @@ const SoundsTab = () => {
 };
 
 const tabs = [
-  { v: "verified", l: "Verified", i: BadgeCheck }, { v: "tips", l: "Tips", i: Coins },
+  { v: "random", l: "Random", i: Shuffle }, { v: "verified", l: "Verified", i: BadgeCheck }, { v: "tips", l: "Tips", i: Coins },
   { v: "crush", l: "Crush", i: Heart }, { v: "bots", l: "AI Bots", i: Bot },
   { v: "garage", l: "Garage", i: Store }, { v: "bounty", l: "Bounty", i: Target }, { v: "sounds", l: "Sounds", i: Music2 },
 ];
@@ -367,7 +367,7 @@ const tabs = [
 export default function ExtremePage() {
   const navigate = useNavigate(); const { bal, refresh } = useBalance();
   const requestedTab = new URLSearchParams(location.search).get("tab");
-  const defaultTab = tabs.some(({ v }) => v === requestedTab) ? requestedTab! : "verified";
+  const defaultTab = tabs.some(({ v }) => v === requestedTab) ? requestedTab! : "random";
   return (
     <div className="prime-extreme min-h-screen pb-28">
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-amber-200/20 bg-[#070809]/90 px-3 py-2.5 backdrop-blur-xl">
@@ -380,6 +380,14 @@ export default function ExtremePage() {
           {tabs.map(({ v, l, i: I }) => <TabsTrigger key={v} value={v} className="min-w-max flex-1 gap-1 rounded-full border border-amber-200/30 bg-black/45 px-3 py-1.5 text-[11px] text-white/80 data-[state=active]:border-amber-100/70 data-[state=active]:bg-amber-400 data-[state=active]:text-[#17120a] data-[state=active]:shadow-[0_0_14px_rgba(234,179,8,.36)]"><I className="h-3 w-3" />{l}</TabsTrigger>)}
         </TabsList>
         <div className="mt-4">
+          <TabsContent value="random">
+            <div className={`${card} space-y-3`}>
+              <div className="flex items-center gap-2 font-bold"><Shuffle className="h-5 w-5 text-primary" /> Random video chat</div>
+              <p className="text-sm text-muted-foreground">Meet new people instantly. Pick your interests, tap Next to skip, report or block anyone.</p>
+              <Button className="w-full" onClick={() => navigate("/random")}>Start video chat</Button>
+              <Button variant="secondary" className="w-full" onClick={() => navigate("/meet")}>Quick Meet (video or voice)</Button>
+            </div>
+          </TabsContent>
           <TabsContent value="verified"><VerifiedTab balance={bal} refresh={refresh} /></TabsContent>
           <TabsContent value="tips"><TipTab refresh={refresh} /></TabsContent>
           <TabsContent value="crush"><CrushTab refresh={refresh} /></TabsContent>
