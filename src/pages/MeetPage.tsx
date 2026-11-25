@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mic, Video, Shuffle, Loader2, ShieldAlert, Users } from "lucide-react";
+import { ArrowLeft, Mic, Video, Shuffle, Loader2, Users } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,7 @@ const MeetPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [params] = useSearchParams();
-  const mode: "general" | "adult" = params.get("mode") === "adult" ? "adult" : "general";
+  const mode = "general" as const;
   const [audio, setAudio] = useState(params.get("audio") === "1");
   const [searching, setSearching] = useState(false);
   const [waiting, setWaiting] = useState(0);
@@ -63,16 +63,14 @@ const MeetPage = () => {
   useEffect(() => { if (params.get("auto") === "1" && user && camOk) start(); /* auto-start after "Next" */ }, [camOk]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { clearInterval(timerRef.current); if (!matchedRef.current) void supabase.rpc("chat_leave" as any); }, []);
 
-  const adult = mode === "adult";
   return (
-    <div className={`flex h-dvh flex-col ${adult ? "bg-[#12060a]" : "bg-background"} text-foreground`}>
+    <div className={`flex h-dvh flex-col bg-background text-foreground`}>
       <header className="safe-area-top flex items-center gap-3 px-5 py-4">
-        <button onClick={() => { void stop(); navigate(adult ? "/adult" : "/"); }} aria-label="Back" className="depth-press"><ArrowLeft className="h-5 w-5" /></button>
-        <h1 className="flex-1 text-lg font-bold">{adult ? "Primempire Meet" : "Meet"}</h1>
-        {adult && <ShieldAlert className="h-5 w-5 text-rose-400" />}
+        <button onClick={() => { void stop(); navigate("/"); }} aria-label="Back" className="depth-press"><ArrowLeft className="h-5 w-5" /></button>
+        <h1 className="flex-1 text-lg font-bold">Meet</h1>
       </header>
       <main className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
-        <div className={`relative aspect-[3/4] w-full max-w-xs overflow-hidden rounded-[2rem] border ${adult ? "border-rose-400/30" : "border-border"} bg-black`}>
+        <div className={`relative aspect-[3/4] w-full max-w-xs overflow-hidden rounded-[2rem] border border-border bg-black`}>
           {audio ? <div className="flex h-full items-center justify-center"><Mic className="h-14 w-14 text-white/50" /></div>
             : camOk === false ? <p className="flex h-full items-center justify-center px-6 text-sm text-white/70">Allow camera access to meet people</p>
             : <video ref={previewRef} autoPlay playsInline muted className="h-full w-full -scale-x-100 object-cover" />}
@@ -90,8 +88,8 @@ const MeetPage = () => {
         </div>
         {searching
           ? <Button size="lg" variant="secondary" onClick={() => void stop()} className="w-full max-w-xs">Cancel</Button>
-          : <Button size="lg" onClick={start} disabled={camOk === null || camOk === false} className={`w-full max-w-xs gap-2 ${adult ? "bg-rose-600 hover:bg-rose-500 text-white" : ""}`}><Shuffle className="h-5 w-5" />Start</Button>}
-        <p className="max-w-xs text-[11px] text-muted-foreground">{adult ? "Only age-verified members are matched here. " : ""}Be respectful. You can report or skip anyone during the chat. Never share personal details.</p>
+          : <Button size="lg" onClick={start} disabled={camOk === null || camOk === false} className="w-full max-w-xs gap-2"><Shuffle className="h-5 w-5" />Start</Button>}
+        <p className="max-w-xs text-[11px] text-muted-foreground">Be respectful. You can report or skip anyone during the chat. Never share personal details.</p>
       </main>
     </div>
   );

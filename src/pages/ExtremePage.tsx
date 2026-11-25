@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, ShieldAlert, Bot, Globe, Loader2, Search, X, Play, Pause, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, Bot, Globe, Loader2, Search, X, Play, Pause, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TIERS, TIP_AMOUNTS } from "@/lib/extreme";
-import AdultTab from "@/components/AdultTab";
 import CreatorTipButton from "@/components/CreatorTipButton";
 import MatchTab from "@/components/MatchTab";
 import { getGlobalTrendingMusic, searchGlobalMusic, type GlobalMusicTrack } from "@/services/GlobalMusicService";
@@ -360,7 +359,7 @@ const SoundsTab = () => {
 };
 
 const tabs = [
-  { v: "adult", l: "Primempire", i: ShieldAlert }, { v: "verified", l: "Verified", i: BadgeCheck }, { v: "tips", l: "Tips", i: Coins },
+  { v: "verified", l: "Verified", i: BadgeCheck }, { v: "tips", l: "Tips", i: Coins },
   { v: "crush", l: "Crush", i: Heart }, { v: "bots", l: "AI Bots", i: Bot },
   { v: "garage", l: "Garage", i: Store }, { v: "bounty", l: "Bounty", i: Target }, { v: "sounds", l: "Sounds", i: Music2 },
 ];
@@ -368,7 +367,7 @@ const tabs = [
 export default function ExtremePage() {
   const navigate = useNavigate(); const { bal, refresh } = useBalance();
   const requestedTab = new URLSearchParams(location.search).get("tab");
-  const defaultTab = tabs.some(({ v }) => v === requestedTab) ? requestedTab! : "adult";
+  const defaultTab = tabs.some(({ v }) => v === requestedTab) ? requestedTab! : "verified";
   return (
     <div className="prime-extreme min-h-screen pb-28">
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-amber-200/20 bg-[#070809]/90 px-3 py-2.5 backdrop-blur-xl">
@@ -384,7 +383,6 @@ export default function ExtremePage() {
           <TabsContent value="verified"><VerifiedTab balance={bal} refresh={refresh} /></TabsContent>
           <TabsContent value="tips"><TipTab refresh={refresh} /></TabsContent>
           <TabsContent value="crush"><CrushTab refresh={refresh} /></TabsContent>
-          <TabsContent value="adult"><AdultTab /></TabsContent>
           <TabsContent value="bots">
             <div className={`${card} space-y-3`}>
               <div className="flex items-center gap-2 font-bold"><Bot className="h-5 w-5 text-primary" /> Chat with AI agents</div>

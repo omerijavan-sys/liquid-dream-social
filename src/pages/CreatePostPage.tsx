@@ -103,7 +103,7 @@ const CreatePostPage = () => {
   const [countdown, setCountdown] = useState(0);
   const [ppvOn, setPpvOn] = useState(false);
   const [ppvPrice, setPpvPrice] = useState("");
-  const [isAdult, setIsAdult] = useState(() => new URLSearchParams(window.location.search).get("adult") === "1");
+  const isAdult = false; // Primempire removed
 
   useEffect(() => {
     const state = location.state as { track?: PickedTrack } | null;
@@ -741,31 +741,7 @@ const CreatePostPage = () => {
                 <Music className="w-4 h-4 text-primary" />
                 {track ? "Change Track" : "Add Background Track"}
               </button>
-              <button
-                onClick={() => setIsAdult((v) => !v)}
-                aria-label="Mark as Primempire content"
-                aria-pressed={isAdult}
-                className={`depth-press px-4 py-2.5 rounded-xl text-sm font-bold ${
-                  isAdult ? "bg-destructive text-destructive-foreground" : "liquid-glass text-muted-foreground"
-                }`}
-              >
-                Primempire
-              </button>
             </div>
-            {isAdult && file && (
-              <div className="liquid-glass relative z-10 space-y-2 rounded-xl p-3">
-                <div className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">Pay to view</p><p className="text-xs text-muted-foreground">Viewers pay to unlock this post</p></div>
-                  <button onClick={() => setPpvOn((v) => !v)} aria-pressed={ppvOn} aria-label="Pay to view" className={`h-7 w-12 rounded-full p-0.5 transition-colors ${ppvOn ? "bg-primary" : "bg-secondary"}`}><span className={`block h-6 w-6 rounded-full bg-white transition-transform ${ppvOn ? "translate-x-5" : ""}`} /></button>
-                </div>
-                {ppvOn && (
-                  <>
-                    <input value={ppvPrice} onChange={(e) => setPpvPrice(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))} inputMode="decimal" placeholder="Price in KES (20 – 20,000)" aria-label="Price in KES" className="w-full rounded-xl bg-secondary/60 px-3 py-2.5 text-sm outline-none" />
-                    {Number(ppvPrice) >= 20 && <p className="text-xs text-muted-foreground">You earn <span className="font-semibold text-foreground">{fmtKes(creatorShare(Number(ppvPrice)))}</span> per unlock. Primegram keeps 15%.</p>}
-                  </>
-                )}
-              </div>
-            )}
             {track && (
               <div className="liquid-glass rounded-xl px-3 py-2 flex items-center gap-2 relative z-10">
                 <Music className="w-3.5 h-3.5 text-primary shrink-0" />
