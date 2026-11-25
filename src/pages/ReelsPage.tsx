@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { getBlockedIds } from "@/utils/blocks";
 import type { Tables } from "@/integrations/supabase/types";
 import { trackEvent } from "@/utils/telemetry";
 import ReportDialog from "@/components/ReportDialog";
@@ -136,7 +137,8 @@ const ReelsPage = () => {
       let hidden: Record<string, string> = {};
       try { hidden = JSON.parse(localStorage.getItem("primegram:reelFeedback") || "{}"); } catch { /* storage unavailable */ }
       const rawBatch = (data ?? []) as Tables<"reels">[];
-      const batch = rawBatch.filter(r => hidden[r.id] !== "not_interested");
+      const blockedIds = await getBlockedIds();
+      const batch = rawBatch.filter(r => hidden[r.id] !== "not_interested" && !blockedIds.has(r.user_id));
       const userIds = [...new Set(batch.map(reel => reel.user_id))];
       const { data: profiles, error: profileError } = userIds.length
         ? await supabase.from("profiles").select("user_id, display_name, avatar_url").in("user_id", userIds)
@@ -300,10 +302,12 @@ const ReelsPage = () => {
   const loadComments = async (id: string) => {
     setOpenComments(id);
     const { data } = await supabase.from("reel_comments").select("*").eq("reel_id", id).order("created_at", { ascending: true });
-    const uids = [...new Set((data || []).map(c => c.user_id))];
+    const blockedC = await getBlockedIds();
+    const visible = (data || []).filter(c => !blockedC.has(c.user_id));
+    const uids = [...new Set(visible.map(c => c.user_id))];
     const { data: profs } = uids.length ? await supabase.from("profiles").select("user_id, username, display_name").in("user_id", uids) : { data: [] as any[] };
     const pm = new Map((profs || []).map(p => [p.user_id, p]));
-    setComments((data || []).map(c => ({ ...c, profile: pm.get(c.user_id) })));
+    setComments(visible.map(c => ({ ...c, profile: pm.get(c.user_id) })));
   };
 
   const postComment = async () => {

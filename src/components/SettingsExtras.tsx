@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { invalidateBlocked } from "@/utils/blocks";
 
 const card = "liquid-glass rounded-2xl p-4 relative z-10";
 const input = "w-full px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm outline-none";
@@ -75,7 +76,7 @@ export const BlockedPanel = () => {
   const unblock = async (id: string) => {
     if (!user) return;
     const { error } = await supabase.from("user_blocks" as never).delete().eq("blocker_id", user.id).eq("blocked_id", id);
-    if (error) toast.error(errMsg(error, "Couldn't unblock")); else { toast.success("Unblocked"); void load(); }
+    if (error) toast.error(errMsg(error, "Couldn't unblock")); else { invalidateBlocked(); toast.success("Unblocked"); void load(); }
   };
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading...</p>;

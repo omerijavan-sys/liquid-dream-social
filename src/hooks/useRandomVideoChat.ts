@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { TURN_SERVERS } from "@/utils/iceConfig";
+import { invalidateBlocked } from "@/utils/blocks";
 
 export type ChatStatus = "idle" | "searching" | "connecting" | "live" | "partner_left";
 export type ReportReason = "underage" | "harassment" | "explicit_content" | "spam";
@@ -274,7 +275,7 @@ export function useRandomVideoChat(opts: { userId: string | undefined; tags: str
     o.current.onBlock(p.uid);
     const [r, b] = await Promise.all([
       supabase.from("video_chat_reports" as never).insert({ reporter_id: me, reported_id: p.uid, reason, session_id: session } as never),
-      supabase.from("user_blocks" as never).upsert({ blocker_id: me, blocked_id: p.uid } as never),
+      supabase.from("user_blocks" as never).upsert({ blocker_id: me, blocked_id: p.uid } as never).then((r) => { invalidateBlocked(); return r; }),
     ]);
     return !r.error && !b.error;
   }, [closePeer, goSearching]);

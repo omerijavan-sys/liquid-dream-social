@@ -22,6 +22,7 @@ import { X, Globe } from "lucide-react";
 import GroupChats from "@/components/GroupChats";
 import VideoThumb from "@/components/VideoThumb";
 import { UPLOAD_CACHE } from "@/utils/media";
+import { getBlockedIds } from "@/utils/blocks";
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
 type SpeechRecognitionLike = {
@@ -243,6 +244,7 @@ const MessagesPage = () => {
         partnerIds.add(other);
       }
       for (const f of follows || []) partnerIds.add(f.following_id);
+      for (const b of await getBlockedIds()) partnerIds.delete(b);
 
       if (partnerIds.size === 0) { setConversations([]); return; }
       const { data: profiles } = await supabase

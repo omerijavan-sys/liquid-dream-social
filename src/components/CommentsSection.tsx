@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Send, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { getBlockedIds } from "@/utils/blocks";
 
 interface Comment {
   id: string;
@@ -27,12 +28,14 @@ const CommentsSection = ({ postId, onCountChange }: { postId: string; onCountCha
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
     if (error) { setLoading(false); return; }
-    const ids = [...new Set((data ?? []).map((c) => c.user_id))];
+    const blocked = await getBlockedIds();
+    const rows = (data ?? []).filter((c) => !blocked.has(c.user_id));
+    const ids = [...new Set(rows.map((c) => c.user_id))];
     const { data: profs } = ids.length
       ? await supabase.from("profiles").select("user_id, username, display_name").in("user_id", ids)
       : { data: [] as any[] };
     const map = new Map((profs ?? []).map((p: any) => [p.user_id, p.username || p.display_name]));
-    const list = (data ?? []).map((c) => ({ ...c, username: map.get(c.user_id) }));
+    const list = rows.map((c) => ({ ...c, username: map.get(c.user_id) }));
     setComments(list);
     onCountChange?.(list.length);
     setLoading(false);

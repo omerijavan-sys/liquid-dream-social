@@ -5,6 +5,7 @@ import GlassTabBar from "@/components/GlassTabBar";
 import DailyDrops from "@/features/drops/DailyDrops";
 import { FeedSkeleton } from "@/components/PostSkeleton";
 import WrappedBanner from "@/features/vibe/WrappedBanner";
+import { getBlockedIds } from "@/utils/blocks";
 import TrendingStrip from "@/components/TrendingStrip";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
@@ -61,11 +62,12 @@ const Index = () => {
 
       if (error) throw error;
       if (followsError) throw followsError;
-      const postRows = data ?? [];
+      const blockedIds = await getBlockedIds();
+      const postRows = (data ?? []).filter(p => !blockedIds.has(p.user_id));
       const rows = [
         ...postRows,
         ...((reelRows ?? []) as any[]).map(r => ({ ...r, _reel: true, media_url: r.video_url, media_type: "video" })),
-      ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+      ].filter(r => !blockedIds.has(r.user_id)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
       hasMoreRef.current = postRows.length === FEED_PAGE_SIZE;
       setHasMore(hasMoreRef.current);
       pageRef.current = page + 1;
