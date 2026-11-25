@@ -132,7 +132,11 @@ const ReelsPage = () => {
         ({ data, error } = await supabase.from("reels").select("*").order("created_at", { ascending: false }).range(page * REEL_BATCH_SIZE, page * REEL_BATCH_SIZE + REEL_BATCH_SIZE - 1));
       }
       if (error) throw error;
-      const batch = (data ?? []) as Tables<"reels">[];
+      // Reels the user marked "Not interested" stay out of the feed (stored on this device).
+      let hidden: Record<string, string> = {};
+      try { hidden = JSON.parse(localStorage.getItem("primegram:reelFeedback") || "{}"); } catch { /* storage unavailable */ }
+      const rawBatch = (data ?? []) as Tables<"reels">[];
+      const batch = rawBatch.filter(r => hidden[r.id] !== "not_interested");
       const userIds = [...new Set(batch.map(reel => reel.user_id))];
       const { data: profiles, error: profileError } = userIds.length
         ? await supabase.from("profiles").select("user_id, display_name, avatar_url").in("user_id", userIds)
@@ -142,7 +146,7 @@ const ReelsPage = () => {
       const mapped = batch.map(reel => ({ ...reel, profile: profileMap.get(reel.user_id) ?? null }));
       setReels(current => reset ? mapped : [...current, ...mapped]);
       pageRef.current = page + 1;
-      hasMoreRef.current = batch.length === REEL_BATCH_SIZE;
+      hasMoreRef.current = rawBatch.length === REEL_BATCH_SIZE;
       setHasMore(hasMoreRef.current);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't load reels");
