@@ -131,3 +131,47 @@ export const drawWrappedCard = async (w: WrappedData, name: string, streak: numb
   c.restore();
   return done(cv);
 };
+
+export interface RankData { name: string; avatarDataUrl: string | null; rank: number; total: number; score: number; likes: number; views: number; items: number }
+
+/** "My week on Primegram" rank card: big rank number, avatar, three stats and the invite link. */
+export const drawRankCard = async (d: RankData, link: string): Promise<string> => {
+  const { cv, c } = newCanvas();
+  c.save(); rr(c, 0, 0, W, H, 28); c.clip();
+  const g = c.createLinearGradient(0, 0, W * 0.7, H);
+  g.addColorStop(0, d.rank <= 3 ? "#2a1f08" : "#1a0b3b"); g.addColorStop(0.6, "#09090B"); g.addColorStop(1, "#12082a"); c.fillStyle = g; c.fillRect(0, 0, W, H);
+  const medal = d.rank === 1 ? "251,191,36" : d.rank === 2 ? "203,213,225" : d.rank === 3 ? "251,146,60" : "168,85,247";
+  blob(c, 170, 150, 190, medal, 0.55); blob(c, 290, 470, 150, "236,72,153", 0.35);
+  rr(c, 18, 18, W - 36, H - 36, 24); c.fillStyle = "rgba(255,255,255,.06)"; c.fill(); c.strokeStyle = "rgba(255,255,255,.12)"; c.lineWidth = 1; c.stroke();
+  const F = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  c.textAlign = "center"; c.textBaseline = "alphabetic";
+  c.font = `600 10px ${F}`; c.fillStyle = "rgba(255,255,255,.65)"; c.fillText("PRIMEGRAM TOP CREATORS · THIS WEEK", W / 2, 54);
+  // avatar
+  const ax = W / 2, ay = 108, ar = 34;
+  const img = d.avatarDataUrl ? await loadImg(d.avatarDataUrl) : null;
+  c.save(); c.beginPath(); c.arc(ax, ay, ar, 0, Math.PI * 2); c.closePath(); c.clip();
+  if (img) c.drawImage(img, ax - ar, ay - ar, ar * 2, ar * 2);
+  else { const ag = c.createLinearGradient(ax - ar, ay - ar, ax + ar, ay + ar); ag.addColorStop(0, "#8b5cf6"); ag.addColorStop(1, "#ec4899"); c.fillStyle = ag; c.fillRect(ax - ar, ay - ar, ar * 2, ar * 2); }
+  c.restore(); c.beginPath(); c.arc(ax, ay, ar + 2, 0, Math.PI * 2); c.strokeStyle = `rgba(${medal},.9)`; c.lineWidth = 3; c.stroke();
+  c.font = `800 18px ${F}`; c.fillStyle = "#fff"; c.fillText(fit(c, d.name, W - 80), W / 2, 168);
+  // rank
+  c.shadowColor = `rgba(${medal},.9)`; c.shadowBlur = 26; c.fillStyle = `rgb(${medal})`; c.font = `900 92px ${F}`; c.fillText(`#${d.rank}`, W / 2, 270); c.shadowBlur = 0;
+  c.font = `500 13px ${F}`; c.fillStyle = "rgba(255,255,255,.8)";
+  c.fillText(d.rank === 1 ? "Top creator on Primegram this week 👑" : `of ${d.total} creator${d.total === 1 ? "" : "s"} this week`, W / 2, 296);
+  // stats
+  const bw = (W - 72 - 16) / 3, bh = 62, y0 = 330;
+  const stat = (i: number, n: number, label: string, col: string) => {
+    const sx = 36 + i * (bw + 8); rr(c, sx, y0, bw, bh, 14); c.fillStyle = "rgba(0,0,0,.35)"; c.fill(); c.strokeStyle = "rgba(255,255,255,.1)"; c.stroke();
+    c.fillStyle = col; c.font = `800 22px ${F}`; c.fillText(n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n), sx + bw / 2, y0 + 30);
+    c.fillStyle = "rgba(255,255,255,.6)"; c.font = `400 9px ${F}`; c.fillText(label.toUpperCase(), sx + bw / 2, y0 + 48);
+  };
+  stat(0, d.likes, "Likes", "#f472b6"); stat(1, d.views, "Views", "#38bdf8"); stat(2, d.score, "Points", "#fbbf24");
+  c.font = `400 12px ${F}`; c.fillStyle = "rgba(255,255,255,.75)"; c.fillText(`${d.items} post${d.items === 1 ? "" : "s"} and reels shared`, W / 2, 424);
+  // footer + QR
+  const qr = await loadImg(await QRCode.toDataURL(link, { margin: 1, width: 120, color: { dark: "#000000", light: "#ffffff" } }));
+  if (qr) { rr(c, W - 36 - 58, H - 36 - 58, 58, 58, 10); c.fillStyle = "#fff"; c.fill(); c.drawImage(qr, W - 36 - 54, H - 36 - 54, 50, 50); }
+  c.textAlign = "left"; c.fillStyle = "#fff"; c.font = `800 14px ${F}`; c.fillText("Beat my rank on Primegram", 36, H - 66);
+  c.fillStyle = "rgba(255,255,255,.6)"; c.font = `400 10px ${F}`; c.fillText(fit(c, link.replace("https://", ""), W - 72 - 70), 36, H - 48);
+  c.restore();
+  return done(cv);
+};

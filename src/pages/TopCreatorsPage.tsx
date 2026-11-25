@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Crown, Eye, Heart, Trophy } from "lucide-react";
+import { ArrowLeft, Crown, Eye, Heart, Share2, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getBlockedIds } from "@/utils/blocks";
 import LiquidBackground from "@/components/LiquidBackground";
+import ShareRankCard from "@/features/shared/ShareRankCard";
 
 type Row = { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; score: number; likes: number; views: number; items: number };
 const MEDAL = ["from-yellow-300 to-amber-500", "from-slate-200 to-slate-400", "from-orange-300 to-orange-600"];
@@ -13,12 +14,23 @@ const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}
 const TopCreatorsPage = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [mine, setMine] = useState<{ rank: number; total: number; score: number; likes: number; views: number; items: number } | null>(null);
+  const [showCard, setShowCard] = useState(false);
   useEffect(() => {
     void (async () => {
       try {
         const [{ data }, blocked] = await Promise.all([(supabase.rpc as any)("top_creators_week", { _limit: 30 }), getBlockedIds()]); // eslint-disable-line @typescript-eslint/no-explicit-any
         setRows(((data ?? []) as Row[]).filter((r) => !blocked.has(r.user_id)).slice(0, 20));
       } catch { setRows([]); }
+    })();
+  }, []);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { data } = await (supabase.rpc as any)("my_week_rank"); // eslint-disable-line @typescript-eslint/no-explicit-any
+        const r = Array.isArray(data) ? data[0] : data;
+        if (r?.rank) setMine({ rank: Number(r.rank), total: Number(r.total), score: Number(r.score), likes: Number(r.likes), views: Number(r.views), items: Number(r.items) });
+      } catch { /* optional */ }
     })();
   }, []);
   return (
@@ -34,6 +46,13 @@ const TopCreatorsPage = () => {
       </div>
       <div className="relative z-10 space-y-2 px-4 pb-24 pt-4">
         <p className="text-xs text-muted-foreground">Ranked by likes and views on what creators posted in the last 7 days. Post and reel more to climb.</p>
+        {mine && (
+          <div className="flex items-center gap-3 rounded-2xl border border-amber-300/30 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 p-3">
+            <span className="text-2xl font-black text-amber-300">#{mine.rank}</span>
+            <span className="min-w-0 flex-1 text-xs text-foreground"><strong className="block text-sm">Your rank this week</strong>of {mine.total} creators · {mine.score} pts</span>
+            <button onClick={() => setShowCard(true)} className="flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-3 py-1.5 text-xs font-bold text-white"><Share2 className="h-3.5 w-3.5" /> Share</button>
+          </div>
+        )}
         {rows === null && Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/5" />)}
         {rows?.length === 0 && <p className="py-16 text-center text-sm text-muted-foreground">No rankings yet this week. Be the first to post.</p>}
         {rows?.map((r, i) => (
@@ -48,6 +67,7 @@ const TopCreatorsPage = () => {
           </button>
         ))}
       </div>
+      {showCard && mine && <ShareRankCard rank={mine} onClose={() => setShowCard(false)} />}
     </div>
   );
 };
