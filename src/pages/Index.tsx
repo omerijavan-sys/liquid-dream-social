@@ -7,6 +7,7 @@ import { FeedSkeleton } from "@/components/PostSkeleton";
 import WrappedBanner from "@/features/vibe/WrappedBanner";
 import { getBlockedIds } from "@/utils/blocks";
 import TrendingStrip from "@/components/TrendingStrip";
+import { useCoverBackfill } from "@/hooks/useCoverBackfill";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
 import UploadStrip from "@/components/UploadStrip";
@@ -27,6 +28,7 @@ const Index = () => {
   const [hasMore, setHasMore] = useState(true);
   const { user } = useAuth();
   const currentUserId = user?.id;
+  useCoverBackfill(currentUserId);
   const pageRef = useRef(0);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
