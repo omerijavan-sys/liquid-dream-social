@@ -98,6 +98,44 @@ function useItems(s: ReturnType<typeof useProfileStats>): Item[] {
   }, [s]);
 }
 
+/** Money the creator earned in the last 30 days (tips, subscriptions and referral rewards). Owner only. */
+function useEarnings(userId: string, enabled: boolean) {
+  const [e, setE] = useState<{ tips: number; other: number; referral: number; loading: boolean }>({ tips: 0, other: 0, referral: 0, loading: true });
+  useEffect(() => {
+    if (!enabled) return;
+    let dead = false;
+    void (async () => {
+      try {
+        const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+        const [{ data: tx }, { data: wt }, { data: ref }] = await Promise.all([
+          supabase.from("transactions").select("creator_net_kes, payment_type").eq("creator_id", userId).eq("status", "success").gte("created_at", since),
+          supabase.from("wallet_transactions").select("amount").eq("user_id", userId).eq("type", "receive").gte("created_at", since),
+          (supabase.rpc as any)("my_referral_earnings"), // eslint-disable-line @typescript-eslint/no-explicit-any
+        ]);
+        const net = (tx ?? []).filter(t => t.payment_type !== "topup");
+        const tipNet = net.filter(t => t.payment_type === "tip").reduce((n, t) => n + Number(t.creator_net_kes), 0);
+        const otherNet = net.filter(t => t.payment_type !== "tip").reduce((n, t) => n + Number(t.creator_net_kes), 0);
+        const walletTips = (wt ?? []).reduce((n, t) => n + Number(t.amount), 0);
+        if (!dead) setE({ tips: tipNet + walletTips, other: otherNet, referral: Number((ref as { last30?: number } | null)?.last30 ?? 0), loading: false });
+      } catch { if (!dead) setE(x => ({ ...x, loading: false })); }
+    })();
+    return () => { dead = true; };
+  }, [userId, enabled]);
+  return e;
+}
+
+/** The hour of day (local) when this creator's posts earn the most likes on average. */
+function bestHour(items: Item[]): { label: string; n: number } | null {
+  if (items.length < 5) return null;
+  const by = new Map<number, { likes: number; n: number }>();
+  for (const it of items) { const h = new Date(it.created_at).getHours(); const b = by.get(h) ?? { likes: 0, n: 0 }; b.likes += it.likes; b.n += 1; by.set(h, b); }
+  let best: number | null = null, bestAvg = -1;
+  for (const [h, b] of by) { const avg = b.likes / b.n; if (avg > bestAvg) { bestAvg = avg; best = h; } }
+  if (best === null || bestAvg <= 0) return null;
+  const ampm = (h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? "am" : "pm"}`;
+  return { label: `${ampm(best)}–${ampm((best + 1) % 24)}`, n: by.get(best)!.n };
+}
+
 const Thumb = ({ it }: { it: Item }) => (
   <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-secondary">
     {it.thumb ? <img src={it.thumb} alt="" className="h-full w-full object-cover" /> : it.video ? <VideoThumb src={it.video} /> : null}
@@ -173,6 +211,8 @@ export const AuraDialog = ({ userId, open, onOpenChange }: { userId: string; ope
 export const AnalyticsDialog = ({ userId, isOwner, open, onOpenChange }: { userId: string; isOwner: boolean; open: boolean; onOpenChange: (o: boolean) => void }) => {
   const s = useProfileStats(userId, open);
   const items = useItems(s);
+  const earn = useEarnings(userId, open && isOwner);
+  const best = useMemo(() => bestHour(items), [items]);
   const totals = useMemo(() => {
     const likes = s.posts.reduce((n, p) => n + (p.likes_count ?? 0), 0) + s.reelLikes;
     const views = s.posts.reduce((n, p) => n + (p.views_count ?? 0), 0) + s.reelViews;
@@ -208,6 +248,14 @@ export const AnalyticsDialog = ({ userId, isOwner, open, onOpenChange }: { userI
               <Stat icon={Film} label="Posts + reels" value={`${s.posts.length + s.reels.length} (${s.reels.length} reels)`} />
               <Stat icon={BarChart3} label="Engagement rate" value={`${totals.engagement.toFixed(1)}%`} />
             </div>
+            {isOwner && !earn.loading && (
+              <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3">
+                <p className="text-xs font-semibold text-emerald-300">Earnings, last 30 days</p>
+                <p className="mt-0.5 text-lg font-bold text-foreground">KES {(earn.tips + earn.other + earn.referral).toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground">Tips KES {earn.tips.toLocaleString()} · Subscriptions KES {earn.other.toLocaleString()} · Referrals KES {earn.referral.toLocaleString()}</p>
+              </div>
+            )}
+            {best && <p className="rounded-xl bg-primary/10 p-3 text-xs text-foreground">Best time to post: <strong>{best.label}</strong>. Your posts around then get the most likes.</p>}
             <div>
               <p className="mb-2 text-xs font-semibold text-muted-foreground">Posts and reels in the last 14 days</p>
               <div className="flex h-20 items-end gap-1">
