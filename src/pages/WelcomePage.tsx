@@ -82,7 +82,7 @@ const WelcomePage = () => {
         <motion.div className="h-full bg-white/80" initial={{ width: "0%" }} animate={{ width: "100%" }} transition={{ duration: 6.4, ease: "linear" }} />
       </div>
       <div className="relative z-10 mt-6 w-[min(92vw,26rem)]"><AndroidDownloadCard compact /></div>
-      <p className="absolute bottom-8 text-xs text-muted-foreground">Created by Java Prime · Sponsored by JP7 ULTRA</p>
+      <p className="absolute bottom-8 px-4 text-center text-xs text-muted-foreground">Primegram X by Aurora · Created by Java Prime · Sponsored by JP7 ULTRA</p>
     </div>
   );
 };
