@@ -7,7 +7,7 @@ export function captureVideoFrame(src: string, at = 0.6): Promise<string | null>
   if (cache.has(src)) return Promise.resolve(cache.get(src)!);
   return new Promise((resolve) => {
     const v = document.createElement("video");
-    v.crossOrigin = "anonymous"; v.muted = true; v.playsInline = true; v.preload = "auto";
+    v.crossOrigin = "anonymous"; v.muted = true; v.playsInline = true; v.preload = "metadata"; // metadata only: "auto" can pull the whole video just to grab one frame
     let done = false;
     const finish = (r: string | null) => { if (done) return; done = true; cache.set(src, r); v.removeAttribute("src"); v.load(); resolve(r); };
     const timer = setTimeout(() => finish(null), 8000);

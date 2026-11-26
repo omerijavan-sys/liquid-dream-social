@@ -20,9 +20,11 @@ const TrendingStrip = () => {
   useEffect(() => {
     let dead = false;
     void (async () => {
+      let grabbed = 0;
       for (const r of items) {
-        if (dead) return;
+        if (dead || grabbed >= 4) return; // cap: every grab costs the user data and us bandwidth
         if (r.thumbnail_url || !r.video_url) continue;
+        grabbed++;
         const f = await captureVideoFrame(r.video_url);
         if (f && !dead) setFrames((cur) => ({ ...cur, [r.id]: f }));
       }
