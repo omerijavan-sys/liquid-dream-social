@@ -1,4 +1,5 @@
 import RouteSeo from "./components/RouteSeo";
+import ServiceStatusGate from "@/components/ServiceStatusGate";
 import BanGate from "./components/BanGate";
 import { PinHost } from "@/components/WalletPin";
 import BackgroundAudio from "./components/BackgroundAudio";
@@ -96,6 +97,7 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => (
+  <ServiceStatusGate>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -169,6 +171,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ServiceStatusGate>
 );
 
 export default App;
