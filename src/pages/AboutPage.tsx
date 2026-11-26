@@ -18,13 +18,14 @@ const founderStructuredData = {
       "@id": "https://primegramx.co.ke/#website",
       name: "Primegram X",
       url: "https://primegramx.co.ke",
-      publisher: { "@id": "https://primegramx.co.ke/#organization" },
+      publisher: { "@type": "Organization", "@id": "https://primegramx.co.ke/#organization", name: "Aurora" },
+      provider: { "@type": "Organization", "@id": "https://primegramx.co.ke/#organization", name: "Aurora" },
     },
     {
       "@type": "Organization",
       "@id": "https://primegramx.co.ke/#organization",
-      name: "Primegram X",
-      url: "https://primegramx.co.ke",
+      name: "Aurora",
+      url: "https://primegramx.co.ke/",
       email: "support@primegramx.co.ke",
       founder: {
         "@type": "Person",
@@ -40,7 +41,7 @@ const founderStructuredData = {
 const AboutPage = () => {
   usePageMeta({
     title: "About Primegram X | Founded in Kisii, Kenya",
-    description: "Meet Javan Omeri (MR. AURA), founder of Primegram X, a social, entertainment, and real-time connection platform created in Kisii, Kenya.",
+    description: "Primegram X is built by Aurora, founded in Kisii, Kenya by Javan Omeri (MR. AURA): a social, entertainment, and real-time connection platform.",
     path: "/about",
   });
 
@@ -54,13 +55,13 @@ const AboutPage = () => {
       <section className="relative z-10 mx-auto grid min-h-[78vh] w-full max-w-7xl items-center gap-14 px-5 pb-20 pt-12 sm:px-8 md:grid-cols-[1.05fr_.95fr] md:pb-28 md:pt-16">
         <div className="max-w-2xl">
           <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.07] px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.13em] text-primary">
-            <Sparkles className="size-4" aria-hidden="true" /> Created in Kisii, Kenya by Javan Omeri (MR. AURA)
+            <Sparkles className="size-4" aria-hidden="true" /> Built by Aurora, founded in Kisii, Kenya by Javan Omeri (MR. AURA)
           </p>
           <h1 className="text-5xl font-black leading-[1.02] tracking-[-0.055em] sm:text-6xl md:text-7xl">
             Social, in<br /><span className="bg-gradient-to-r from-primary via-fuchsia-300 to-white bg-clip-text text-transparent">full colour.</span>
           </h1>
           <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            Primegram X is a next-generation social, entertainment, and real-time connection platform for Gen Z. Created in Kisii, Kenya by founder Javan Omeri (MR. AURA), it brings real-time feeds, stories, live rooms, music, sports, and creator communities together at primegramx.co.ke.
+            Primegram X is a next-generation social, entertainment, and real-time connection platform for Gen Z. Built by Aurora, a company founded in Kisii, Kenya by Javan Omeri (MR. AURA), it brings real-time feeds, stories, live rooms, music, sports, and creator communities together at primegramx.co.ke.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <a href="/auth" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-[0_8px_30px_hsla(var(--primary)/.2)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
@@ -120,9 +121,9 @@ const AboutPage = () => {
             <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/[0.07] px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-200">
               <Sparkles className="size-4" aria-hidden="true" /> MEET THE FOUNDER
             </p>
-            <h2 id="founder-heading" className="text-3xl font-black tracking-tight sm:text-5xl">Built by Javan Omeri <span className="text-amber-200">(MR. AURA)</span></h2>
+            <h2 id="founder-heading" className="text-3xl font-black tracking-tight sm:text-5xl">Built by Aurora, founded by Javan Omeri <span className="text-amber-200">(MR. AURA)</span></h2>
             <p className="mt-5 text-sm leading-7 text-muted-foreground sm:text-base sm:leading-8">
-              Primegram X was created in Kisii, Kenya by Javan Omeri—known across the digital and music space as MR. AURA (JAVA PRIME ULTRA / JP7 ULTRA). Built to merge refractive Liquid Glass design, real-time WebRTC connections, music discovery, and social feeds into one fast, expressive hub for Gen Z creators and communities.
+              Primegram X is built by Aurora, founded in Kisii, Kenya by Javan Omeri—known across the digital and music space as MR. AURA (JAVA PRIME ULTRA / JP7 ULTRA). Built to merge refractive Liquid Glass design, real-time WebRTC connections, music discovery, and social feeds into one fast, expressive hub for Gen Z creators and communities.
             </p>
           </div>
 
@@ -145,7 +146,7 @@ const AboutPage = () => {
 
             <div className="relative flex flex-col gap-7 p-7 sm:p-10">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Founder &amp; Lead Developer, Primegram X</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Founder &amp; Lead Developer • Aurora (Primegram X)</p>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">Independent digital creator &amp; music producer, bringing social technology and creative culture together.</p>
               </div>
               <div className="grid gap-5 border-y border-white/[0.09] py-6 sm:grid-cols-2">
@@ -175,7 +176,7 @@ const AboutPage = () => {
           <h2 className="mt-4 max-w-sm text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Make social feel more alive.</h2>
         </div>
         <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
-          Founded and built in Kisii, Kenya by Javan Omeri (MR. AURA), Primegram X brings Gen Z together through expressive social features, entertainment, and real-time connection.
+          Primegram X is built by Aurora, founded in Kisii, Kenya by Javan Omeri (MR. AURA). It brings Gen Z together through expressive social features, entertainment, and real-time connection.
         </p>
       </section>
 

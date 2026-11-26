@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import GlassTabBar from "@/components/GlassTabBar";
 import TopNavBar from "@/components/TopNavBar";
 import { readContentPrefs } from "@/components/SettingsExtras";
+import { getBlockedIds } from "@/utils/blocks";
 
 const HISTORY_KEY = "primegram-search-history";
 const readHistory = (): string[] => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; } };
@@ -42,10 +43,33 @@ const SearchPage = () => {
       .then(({ data }) => setPostResults(data || []));
   }, []);
 
+  // Suggestions while typing: people whose username or name starts with (or contains) what was typed.
+  type Sug = { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null };
+  const [sugs, setSugs] = useState<Sug[]>([]);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    const q = query.trim().replace(/[%,()]/g, "").toLowerCase();
+    if (!q || !user) { setSugs([]); return; }
+    let dead = false;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const [{ data }, blocked] = await Promise.all([
+          supabase.from("profiles").select("user_id, username, display_name, avatar_url").or(`username.ilike.%${q}%,display_name.ilike.%${q}%`).neq("user_id", user.id).limit(20),
+          getBlockedIds(),
+        ]);
+        if (dead) return;
+        const rank = (s: Sug) => ((s.username ?? "").toLowerCase().startsWith(q) ? 0 : (s.display_name ?? "").toLowerCase().startsWith(q) ? 1 : 2);
+        setSugs(((data ?? []) as Sug[]).filter(s => !blocked.has(s.user_id)).sort((a, b) => rank(a) - rank(b)).slice(0, 6));
+      })();
+    }, 180);
+    return () => { dead = true; window.clearTimeout(t); };
+  }, [query, user]);
+
   const search = async (override?: string) => {
     const q = (override ?? query).trim().replace(/[%,()]/g, "");
     if (!q) return;
     if (override) setQuery(override);
+    setFocused(false);
     if (readContentPrefs().saveSearchHistory) {
       const next = [q, ...readHistory().filter(h => h.toLowerCase() !== q.toLowerCase())].slice(0, 8);
       localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
@@ -81,11 +105,28 @@ const SearchPage = () => {
           <Search className="w-4 h-4 text-muted-foreground" />
           <input
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { setQuery(e.target.value); setFocused(true); }}
+            onFocus={() => setFocused(true)}
             onKeyDown={e => e.key === "Enter" && void search()}
+            autoComplete="off" enterKeyHint="search"
             placeholder="Search users..."
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
+          {focused && query.trim() && (
+            <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-background/95 shadow-2xl backdrop-blur-xl">
+              {sugs.map(s => (
+                <button key={s.user_id} onMouseDown={e => e.preventDefault()} onClick={() => { setFocused(false); navigate(`/profile/${s.user_id}`); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-white/5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/20 text-sm font-semibold text-primary">
+                    {s.avatar_url ? <img src={s.avatar_url} alt="" className="h-full w-full object-cover" loading="lazy" /> : (s.display_name || s.username || "?").charAt(0).toUpperCase()}
+                  </span>
+                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-foreground">{s.display_name || s.username}</span>{s.username && <span className="block truncate text-xs text-muted-foreground">@{s.username}</span>}</span>
+                </button>
+              ))}
+              <button onMouseDown={e => e.preventDefault()} onClick={() => void search()} className="flex w-full items-center gap-3 border-t border-white/10 px-4 py-2.5 text-left text-sm text-primary hover:bg-white/5">
+                <Search className="h-4 w-4" /> Search for "{query.trim()}"
+              </button>
+            </div>
+          )}
         </div>
 
         {history.length > 0 && (

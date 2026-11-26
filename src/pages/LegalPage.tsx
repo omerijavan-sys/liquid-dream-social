@@ -52,6 +52,7 @@ const LegalPage = ({ kind }: { kind: Kind }) => {
         <header className="mb-10 border-b border-white/10 pb-8 sm:mb-12 sm:pb-10">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Primegram X · Public policy</p>
           <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">{page.title}</h1>
+          <p className="mt-4 text-sm font-semibold leading-7 text-foreground">Primegram X is operated by Aurora ("we", "us", or "our").</p>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">{page.description}</p>
         </header>
         <div className="grid gap-4 sm:gap-5">

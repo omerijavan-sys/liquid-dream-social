@@ -135,7 +135,7 @@ const PublicLandingPage = () => {
 
       <footer className="relative z-10 border-t border-white/10 px-5 py-6 text-xs text-white/50">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} Primegram X</p>
+          <p>© 2026 Aurora. Primegram X is a product of Aurora.</p>
           <nav aria-label="Trust and legal pages" className="flex flex-wrap gap-x-5 gap-y-2">
             <a className="transition-colors hover:text-white" href="/about">About</a>
             <a className="transition-colors hover:text-white" href="/privacy">Privacy</a>

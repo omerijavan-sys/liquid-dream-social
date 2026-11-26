@@ -106,6 +106,7 @@ const ReelsPage = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
   const pageRef = useRef(0);
+  const startIdRef = useRef<string | null>(new URLSearchParams(window.location.search).get("id"));
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const reelIdKey = reels.map(reel => reel.id).join(",");
@@ -167,7 +168,22 @@ const ReelsPage = () => {
       const affinity = readCreatorAffinity();
       const mapped = shuffleReels(batch.map(reel => ({ ...reel, profile: profileMap.get(reel.user_id) ?? null })))
         .sort((a, b) => (affinity[b.user_id] ?? 0) - (affinity[a.user_id] ?? 0));
-      setReels(current => reset ? mapped : [...current, ...mapped]);
+      let list = mapped;
+      // Opened from Trending (or a link) with ?id=: start on exactly that reel.
+      if (reset && startIdRef.current) {
+        const wanted = startIdRef.current; startIdRef.current = null;
+        const found = mapped.find(r => r.id === wanted);
+        let target: typeof mapped[number] | null = found ?? null;
+        if (!target) {
+          const { data: one } = await supabase.from("reels").select("*").eq("id", wanted).maybeSingle();
+          if (one && !blockedIds.has(one.user_id)) {
+            const { data: pr } = await supabase.from("profiles").select("user_id, display_name, avatar_url").eq("user_id", one.user_id).maybeSingle();
+            target = { ...(one as Tables<"reels">), profile: pr ?? null } as typeof mapped[number];
+          }
+        }
+        if (target) list = [target, ...mapped.filter(r => r.id !== wanted)];
+      }
+      setReels(current => reset ? list : [...current, ...list]);
       pageRef.current = page + 1;
       hasMoreRef.current = rawBatch.length === REEL_BATCH_SIZE;
       setHasMore(hasMoreRef.current);

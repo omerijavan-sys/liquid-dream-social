@@ -48,6 +48,7 @@ const TrustPageLayout = ({ children }: { children: ReactNode }) => (
           <Mail className="size-3.5" aria-hidden="true" /> support@primegramx.co.ke
         </a>
       </div>
+      <p className="mx-auto mt-5 w-full max-w-7xl text-xs text-muted-foreground">© 2026 Aurora. Primegram X is a product of Aurora.</p>
     </footer>
   </main>
 );
