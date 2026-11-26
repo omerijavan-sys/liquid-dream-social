@@ -7,6 +7,7 @@ import { FeedSkeleton } from "@/components/PostSkeleton";
 import WrappedBanner from "@/features/vibe/WrappedBanner";
 import { getBlockedIds } from "@/utils/blocks";
 import TrendingStrip from "@/components/TrendingStrip";
+import SuggestedPeopleStrip from "@/components/SuggestedPeopleStrip";
 import { useCoverBackfill } from "@/hooks/useCoverBackfill";
 import StoriesBar from "@/components/StoriesBar";
 import FloatingActions from "@/components/FloatingActions";
@@ -171,6 +172,7 @@ const Index = () => {
         </div>
         <DailyDrops />
         <WrappedBanner />
+        <SuggestedPeopleStrip />
         <TrendingStrip />
         <div className="mb-5 px-4">
           <div className="liquid-glass-elevated rounded-[2rem] p-4">
