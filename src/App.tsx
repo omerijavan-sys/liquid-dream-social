@@ -14,6 +14,7 @@ import NativePush from "@/components/NativePush";
 import ReferralClaimer from "@/features/referrals/ReferralClaimer";
 import OnboardingGate from "@/features/onboarding/OnboardingGate";
 import UpdateChecker from "@/components/UpdateChecker";
+import WebAppDownloadNotice from "@/components/WebAppDownloadNotice";
 import BackButtonHandler from "@/components/BackButtonHandler";
 import MiniPlayer from "@/components/MiniPlayer";
 import InAppBrowser from "@/components/InAppBrowser";
@@ -119,6 +120,7 @@ const App = () => (
         <AuthProvider>
           <ReferralClaimer />
           <OnboardingGate />
+          <WebAppDownloadNotice />
           <MuteProvider>
           <OnlineProvider>
           <ConsentGate />
