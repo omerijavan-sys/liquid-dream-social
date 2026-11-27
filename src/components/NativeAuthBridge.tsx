@@ -8,8 +8,29 @@ import { finishNativeSpotify } from "@/services/SpotifyConnect";
 
 export const NATIVE_REDIRECT = "com.primegram.app://auth-callback";
 
-/** Opens Google sign-in in the system browser (Chrome Custom Tab) from the Android app. */
+const GOOGLE_WEB_CLIENT_ID = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID as string | undefined;
+
+/**
+ * Google's own account picker inside the app (no browser hand-off), exchanged for a Supabase session.
+ * Returns false when the installed APK doesn't have the plugin yet, so the caller can use the browser flow instead.
+ */
+async function nativeGoogleIdTokenSignIn(): Promise<boolean> {
+  if (!GOOGLE_WEB_CLIENT_ID || !Capacitor.isPluginAvailable("SocialLogin")) return false;
+  const { SocialLogin } = await import("@capgo/capacitor-social-login");
+  await SocialLogin.initialize({ google: { webClientId: GOOGLE_WEB_CLIENT_ID } });
+  const res = await SocialLogin.login({ provider: "google", options: {} });
+  const idToken = (res as { result?: { idToken?: string | null } }).result?.idToken;
+  if (!idToken) throw new Error("Google sign-in was cancelled");
+  const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken });
+  if (error) throw error;
+  toast.success("Signed in with Google");
+  window.location.replace("/");
+  return true;
+}
+
+/** Google sign-in from the Android app: native account picker when available, otherwise the system browser. */
 export async function nativeGoogleSignIn() {
+  if (await nativeGoogleIdTokenSignIn()) return;
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: NATIVE_REDIRECT, skipBrowserRedirect: true },

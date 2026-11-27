@@ -23,6 +23,7 @@
     "@capacitor/core": "^8.4.1",
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/push-notifications": "^8.1.3",
+    "@capgo/capacitor-social-login": "^8.7.13",
     "@hookform/resolvers": "^3.10.0",
     "@lovable.dev/cloud-auth-js": "^1.1.1",
     "@lovable.dev/mcp-js": "^0.24.0",
