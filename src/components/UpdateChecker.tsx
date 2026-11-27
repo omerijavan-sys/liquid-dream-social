@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
-import { Browser } from "@capacitor/browser";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 import { ArrowUpCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { setAppUpdate, type AppUpdate } from "@/utils/updateStore";
@@ -47,7 +47,7 @@ const UpdateChecker = () => {
     if (!update || busy) return;
     setBusy(true);
     try {
-      if (update.kind === "native") { await Browser.open({ url: update.url! }); setBusy(false); return; }
+      if (update.kind === "native") { await openExternalUrl(update.url!); setBusy(false); return; }
       // drop service-worker caches too, then let the native side clear the WebView cache and reload over HTTPS
       try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* ignore */ }
       try { for (const reg of await navigator.serviceWorker.getRegistrations()) await reg.unregister(); } catch { /* ignore */ }

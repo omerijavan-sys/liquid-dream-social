@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAppUpdate, openUpdatePrompt } from "@/utils/updateStore";
 import { ArrowUpCircle } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
-import { Browser } from "@capacitor/browser";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 import { Download, ExternalLink, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,7 +19,7 @@ const AndroidDownloadCard = ({ compact = false }: { compact?: boolean }) => {
     if (openingUpgrade) return;
     setOpeningUpgrade(true);
     try {
-      await Browser.open({ url: upgradeUrl });
+      await openExternalUrl(upgradeUrl);
     } catch {
       toast.error("Could not open the APK download. Please try again from your browser.");
     } finally {

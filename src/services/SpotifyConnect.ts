@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 const LS = "primegram:spotify";
 const SCOPES = "streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state";
@@ -34,7 +35,7 @@ export async function startSpotifyLogin() {
   try { sessionStorage.setItem("primegram:spVerifier", verifier); localStorage.setItem("primegram:spVerifier", verifier); localStorage.setItem("primegram:spReturn", window.location.pathname + window.location.search); } catch { /* ignore */ }
   const u = new URL("https://accounts.spotify.com/authorize");
   u.search = new URLSearchParams({ client_id: id, response_type: "code", redirect_uri: redirectUri(), scope: SCOPES, code_challenge_method: "S256", code_challenge: challenge, state: isNative() ? "primegram-spotify-app" : "primegram-spotify" }).toString();
-  if (isNative()) { const { Browser } = await import("@capacitor/browser"); await Browser.open({ url: u.toString() }); return; }
+  if (isNative()) { await openExternalUrl(u.toString()); return; }
   window.location.assign(u.toString());
 }
 
