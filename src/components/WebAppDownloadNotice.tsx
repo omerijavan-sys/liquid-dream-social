@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Download, Smartphone, X } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { ANDROID_APK_URL } from "@/components/AndroidDownloadCard";
 
@@ -21,12 +22,19 @@ const HIDDEN_ROUTES = [
 
 const WebAppDownloadNotice = () => {
   const { pathname } = useLocation();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     const hiddenRoute = HIDDEN_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
     );
-    if (Capacitor.isNativePlatform() || !/Android/i.test(navigator.userAgent) || hiddenRoute) return;
+    let isGuest = false;
+    try {
+      isGuest = localStorage.getItem("guestMode") === "true";
+    } catch {
+      // Treat unavailable storage as a signed-out web session.
+    }
+    if (loading || (!user && !isGuest) || Capacitor.isNativePlatform() || !/Android/i.test(navigator.userAgent) || hiddenRoute) return;
 
     try {
       if (sessionStorage.getItem(NOTICE_KEY)) return;
@@ -75,12 +83,16 @@ const WebAppDownloadNotice = () => {
             </button>
           </div>
         ),
-        { duration: 14000, position: "bottom-center" },
+        {
+          duration: 14000,
+          position: "bottom-center",
+          style: { marginBottom: "calc(env(safe-area-inset-bottom, 0px) + 4rem)" },
+        },
       );
     }, 3500);
 
     return () => window.clearTimeout(timer);
-  }, [pathname]);
+  }, [pathname, loading, user]);
 
   return null;
 };

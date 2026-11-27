@@ -113,7 +113,6 @@ const App = () => (
         <PostMusicGuard />
         <BackgroundAudio />
         <UpdateChecker />
-        <WebAppDownloadNotice />
         <PaystackReturn />
         <SpotifyCallback />
         <MiniPlayer />
@@ -121,6 +120,7 @@ const App = () => (
         <AuthProvider>
           <ReferralClaimer />
           <OnboardingGate />
+          <WebAppDownloadNotice />
           <MuteProvider>
           <OnlineProvider>
           <ConsentGate />
