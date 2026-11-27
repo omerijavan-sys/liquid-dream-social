@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -508,9 +509,9 @@ const CreatePostPage = () => {
           thumbnailUrl = await uploadVideoCover(snap.uid, finalFile);
           progress("Uploading video…");
         }
-        const { error: uploadErr } = await supabase.storage.from("media").upload(path, finalFile, { cacheControl: UPLOAD_CACHE });
+        const { error: uploadErr } = await mediaStorage.upload(path, finalFile, { cacheControl: UPLOAD_CACHE });
         if (uploadErr) throw uploadErr;
-        publicUrl = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+        publicUrl = mediaStorage.getPublicUrl(path).data.publicUrl;
       }
       const { error } = await supabase.from("posts").insert({
         user_id: snap.uid,

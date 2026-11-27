@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Phone, Video as VideoIcon, Loader2, Palette, Paperclip, Send, Users, X, LogOut, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -107,8 +108,8 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
     setUploading(true);
     try {
       const path = `${user.id}/group_${Date.now()}.${file.name.split(".").pop()}`;
-      const up = await supabase.storage.from("media").upload(path, file, { cacheControl: UPLOAD_CACHE }); if (up.error) throw up.error;
-      const url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+      const up = await mediaStorage.upload(path, file, { cacheControl: UPLOAD_CACHE }); if (up.error) throw up.error;
+      const url = mediaStorage.getPublicUrl(path).data.publicUrl;
       const { data, error } = await supabase.from("group_messages" as never).insert({ group_id: groupId, sender_id: user.id, content: type === "image" ? "📷 Photo" : "🎥 Video", media_url: url, media_type: type } as never).select(COLS).single();
       if (error) throw error; const m = data as unknown as GMsg; setMsgs((prev) => prev.some((x) => x.id === m.id) ? prev : [...prev, m]);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Upload failed"); } finally { setUploading(false); }

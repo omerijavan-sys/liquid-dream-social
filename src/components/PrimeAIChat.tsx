@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { authHeader } from "@/utils/authFetch";
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -199,8 +200,8 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
         let url = URL.createObjectURL(f);
         if (uid) {
           const path = `${uid}/ai/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-          const { error } = await supabase.storage.from("media").upload(path, f, { contentType: f.type || undefined });
-          if (!error) url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+          const { error } = await mediaStorage.upload(path, f, { contentType: f.type || undefined });
+          if (!error) url = mediaStorage.getPublicUrl(path).data.publicUrl;
         }
         next.push({ kind, url, name: f.name, dataUrl: kind === "image" ? await toDataUrl(f) : undefined });
       }

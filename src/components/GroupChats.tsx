@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Camera, Loader2, Plus, Search, Send, Users, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -153,9 +154,9 @@ const GroupChats = ({ userId }: { userId: string }) => {
       if (photo) {
         const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg";
         uploadedPath = `${userId}/group_${crypto.randomUUID()}.${extension}`;
-        const { error: uploadError } = await supabase.storage.from("media").upload(uploadedPath, photo, { contentType: photo.type, upsert: false });
+        const { error: uploadError } = await mediaStorage.upload(uploadedPath, photo, { contentType: photo.type, upsert: false });
         if (uploadError) throw uploadError;
-        avatarUrl = supabase.storage.from("media").getPublicUrl(uploadedPath).data.publicUrl;
+        avatarUrl = mediaStorage.getPublicUrl(uploadedPath).data.publicUrl;
       }
       const callRpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
       const { data, error } = await callRpc("create_chat_group", {
@@ -171,7 +172,7 @@ const GroupChats = ({ userId }: { userId: string }) => {
       resetCreateForm();
       toast.success("Group created.");
     } catch (error) {
-      if (uploadedPath) void supabase.storage.from("media").remove([uploadedPath]);
+      if (uploadedPath) void mediaStorage.remove([uploadedPath]);
       toast.error(error instanceof Error ? error.message : "Could not create the group.");
     } finally {
       setCreating(false);

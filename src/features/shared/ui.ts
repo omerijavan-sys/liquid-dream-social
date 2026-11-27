@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { UPLOAD_CACHE } from "@/utils/media";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,7 +25,7 @@ export const deviceTz = () => { try { return Intl.DateTimeFormat().resolvedOptio
 
 export const uploadMedia = async (userId: string, folder: string, blob: Blob, ext: string): Promise<string> => {
   const path = `${userId}/${folder}/${Date.now()}.${ext}`; // storage policy: first folder must be the user id
-  const { error } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined, cacheControl: UPLOAD_CACHE });
+  const { error } = await mediaStorage.upload(path, blob, { contentType: blob.type || undefined, cacheControl: UPLOAD_CACHE });
   if (error) throw error;
-  return supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+  return mediaStorage.getPublicUrl(path).data.publicUrl;
 };

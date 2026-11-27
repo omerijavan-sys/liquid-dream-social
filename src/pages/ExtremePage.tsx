@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Shuffle, BadgeCheck, Coins, Heart, Store, Target, Music2, Lock, Bot, Globe, Loader2, Search, X, Play, Pause, Upload, Trash2 } from "lucide-react";
@@ -262,14 +263,14 @@ const SoundsTab = () => {
     try {
       const base = `${user.id}/music/${Date.now()}`;
       const ext = (file.name.split(".").pop() || "mp3").toLowerCase().replace(/[^a-z0-9]/g, "");
-      const { error: upErr } = await supabase.storage.from("media").upload(`${base}.${ext}`, file, { contentType: file.type, upsert: false });
+      const { error: upErr } = await mediaStorage.upload(`${base}.${ext}`, file, { contentType: file.type, upsert: false });
       if (upErr) throw upErr;
-      const audio_url = supabase.storage.from("media").getPublicUrl(`${base}.${ext}`).data.publicUrl;
+      const audio_url = mediaStorage.getPublicUrl(`${base}.${ext}`).data.publicUrl;
       let cover_url: string | null = null;
       if (cover) {
         const cext = (cover.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-        const { error: cErr } = await supabase.storage.from("media").upload(`${base}_cover.${cext}`, cover, { contentType: cover.type });
-        if (!cErr) cover_url = supabase.storage.from("media").getPublicUrl(`${base}_cover.${cext}`).data.publicUrl;
+        const { error: cErr } = await mediaStorage.upload(`${base}_cover.${cext}`, cover, { contentType: cover.type });
+        if (!cErr) cover_url = mediaStorage.getPublicUrl(`${base}_cover.${cext}`).data.publicUrl;
       }
       const duration = await readDuration(file);
       const { error } = await supabase.from("music_tracks" as never).insert({ user_id: user.id, title: title.trim(), artist: artist.trim() || null, audio_url, cover_url, duration } as never);

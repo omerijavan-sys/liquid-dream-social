@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import VibeSection from "@/features/vibe/VibeSection";
 import PublicVibe from "@/features/vibe/PublicVibe";
 import StreakBadge from "@/features/drops/StreakBadge";
@@ -139,9 +140,9 @@ const ProfilePage = () => {
     try {
       const ext = file.name.split(".").pop();
       const path = `${user.id}/avatar_${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("media").upload(path, file);
+      const { error: uploadErr } = await mediaStorage.upload(path, file);
       if (uploadErr) throw uploadErr;
-      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const { data: { publicUrl } } = mediaStorage.getPublicUrl(path);
       
       await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("user_id", user.id);
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev);
@@ -156,9 +157,9 @@ const ProfilePage = () => {
     try {
       const ext = file.name.split(".").pop() || "jpg";
       const path = `${user.id}/cover_${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("media").upload(path, file);
+      const { error: upErr } = await mediaStorage.upload(path, file);
       if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const { data: { publicUrl } } = mediaStorage.getPublicUrl(path);
       const { error } = await supabase.from("profiles").update({ cover_url: publicUrl } as never).eq("user_id", user.id);
       if (error) throw error;
       setProfile(prev => prev ? { ...prev, cover_url: publicUrl } : prev);

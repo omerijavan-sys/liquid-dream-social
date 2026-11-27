@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { createPortal } from "react-dom";
 import { getBlockedIds } from "@/utils/blocks";
 import type { Tables } from "@/integrations/supabase/types";
@@ -243,9 +244,9 @@ const ReelsPage = () => {
       progress("Uploading reel…");
       const ext = snap.file.name.split(".").pop();
       const path = `${snap.uid}/reel_${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("media").upload(path, snap.file, { cacheControl: UPLOAD_CACHE });
+      const { error: uploadErr } = await mediaStorage.upload(path, snap.file, { cacheControl: UPLOAD_CACHE });
       if (uploadErr) throw uploadErr;
-      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const { data: { publicUrl } } = mediaStorage.getPublicUrl(path);
       const { error } = await supabase.from("reels").insert({ user_id: snap.uid, caption: snap.caption || null, music_title: snap.musicTitle || null, music_artist: snap.track?.artist ?? null, music_art_url: snap.track?.artUrl ?? null, music_url: snap.track?.streamUrl ?? null, ...(snap.track ? { music_start: snap.clip.start, music_len: snap.clip.len } : {}), video_url: publicUrl, thumbnail_url, ...snap.opts } as any);
       if (error) throw error;
     }, () => { void fetchReels(true); });

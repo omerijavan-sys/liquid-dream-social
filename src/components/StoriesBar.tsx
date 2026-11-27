@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -288,9 +289,9 @@ const StoriesBar = () => {
       progress("Uploading story…");
       const ext = file.name.split(".").pop();
       const path = `${uid}/story_${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("media").upload(path, file, { cacheControl: UPLOAD_CACHE });
+      const { error: uploadErr } = await mediaStorage.upload(path, file, { cacheControl: UPLOAD_CACHE });
       if (uploadErr) throw uploadErr;
-      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const { data: { publicUrl } } = mediaStorage.getPublicUrl(path);
       const { data: post, error } = await supabase.from("posts").insert({
         user_id: uid,
         media_url: publicUrl,

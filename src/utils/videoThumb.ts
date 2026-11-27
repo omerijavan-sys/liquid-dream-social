@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { supabase } from "@/integrations/supabase/client";
 
 /** Grab a still frame from a video file to use as a cover picture. */
@@ -40,7 +41,7 @@ export async function uploadVideoCover(userId: string, file: File | Blob): Promi
   const blob = await captureVideoThumb(file);
   if (!blob) return null;
   const path = `${userId}/cover_${Date.now()}.jpg`;
-  const { error } = await supabase.storage.from("media").upload(path, blob, { contentType: "image/jpeg" });
+  const { error } = await mediaStorage.upload(path, blob, { contentType: "image/jpeg" });
   if (error) return null;
-  return supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+  return mediaStorage.getPublicUrl(path).data.publicUrl;
 }

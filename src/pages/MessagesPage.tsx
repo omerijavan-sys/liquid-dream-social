@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { motion, AnimatePresence } from "framer-motion";
 import LockedMedia from "@/features/ppv/LockedMedia";
 import { creatorShare, kes as fmtKes, priceError, uploadLocked } from "@/features/ppv/ppv";
@@ -400,9 +401,9 @@ const MessagesPage = () => {
     setUploading(true);
     try {
       const path = `${user.id}/dm_${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || undefined, cacheControl: UPLOAD_CACHE });
+      const { error: upErr } = await mediaStorage.upload(path, blob, { contentType: blob.type || undefined, cacheControl: UPLOAD_CACHE });
       if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const { data: { publicUrl } } = mediaStorage.getPublicUrl(path);
       const label = type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice message";
       const { data, error } = await supabase.from("messages").insert({
         sender_id: user.id, receiver_id: activeChat.user_id, content: label, media_url: publicUrl, media_type: type,

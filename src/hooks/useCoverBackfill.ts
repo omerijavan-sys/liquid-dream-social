@@ -1,3 +1,4 @@
+import { mediaStorage } from "@/lib/mediaStorage";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { captureVideoFrame } from "@/utils/videoPoster";
@@ -24,9 +25,9 @@ export function useCoverBackfill(userId: string | undefined) {
             if (!dataUrl) continue;
             const blob = await (await fetch(dataUrl)).blob();
             const path = `${userId}/cover_${Date.now()}_${r.id.slice(0, 8)}.jpg`;
-            const { error } = await supabase.storage.from("media").upload(path, blob, { contentType: "image/jpeg" });
+            const { error } = await mediaStorage.upload(path, blob, { contentType: "image/jpeg" });
             if (error) continue;
-            const url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+            const url = mediaStorage.getPublicUrl(path).data.publicUrl;
             await supabase.from("reels").update({ thumbnail_url: url }).eq("id", r.id).eq("user_id", userId);
           }
         } catch { /* best effort: never disturb the app */ }
