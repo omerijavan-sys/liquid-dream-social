@@ -1,6 +1,6 @@
 export const config = { runtime: "edge" };
 
-const SB_URL = process.env.VITE_SUPABASE_URL || "https://kfvoqwbfgptqrrkyhorj.supabase.co";
+const SB_URL = process.env.VITE_SUPABASE_URL || "https://nrtvvddlnreqskzqksss.supabase.co";
 const SB_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

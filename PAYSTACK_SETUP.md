@@ -9,7 +9,7 @@ Optional AI secrets: `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL` (the assistant work
 
 ## Paystack dashboard
 1. Settings → API Keys & Webhooks → Webhook URL:
-   `https://kfvoqwbfgptqrrkyhorj.supabase.co/functions/v1/paystack-webhook`
+   `https://nrtvvddlnreqskzqksss.supabase.co/functions/v1/paystack-webhook`
 2. Make sure KES, Mobile Money (M-Pesa) and Cards are enabled for your Kenya business.
 3. Subaccount settlement bank: use `MPESA` for M-Pesa payouts, or the bank code from
    `GET https://api.paystack.co/bank?country=kenya` (verify the exact M-Pesa code for your account).
