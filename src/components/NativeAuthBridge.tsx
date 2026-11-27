@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
-import { Browser } from "@capacitor/browser";
+import { closeExternalBrowser, openExternalUrl } from "@/utils/openExternalUrl";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { finishNativeSpotify } from "@/services/SpotifyConnect";
@@ -16,7 +16,7 @@ export async function nativeGoogleSignIn() {
   });
   if (error) throw error;
   if (!data?.url) throw new Error("Could not start Google sign-in");
-  await Browser.open({ url: data.url });
+  await openExternalUrl(data.url);
 }
 
 /** Catches the com.primegram.app://auth-callback deep link and finishes sign-in inside the app. */
@@ -25,7 +25,7 @@ const NativeAuthBridge = () => {
     if (!Capacitor.isNativePlatform()) return;
     const handle = CapApp.addListener("appUrlOpen", async ({ url }) => {
       if (!url.startsWith(NATIVE_REDIRECT)) return;
-      try { await Browser.close(); } catch { /* already closed */ }
+      await closeExternalBrowser();
       if (url.includes("spotify_code=") || url.includes("spotify_error=")) {
         try {
           const code = new URL(url).searchParams.get("spotify_code");

@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 export const normalizeUrl = (raw: string): string => {
   const t = raw.trim();
@@ -13,8 +14,7 @@ export async function openLink(raw: string) {
   if (!/^https?:\/\//i.test(url)) { window.location.href = url; return; }
   if (Capacitor.isNativePlatform()) {
     try {
-      const { Browser } = await import("@capacitor/browser");
-      await Browser.open({ url, presentationStyle: "popover" });
+      await openExternalUrl(url);
       return;
     } catch { /* fall through to overlay */ }
   }
