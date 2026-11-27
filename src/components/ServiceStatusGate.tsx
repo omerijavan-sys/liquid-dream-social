@@ -17,10 +17,8 @@ const isRestricted = async (): Promise<boolean> => {
     const r = await ping(`${URL_}/auth/v1/settings`, { headers: { apikey: KEY } });
     return r.status === 402;
   } catch {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
-    try { await ping("/favicon.ico", { method: "HEAD" }); } catch { return false; } // our own site is down too: just a bad connection
-    await new Promise((res) => window.setTimeout(res, 3000));
-    try { const r2 = await ping(`${URL_}/auth/v1/settings`, { headers: { apikey: KEY } }); return r2.status === 402; } catch { return true; }
+    // Network errors, blockers and timeouts are not proof of a restriction: only an explicit 402 shows the notice.
+    return false;
   }
 };
 
