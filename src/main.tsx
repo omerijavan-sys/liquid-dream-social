@@ -39,6 +39,11 @@ if (root) {
     try { if (sessionStorage.getItem("chunkReload") === "1") return; sessionStorage.setItem("chunkReload", "1"); } catch { /* storage blocked */ }
     window.location.reload();
   });
+  // Media from the old backend can't load yet: hide the broken-image icon so initials/gradient backgrounds show instead.
+  window.addEventListener("error", (e) => {
+    const t = e.target as HTMLElement | null;
+    if (t instanceof HTMLImageElement && t.src.includes("kfvoqwbfgptqrrkyhorj.supabase.co")) t.style.visibility = "hidden";
+  }, true);
   setTimeout(() => { try { sessionStorage.removeItem("chunkReload"); } catch { /* ignore */ } }, 15000);
   import("./App.tsx").then(({ default: App }) => createRoot(root).render(<ErrorBoundary><App /></ErrorBoundary>)).catch(showFatal);
   window.addEventListener("error", (e) => { if (!root.hasChildNodes() || root.querySelector(".pg-splash")) showFatal(e.error ?? e.message); });
