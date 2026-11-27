@@ -52,8 +52,11 @@ async function suggest(name: string, text: string): Promise<string[]> {
   } catch { return fallback; }
 }
 
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+
 Deno.serve(async (req) => {
-  const ok = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  const ok = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
   try {
     const input = await req.json().catch(() => ({})) as { id?: string; call?: string; group_msg?: string; test?: string };
     const raw = Deno.env.get("FCM_SERVICE_ACCOUNT");
