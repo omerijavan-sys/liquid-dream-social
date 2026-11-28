@@ -150,10 +150,11 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     return false;
   };
 
-  const [voiceOn, setVoiceOn] = useState(() => { try { return localStorage.getItem("aurora_voice") !== "0"; } catch { return true; } });
+  const [voiceOn, setVoiceOn] = useState(() => { try { return localStorage.getItem("aurora_voice") === "1"; } catch { return false; } });
   const toggleVoiceOut = () => { const v = !voiceOn; setVoiceOn(v); try { localStorage.setItem("aurora_voice", v ? "1" : "0"); } catch { /* ignore */ } if (!v) { stopSpeaking(); setSpeaking(false); } };
+  const askedByVoice = useRef(false); // typed chats stay silent; spoken questions get spoken answers
   const speak = (text: string) => {
-    if (!voiceOn) return;
+    if (!voiceOn && !askedByVoice.current) return;
     void speakAurora(text, () => setSpeaking(true)).catch(() => undefined).finally(() => setSpeaking(false));
   };
   const listenRef = useRef<Listener | null>(null);
@@ -166,7 +167,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     if (!Capacitor.isNativePlatform()) startAudioAnalysis();
     void listen({
       onPartial: (t) => setInput(t),
-      onFinal: (t) => { setInput(t); setListening(false); stopAudioAnalysis(); setTimeout(() => sendRef.current?.(t), 150); },
+      onFinal: (t) => { askedByVoice.current = true; setInput(t); setListening(false); stopAudioAnalysis(); setTimeout(() => sendRef.current?.(t), 150); },
       onError: (e) => { if (e === "not-allowed" || e === "service-not-allowed") toast.error("Allow microphone access for Primegram"); },
       onEnd: () => { setListening(false); stopAudioAnalysis(); },
     }).then((l) => { listenRef.current = l; });
@@ -244,6 +245,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
   const sendRef = useRef<((t?: string) => void) | null>(null);
   const send = async (override?: string) => {
     const text = (override ?? input).trim();
+    if (override === undefined) askedByVoice.current = false;
     if ((!text && !pending.length) || loading) return;
     const lower = text.toLowerCase();
     

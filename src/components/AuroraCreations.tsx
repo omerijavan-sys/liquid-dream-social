@@ -9,33 +9,72 @@ const save = (blob: Blob, name: string) => {
 };
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "aurora";
 
-export const imageUrl = (prompt: string, seed: number) =>
-  `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 400))}?width=1024&height=1024&seed=${seed}&nologo=true&model=flux`;
+const HORDE = "https://aihorde.net/api/v2";
+const HH = { apikey: "0000000000", "Content-Type": "application/json", "Client-Agent": "primegram:1:support" };
+
+/** Paints an image with the free AI Horde community network (no key, no daily cap). Returns a webp blob. */
+async function paint(prompt: string, seed: number, onNote: (n: string) => void, signal: AbortSignal): Promise<Blob> {
+  const post = await fetch(`${HORDE}/generate/async`, { method: "POST", signal, headers: HH, body: JSON.stringify({
+    prompt: `${prompt.slice(0, 380)}, highly detailed, vibrant, professional`,
+    params: { width: 512, height: 512, steps: 25, n: 1, sampler_name: "k_euler_a", cfg_scale: 7.5, seed: String(seed) },
+    nsfw: false, censor_nsfw: true, r2: false, shared: false, slow_workers: true,
+  }) });
+  const job = await post.json();
+  if (!job.id) throw new Error(job.message || "busy");
+  for (let i = 0; i < 80; i++) {
+    await new Promise((r) => setTimeout(r, 2500));
+    if (signal.aborted) throw new Error("cancelled");
+    const c = await (await fetch(`${HORDE}/generate/check/${job.id}`, { signal })).json();
+    if (c.faulted) throw new Error("faulted");
+    if (c.done) {
+      const st = await (await fetch(`${HORDE}/generate/status/${job.id}`, { signal })).json();
+      const img: string | undefined = st.generations?.[0]?.img;
+      if (!img) throw new Error("empty");
+      if (/^https?:/.test(img)) return await (await fetch(img, { signal })).blob();
+      const bin = atob(img); const u8 = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+      return new Blob([u8], { type: "image/webp" });
+    }
+    onNote(c.queue_position > 0 ? `In line: ${c.queue_position} ahead of you…` : "Painting your image…");
+  }
+  throw new Error("timeout");
+}
 
 /** An image Aurora drew from the user's description. */
 export const ImageCard = ({ prompt, seed }: { prompt: string; seed: number }) => {
   const [s, setS] = useState(seed);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
-  const url = imageUrl(prompt, s);
-  const blobOf = async () => (await fetch(url)).blob();
+  const [note, setNote] = useState("Painting your image…");
+  const [src, setSrc] = useState<string | null>(null);
+  const blob = useRef<Blob | null>(null);
+
+  useEffect(() => {
+    const ctl = new AbortController(); let url: string | null = null;
+    setState("loading"); setNote("Painting your image…");
+    paint(prompt, s, setNote, ctl.signal)
+      .then((b) => { blob.current = b; url = URL.createObjectURL(b); setSrc(url); setState("ready"); })
+      .catch(() => { if (!ctl.signal.aborted) setState("failed"); });
+    return () => { ctl.abort(); if (url) URL.revokeObjectURL(url); };
+  }, [prompt, s]);
+
+  const again = () => setS((x) => x + 1);
   return (
     <div className="mt-2 w-full max-w-[19rem] overflow-hidden rounded-2xl border border-white/15 bg-black/30">
       <div className="relative aspect-square w-full bg-gradient-to-br from-violet-900/50 to-cyan-900/40">
         {state !== "ready" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-white/70">
-            {state === "loading" ? <><Loader2 className="h-5 w-5 animate-spin" />Painting your image…</> : <>Couldn't paint that. <button className="underline" onClick={() => { setState("loading"); setS((x) => x + 1); }}>Try again</button></>}
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-xs text-white/70">
+            {state === "loading" ? <><Loader2 className="h-5 w-5 animate-spin" />{note}</> : <>Couldn't paint that right now. <button className="underline" onClick={again}>Try again</button></>}
           </div>
         )}
-        <img key={s} src={url} alt={prompt} onLoad={() => setState("ready")} onError={() => setState("failed")} className={`h-full w-full object-cover transition-opacity ${state === "ready" ? "opacity-100" : "opacity-0"}`} />
+        {state === "ready" && src && <img src={src} alt={prompt} className="h-full w-full object-cover" />}
       </div>
       {state === "ready" && (
         <div className="flex items-center gap-1 p-2 text-[11px] text-white/80">
-          <button className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5" onClick={async () => { try { save(await blobOf(), `${slug(prompt)}.jpg`); } catch { toast.error("Couldn't download it"); } }}><Download className="h-3.5 w-3.5" />Save</button>
+          <button className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5" onClick={() => { if (blob.current) save(blob.current, `${slug(prompt)}.webp`); }}><Download className="h-3.5 w-3.5" />Save</button>
           <button className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5" onClick={async () => {
-            try { const b = await blobOf(); const f = new File([b], `${slug(prompt)}.jpg`, { type: b.type || "image/jpeg" });
+            try { const b = blob.current; if (!b) return; const f = new File([b], `${slug(prompt)}.webp`, { type: b.type || "image/webp" });
               if (navigator.canShare?.({ files: [f] })) await navigator.share({ files: [f], text: prompt }); else { save(b, f.name); toast.success("Saved. Post it from your gallery."); } } catch { /* cancelled */ }
           }}><Share2 className="h-3.5 w-3.5" />Share</button>
-          <button className="ml-auto flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5" onClick={() => { setState("loading"); setS((x) => x + 1); }}><RefreshCw className="h-3.5 w-3.5" />Another</button>
+          <button className="ml-auto flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5" onClick={again}><RefreshCw className="h-3.5 w-3.5" />Another</button>
         </div>
       )}
     </div>
