@@ -264,97 +264,48 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
           ? "Speaking…"
           : "Tap the orb to talk";
 
+  const aState = phase === "listening" ? "listening" : phase === "speaking" ? "speaking" : phase === "thinking" ? "thinking" : "idle";
+  const toggleMic = () => (wantListeningRef.current ? endSession() : beginSession());
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          role="dialog" aria-modal="true" aria-label="Aurora assistant"
-          className="fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-y-auto py-6"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          role="dialog" aria-label="Aurora assistant"
+          className="pointer-events-none fixed inset-0 z-[70]"
         >
-          {/* Dim + glass backdrop */}
-          <div className="absolute inset-0 bg-background/70 backdrop-blur-2xl" />
-
-          <div className="relative z-10 w-full max-w-lg px-6 flex flex-col items-center gap-5">
-            <div className="w-full flex items-center justify-between border-b border-border pb-3"><h2 className="text-xl font-semibold text-foreground">Aurora</h2><span className="text-xs text-muted-foreground">{label}</span></div>
-            {/* Orb */}
+          {/* Siri-style glow around the screen edge; the app stays visible and usable behind it */}
+          <style>{`
+            @keyframes aurora-edge { 0% { filter: hue-rotate(0deg) } 100% { filter: hue-rotate(360deg) } }
+            @keyframes aurora-edge-pulse { 0%,100% { opacity: .75 } 50% { opacity: 1 } }
+          `}</style>
+          <div className="absolute inset-0" style={{
+            boxShadow: `inset 0 0 ${phase === "listening" ? 38 + Math.min(40, intensity * 90) : 30}px 6px rgba(124,92,255,.75), inset 0 0 90px 10px rgba(34,211,238,.35), inset 0 0 140px 14px rgba(217,70,239,.25)`,
+            animation: "aurora-edge 6s linear infinite, aurora-edge-pulse 2.4s ease-in-out infinite",
+            transition: "box-shadow .15s ease-out",
+          }} />
+          <div className="absolute inset-x-0 bottom-0 flex justify-center px-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <motion.div
-              initial={{ scale: 0.7, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              initial={{ y: 80, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 80, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+              className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-[2rem] border border-white/20 bg-black/55 p-3 pr-4 text-white shadow-2xl backdrop-blur-2xl"
             >
-              <AuroraAura size={220} level={phase === "speaking" ? 0.55 : intensity} state={phase === "listening" ? "listening" : phase === "speaking" ? "speaking" : phase === "thinking" ? "thinking" : "idle"}>
-                <SiriOrb
-                  size={150}
-                  intensity={phase === "speaking" ? 0.55 : intensity}
-                  listening={phase === "listening"}
-                  speaking={phase === "speaking" || phase === "thinking"}
-                  onClick={() => (wantListeningRef.current ? endSession() : beginSession())}
-                />
-              </AuroraAura>
+              <button onClick={toggleMic} aria-label={wantListeningRef.current ? "Mute microphone" : "Start listening"} className="shrink-0">
+                <AuroraAura size={76} level={phase === "speaking" ? 0.5 : intensity} state={aState} />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/50">{label}</p>
+                <div className="max-h-[22dvh] overflow-y-auto break-words">
+                  {transcript && !reply && <p className="text-sm italic text-white/80">“{transcript}”</p>}
+                  {reply ? <p className="text-sm leading-snug text-white">{reply}</p> : !transcript && !note && <p className="text-sm text-white/60">{phase === "idle" ? "Tap the orb to talk" : "Go ahead, I'm listening"}</p>}
+                  {note && <p className="mt-1 text-xs text-amber-300">{note}</p>}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col gap-1.5">
+                <button onClick={() => { stopSpeaking(); busyRef.current = false; if (wantListeningRef.current) startRecognition(); else setPhaseSafe("idle"); }} aria-label="Stop speaking" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10"><Square className="h-3.5 w-3.5" /></button>
+                <button onClick={() => { endSession(); onClose(); }} aria-label="Close assistant" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10"><X className="h-4 w-4" /></button>
+              </div>
             </motion.div>
-
-            <div className="text-center w-full min-h-[92px] max-h-[30dvh] overflow-y-auto break-words">
-              <p className="text-caption text-muted-foreground mb-1">{label}</p>
-              {transcript && <p className="text-sm text-foreground/80 italic mb-2">“{transcript}”</p>}
-              {reply && <p className="text-base text-foreground leading-relaxed">{reply}</p>}
-              {note && <p className="mt-2 text-xs text-amber-400">{note}</p>}
-            </div>
-
-            {/* Controls */}
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon"
-                onClick={() => (wantListeningRef.current ? endSession() : beginSession())}
-                className={`depth-press w-14 h-14 rounded-full flex items-center justify-center ${
-                  wantListeningRef.current ? "bg-primary" : "liquid-glass-subtle"
-                }`}
-                aria-label={wantListeningRef.current ? "Mute microphone" : "Start listening"}
-              >
-                {wantListeningRef.current ? (
-                  <MicOff className="w-5 h-5 text-primary-foreground" />
-                ) : (
-                  <Mic className="w-5 h-5 text-foreground" />
-                )}
-              </Button>
-
-              <Button variant="ghost" size="icon"
-                onClick={() => {
-                  stopSpeaking();
-                  busyRef.current = false;
-                  if (wantListeningRef.current) startRecognition();
-                  else setPhaseSafe("idle");
-                }}
-                className="depth-press w-14 h-14 rounded-full liquid-glass-subtle flex items-center justify-center"
-                aria-label="Stop speaking"
-              >
-                <Square className="w-5 h-5 text-foreground" />
-              </Button>
-
-              <Button variant="ghost" size="icon"
-                onClick={() => {
-                  endSession();
-                  onClose();
-                  onOpenTextChat?.();
-                }}
-                className="depth-press w-14 h-14 rounded-full liquid-glass-subtle flex items-center justify-center"
-                aria-label="Switch to typing"
-              >
-                <Keyboard className="w-5 h-5 text-foreground" />
-              </Button>
-
-              <Button variant="ghost" size="icon"
-                onClick={() => {
-                  endSession();
-                  onClose();
-                }}
-                className="depth-press w-14 h-14 rounded-full liquid-glass-subtle flex items-center justify-center"
-                aria-label="Close assistant"
-              >
-                <X className="w-5 h-5 text-foreground" />
-              </Button>
-            </div>
           </div>
         </motion.div>
       )}
