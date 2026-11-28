@@ -2,8 +2,11 @@ import { mediaStorage } from "@/lib/mediaStorage";
 import { authHeader } from "@/utils/authFetch";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Sparkles, Mic, MicOff, Paperclip, Share2, Image as ImageIcon, Music2, FileText, Loader2 } from "lucide-react";
+import { X, Send, Sparkles, Mic, MicOff, Paperclip, Share2, Volume2, VolumeX, Image as ImageIcon, Music2, FileText, Loader2 } from "lucide-react";
 import AuroraAura from "./AuroraAura";
+import { setWakeEnabled, wakeEnabled } from "./AuroraWake";
+import { Capacitor } from "@capacitor/core";
+import { listen, speakAurora, stopSpeaking, canListen, type Listener } from "@/lib/auroraSpeech";
 import { ImageCard, SongCard } from "./AuroraCreations";
 import { parseSongSpec, type SongSpec } from "@/features/aurora/songComposer";
 import { supabase } from "@/integrations/supabase/client";
@@ -70,6 +73,12 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>("chat");
+  const [wake, setWake] = useState(wakeEnabled);
+  const flipWake = async () => {
+    const v = !wake;
+    if (v) { try { if (!Capacitor.isNativePlatform()) { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); } } catch { toast.error("Allow the microphone to use Hey Aurora"); return; } toast.success("Say “Hey Aurora” while Primegram is open"); }
+    setWake(v); setWakeEnabled(v);
+  };
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -141,58 +150,26 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     return false;
   };
 
+  const [voiceOn, setVoiceOn] = useState(() => { try { return localStorage.getItem("aurora_voice") !== "0"; } catch { return true; } });
+  const toggleVoiceOut = () => { const v = !voiceOn; setVoiceOn(v); try { localStorage.setItem("aurora_voice", v ? "1" : "0"); } catch { /* ignore */ } if (!v) { stopSpeaking(); setSpeaking(false); } };
   const speak = (text: string) => {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const plain = text.replace(/[#*_`~\[\]()]/g, "");
-    const utterance = new SpeechSynthesisUtterance(plain);
-    utterance.rate = 1;
-    utterance.pitch = 1.1;
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    if (!voiceOn) return;
+    void speakAurora(text, () => setSpeaking(true)).catch(() => undefined).finally(() => setSpeaking(false));
   };
+  const listenRef = useRef<Listener | null>(null);
 
   const toggleVoiceInput = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { toast.error("Voice input not supported"); return; }
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      stopAudioAnalysis();
-      return;
-    }
-    const recognition = new SR();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognition.onresult = (e: any) => {
-      const transcript = e.results[0][0].transcript;
-      setInput(transcript);
-      setListening(false);
-      stopAudioAnalysis();
-      // Auto-send voice commands
-      setTimeout(() => {
-        const lower = transcript.toLowerCase();
-        // Check for "Aurora" prefix commands
-        if (lower.includes("aurora")) {
-          for (const [keyword, path] of Object.entries(COMMAND_REGISTRY)) {
-            if (lower.includes(keyword)) {
-              onClose();
-              navigate(path);
-              toast.success(`Opening ${keyword}...`);
-              return;
-            }
-          }
-        }
-      }, 300);
-    };
-    recognition.onerror = () => { setListening(false); stopAudioAnalysis(); };
-    recognition.onend = () => { setListening(false); stopAudioAnalysis(); };
-    recognitionRef.current = recognition;
-    recognition.start();
+    if (listening) { listenRef.current?.stop(); setListening(false); stopAudioAnalysis(); return; }
+    if (!canListen()) { toast.error("Voice input isn't supported here"); return; }
+    stopSpeaking();
     setListening(true);
-    startAudioAnalysis();
+    if (!Capacitor.isNativePlatform()) startAudioAnalysis();
+    void listen({
+      onPartial: (t) => setInput(t),
+      onFinal: (t) => { setInput(t); setListening(false); stopAudioAnalysis(); setTimeout(() => sendRef.current?.(t), 150); },
+      onError: (e) => { if (e === "not-allowed" || e === "service-not-allowed") toast.error("Allow microphone access for Primegram"); },
+      onEnd: () => { setListening(false); stopAudioAnalysis(); },
+    }).then((l) => { listenRef.current = l; });
   };
 
   const attach = async (files: FileList | null) => {
@@ -264,11 +241,13 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     } catch { /* cancelled */ }
   };
 
-  const send = async () => {
-    if ((!input.trim() && !pending.length) || loading) return;
-    const lower = input.toLowerCase();
+  const sendRef = useRef<((t?: string) => void) | null>(null);
+  const send = async (override?: string) => {
+    const text = (override ?? input).trim();
+    if ((!text && !pending.length) || loading) return;
+    const lower = text.toLowerCase();
     
-    if (!pending.length && await create(input.trim())) return;
+    if (!pending.length && await create(text)) return;
     // Check for Aurora commands
     const isAurora = lower.includes("aurora");
     for (const [keyword, path] of Object.entries(COMMAND_REGISTRY)) {
@@ -287,7 +266,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
       return;
     }
 
-    const userMsg: Msg = { role: "user", content: input.trim(), attachments: pending.length ? pending : undefined };
+    const userMsg: Msg = { role: "user", content: text, attachments: pending.length ? pending : undefined };
     setInput("");
     setPending([]);
     setMessages(prev => [...prev, userMsg]);
@@ -339,6 +318,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     finally { setLoading(false); }
   };
 
+  sendRef.current = (t) => { void send(t); };
   const aState = listening ? "listening" : speaking ? "speaking" : loading ? "thinking" : "idle";
   const chips: { m: Mode; label: string; icon: typeof ImageIcon }[] = [{ m: "chat", label: "Chat", icon: Sparkles }, { m: "image", label: "Create image", icon: ImageIcon }, { m: "song", label: "Create song", icon: Music2 }];
   return (
@@ -351,9 +331,9 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.35),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(6,182,212,0.22),transparent_55%)]" />
           <div className="safe-area-top relative z-10 flex items-center justify-between px-4 pt-3">
-            <div className="w-9" />
+            <button onClick={toggleVoiceOut} aria-label={voiceOn ? "Mute Aurora's voice" : "Unmute Aurora's voice"} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 backdrop-blur">{voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-white/50" />}</button>
             <h2 className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-lg font-black tracking-[0.35em] text-transparent">AURORA</h2>
-            <button onClick={() => { window.speechSynthesis.cancel(); onClose(); }} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 backdrop-blur"><X className="h-4 w-4" /></button>
+            <button onClick={() => { stopSpeaking(); onClose(); }} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 backdrop-blur"><X className="h-4 w-4" /></button>
           </div>
 
           <div className="relative z-10 flex flex-1 flex-col overflow-y-auto px-4 pb-2">
@@ -403,6 +383,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
               {chips.map(c => (
                 <button key={c.m} onClick={() => setMode(c.m)} className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${mode === c.m ? "border-transparent bg-gradient-to-r from-cyan-400 to-fuchsia-500 font-semibold text-black" : "border-white/15 bg-white/10"}`}><c.icon className="h-3.5 w-3.5" />{c.label}</button>
               ))}
+              <button onClick={() => void flipWake()} className={`ml-auto flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${wake ? "border-transparent bg-green-400 font-semibold text-black" : "border-white/15 bg-white/10"}`}><Mic className="h-3.5 w-3.5" />Hey Aurora {wake ? "on" : "off"}</button>
             </div>
             {pending.length > 0 && (
               <div className="mb-2 flex gap-2 overflow-x-auto">

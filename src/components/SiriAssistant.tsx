@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mic, MicOff, Keyboard, Square } from "lucide-react";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
 import { useNavigate } from "react-router-dom";
 import SiriOrb from "./SiriOrb";
 import AuroraAura from "./AuroraAura";
 import { authHeader } from "@/utils/authFetch";
 import { Button } from "@/components/ui/button";
 import { ROUTES, runAction, splitAction } from "@/utils/auroraActions";
+import { listen, speakAurora, stopSpeaking, canListen, type Listener } from "@/lib/auroraSpeech";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prime-ai-chat`;
 
@@ -33,7 +35,7 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
   const [history, setHistory] = useState<Msg[]>([]);
   const navigate = useNavigate();
 
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<Listener | null>(null);
   const wantListeningRef = useRef(false);
   const phaseRef = useRef<Phase>("idle");
   const busyRef = useRef(false);
@@ -79,31 +81,11 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
     setIntensity(0);
   }, []);
 
-  /* ---------------- speech synthesis (Siri-like voice) ---------------- */
-  const pickVoice = () => {
-    const voices = window.speechSynthesis?.getVoices?.() ?? [];
-    return (
-      voices.find((v) => /samantha|siri|ava|serena|zira|female/i.test(v.name) && v.lang.startsWith("en")) ??
-      voices.find((v) => v.lang.startsWith("en")) ??
-      null
-    );
-  };
-
+  /* ---------------- Aurora's voice (a woman's, native on Android) ---------------- */
   const speak = useCallback((text: string, onDone: () => void) => {
-    if (!("speechSynthesis" in window) || !text.trim()) {
-      onDone();
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/[#*_`~\[\]()]/g, ""));
-    const v = pickVoice();
-    if (v) u.voice = v;
-    u.rate = 1.02;
-    u.pitch = 1.05;
-    u.onstart = () => setPhaseSafe("speaking");
-    u.onend = onDone;
-    u.onerror = onDone;
-    window.speechSynthesis.speak(u);
+    if (!text.trim()) { onDone(); return; }
+    setPhaseSafe("speaking");
+    void speakAurora(text, () => setPhaseSafe("speaking")).catch(() => undefined).finally(onDone);
   }, []);
 
   /* ---------------- recognition control ---------------- */
@@ -111,6 +93,7 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
     try {
       recognitionRef.current?.stop();
     } catch {}
+    recognitionRef.current = null;
   }, []);
 
   const askAI = useCallback(
@@ -197,64 +180,33 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
   );
 
   const startRecognition = useCallback(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      toast.error("Live voice isn't supported in this browser — use the keyboard instead");
+    if (!canListen()) {
+      toast.error("Live voice isn't supported here — use the keyboard instead");
       return;
     }
     if (busyRef.current) return;
-    try {
-      recognitionRef.current?.abort();
-    } catch {}
-
-    const rec = new SR();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = "en-US";
-
-    rec.onresult = (e: any) => {
-      let interim = "";
-      let final = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r.isFinal) final += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      setTranscript((final || interim).trim());
-      if (final.trim() && !busyRef.current) askAI(final.trim());
-    };
-    rec.onerror = (e: any) => {
-      const err = e?.error;
-      if (err === "not-allowed" || err === "service-not-allowed") {
-        wantListeningRef.current = false;
-        setPhaseSafe("idle");
-        toast.error("Microphone is blocked — allow it in your browser, or open the app in its own tab");
-      } else if (err === "audio-capture") {
-        toast.error("No microphone found");
-      } else if (err === "network") {
-        toast.error("Voice recognition needs an internet connection");
-      }
-    };
-    rec.onend = () => {
-      // Auto-restart for a truly continuous conversation
-      if (wantListeningRef.current && !busyRef.current) {
-        setTimeout(() => {
-          if (wantListeningRef.current && !busyRef.current) {
-            try {
-              recognitionRef.current?.start();
-            } catch {}
-          }
-        }, 250);
-      }
-    };
-
-    recognitionRef.current = rec;
-    try {
-      rec.start();
-      setPhaseSafe("listening");
-    } catch (err) {
-      console.warn("Speech recognition failed to start", err);
-    }
+    try { recognitionRef.current?.stop(); } catch {}
+    setPhaseSafe("listening");
+    let mine: Listener | null = null;
+    void listen({
+      continuous: true,
+      onPartial: (t) => setTranscript(t),
+      onFinal: (t) => { if (!busyRef.current) askAI(t); },
+      onError: (err) => {
+        if (err === "not-allowed" || err === "service-not-allowed") {
+          wantListeningRef.current = false;
+          setPhaseSafe("idle");
+          toast.error("Microphone is blocked — allow microphone access for Primegram in your phone settings");
+        } else if (err === "audio-capture") toast.error("No microphone found");
+        else if (err === "network") toast.error("Voice recognition needs an internet connection");
+      },
+      onEnd: () => {
+        // keep the conversation going: listen again unless Aurora is busy answering
+        if (recognitionRef.current === mine && wantListeningRef.current && !busyRef.current) {
+          setTimeout(() => { if (wantListeningRef.current && !busyRef.current) startRecognition(); }, 300);
+        }
+      },
+    }).then((l) => { mine = l; recognitionRef.current = l; });
   }, [askAI]);
 
   const beginSession = useCallback(() => {
@@ -262,26 +214,31 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
     // Start recognition synchronously inside the tap so the browser keeps the user gesture
     startRecognition();
     // Level meter is cosmetic; start it after recognition has claimed the mic
-    setTimeout(() => { startMeter(); }, 600);
+    if (!Capacitor.isNativePlatform()) setTimeout(() => { startMeter(); }, 600);
   }, [startMeter, startRecognition]);
 
   const endSession = useCallback(() => {
     wantListeningRef.current = false;
     busyRef.current = false;
     try {
-      recognitionRef.current?.abort();
+      recognitionRef.current?.stop();
     } catch {}
-    window.speechSynthesis?.cancel();
+    recognitionRef.current = null;
+    stopSpeaking();
     stopMeter();
     setPhaseSafe("idle");
   }, [stopMeter]);
 
   // Auto-start the live session when opened
   useEffect(() => {
+    window.dispatchEvent(new CustomEvent("aurora:overlay", { detail: open }));
     if (open) {
       setTranscript("");
       setReply("");
-      beginSession();
+      const w = window as unknown as { __auroraWake?: string };
+      const first = w.__auroraWake?.trim(); w.__auroraWake = undefined;
+      if (first) { wantListeningRef.current = true; setTimeout(() => askAI(first), 400); }
+      else beginSession();
     } else {
       endSession();
     }
@@ -289,11 +246,6 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
   }, [open]);
 
   useEffect(() => () => endSession(), [endSession]);
-
-  // Prime the voice list (Chrome loads voices async)
-  useEffect(() => {
-    window.speechSynthesis?.getVoices?.();
-  }, []);
 
   const label =
     phase === "listening"
@@ -360,7 +312,7 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
 
               <Button variant="ghost" size="icon"
                 onClick={() => {
-                  window.speechSynthesis?.cancel();
+                  stopSpeaking();
                   busyRef.current = false;
                   if (wantListeningRef.current) startRecognition();
                   else setPhaseSafe("idle");

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import SiriOrb from "./SiriOrb";
 const PrimeAIChat = lazy(() => import("./PrimeAIChat"));
 import SiriAssistant from "./SiriAssistant";
+import AuroraWake from "./AuroraWake";
 
 const FloatingOrb = () => {
   const [aiOpen, setAiOpen] = useState(false);
@@ -134,6 +135,7 @@ const FloatingOrb = () => {
           aria-label="Trigger voice input"
         />
         
+        <AuroraWake />
         {/* AI Chat */}
         <SiriAssistant
           open={voiceOpen}
