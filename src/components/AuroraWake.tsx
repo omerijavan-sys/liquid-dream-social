@@ -30,7 +30,7 @@ const AuroraWake = () => {
         heard = true;
         (window as unknown as { __auroraWake?: string }).__auroraWake = t.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "").trim();
         stop(); overlay.current = true;
-        window.dispatchEvent(new Event("prime:openOrb"));
+        window.dispatchEvent(new Event("aurora:voice"));
       };
       void listen({
         continuous: true,

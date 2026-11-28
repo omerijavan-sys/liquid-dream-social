@@ -74,7 +74,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
   const docRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>("chat");
   const [wake, setWake] = useState(wakeEnabled);
-  const openVoiceMode = () => { stopSpeaking(); onClose(); setTimeout(() => window.dispatchEvent(new Event("prime:openOrb")), 150); };
+  const openVoiceMode = () => { stopSpeaking(); onClose(); setTimeout(() => window.dispatchEvent(new Event("aurora:voice")), 150); };
   const flipWake = async () => {
     const v = !wake;
     if (v) { try { if (!Capacitor.isNativePlatform()) { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); } } catch { toast.error("Allow the microphone to use Hey Aurora"); return; } toast.success("Say “Hey Aurora” while Primegram is open"); }

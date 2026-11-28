@@ -41,10 +41,12 @@ const FloatingOrb = () => {
 
     window.addEventListener('keydown', handleKeyPress);
     window.addEventListener('prime:openOrb', handleOpenEvent as EventListener);
+    window.addEventListener('aurora:voice', handleOpenEvent as EventListener);
 
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
       window.removeEventListener('prime:openOrb', handleOpenEvent as EventListener);
+      window.removeEventListener('aurora:voice', handleOpenEvent as EventListener);
     };
   }, [aiOpen]);
   
