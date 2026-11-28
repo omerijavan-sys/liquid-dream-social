@@ -32,6 +32,7 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
   const [intensity, setIntensity] = useState(0);
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
+  const [note, setNote] = useState("");
   const [history, setHistory] = useState<Msg[]>([]);
   const navigate = useNavigate();
 
@@ -181,7 +182,7 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
 
   const startRecognition = useCallback(() => {
     if (!canListen()) {
-      toast.error("Live voice isn't supported here — use the keyboard instead");
+      setNote("This browser can't listen. Try Chrome or Edge, or use the Android app.");
       return;
     }
     if (busyRef.current) return;
@@ -190,15 +191,20 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
     let mine: Listener | null = null;
     void listen({
       continuous: true,
-      onPartial: (t) => setTranscript(t),
+      onPartial: (t) => { setTranscript(t); setNote(""); },
       onFinal: (t) => { if (!busyRef.current) askAI(t); },
       onError: (err) => {
-        if (err === "not-allowed" || err === "service-not-allowed") {
-          wantListeningRef.current = false;
-          setPhaseSafe("idle");
-          toast.error("Microphone is blocked — allow microphone access for Primegram in your phone settings");
-        } else if (err === "audio-capture") toast.error("No microphone found");
-        else if (err === "network") toast.error("Voice recognition needs an internet connection");
+        const why: Record<string, string> = {
+          "not-allowed": "Microphone is blocked. Allow microphone access for Primegram in your browser or phone settings, then tap the orb.",
+          "service-not-allowed": "Speech recognition is blocked. Allow microphone access, then tap the orb.",
+          "audio-capture": "No microphone found.",
+          network: "Voice recognition needs an internet connection (some browsers like Brave don't support it; try Chrome or Edge).",
+          unsupported: "This browser can't listen. Try Chrome or Edge, or use the Android app.",
+          "start-failed": "Couldn't start the microphone. Tap the orb to try again.",
+        };
+        if (err === "no-speech" || err === "aborted") return;
+        setNote(why[err] ?? `Voice problem (${err}). Tap the orb to retry.`);
+        if (err === "not-allowed" || err === "service-not-allowed" || err === "unsupported") { wantListeningRef.current = false; setPhaseSafe("idle"); }
       },
       onEnd: () => {
         // keep the conversation going: listen again unless Aurora is busy answering
@@ -235,6 +241,7 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
     if (open) {
       setTranscript("");
       setReply("");
+      setNote("");
       const w = window as unknown as { __auroraWake?: string };
       const first = w.__auroraWake?.trim(); w.__auroraWake = undefined;
       if (first) { wantListeningRef.current = true; setTimeout(() => askAI(first), 400); }
@@ -292,6 +299,7 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
               <p className="text-caption text-muted-foreground mb-1">{label}</p>
               {transcript && <p className="text-sm text-foreground/80 italic mb-2">“{transcript}”</p>}
               {reply && <p className="text-base text-foreground leading-relaxed">{reply}</p>}
+              {note && <p className="mt-2 text-xs text-amber-400">{note}</p>}
             </div>
 
             {/* Controls */}
