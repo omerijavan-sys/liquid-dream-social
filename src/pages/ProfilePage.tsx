@@ -135,6 +135,18 @@ const ProfilePage = () => {
     return () => window.removeEventListener("prime:posted", again);
   }, [user]);
 
+  /** Deletes one of your own posts or reels (a video post also removes its matching reel). */
+  const deleteMine = async (kind: "posts" | "reels", id: string) => {
+    if (!user || !window.confirm(kind === "reels" ? "Delete this reel? This can't be undone." : "Delete this post? This can't be undone.")) return;
+    const { error } = await supabase.from(kind).delete().eq("id", id).eq("user_id", user.id);
+    if (error) { toast.error("Couldn't delete it"); return; }
+    if (kind === "posts") await supabase.from("reels").delete().eq("source_post_id", id).eq("user_id", user.id);
+    setPosts(prev => prev.filter(p => p.id !== id));
+    setTabPosts(prev => prev.filter(p => p.id !== id));
+    setSelectedPostId(null); setSelectedReelId(null);
+    toast.success(kind === "reels" ? "Reel deleted" : "Post deleted");
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -314,6 +326,7 @@ const ProfilePage = () => {
         initialReelId={selectedReelId}
         username={profile?.username}
         onClose={() => setSelectedReelId(null)}
+        onDelete={(id) => void deleteMine("reels", id)}
       />
       <ProfilePostsViewer
         open={selectedPostId !== null}
@@ -331,6 +344,7 @@ const ProfilePage = () => {
         initialPostId={selectedPostId}
         username={profile?.username}
         onClose={() => setSelectedPostId(null)}
+        onDelete={(id) => void deleteMine("posts", id)}
       />
       <MediaViewer onClose={() => setSelectedMedia(null)} post={selectedMedia ? {
         id: selectedMedia.id, media_url: selectedMedia.media_url ?? selectedMedia.video_url ?? null, media_type: selectedMedia.media_type ?? (selectedMedia.video_url ? "video" : "image"),

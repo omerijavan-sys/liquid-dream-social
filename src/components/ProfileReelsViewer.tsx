@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { INLINE_VIDEO_ATTRS } from "@/utils/media";
 import { useMute } from "@/contexts/MuteContext";
-import { Volume2, VolumeX, X } from "lucide-react";
+import { Trash2, Volume2, VolumeX, X } from "lucide-react";
 
 type ProfileReel = {
   id: string;
@@ -17,7 +17,9 @@ export default function ProfileReelsViewer({
   username,
   open,
   onClose,
+  onDelete,
 }: {
+  onDelete?: (id: string) => void;
   reels: ProfileReel[];
   initialReelId: string | null;
   open: boolean;
@@ -42,6 +44,7 @@ export default function ProfileReelsViewer({
         <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <span className="rounded-full bg-black/45 px-3 py-1 text-sm font-semibold">{username || "Reels"}</span>
           <div className="flex gap-2">
+            {onDelete && reels[activeIndex] && <button onClick={() => onDelete(reels[activeIndex].id)} aria-label="Delete reel" className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-red-300"><Trash2 className="h-4 w-4" /></button>}
             <button onClick={toggleMuted} aria-label={muted ? "Unmute reels" : "Mute reels"} className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50">
               {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </button>

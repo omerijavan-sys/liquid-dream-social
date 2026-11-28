@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, X } from "lucide-react";
+import { Heart, MessageCircle, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +19,9 @@ export default function ProfilePostsViewer({
   username,
   open,
   onClose,
+  onDelete,
 }: {
+  onDelete?: (id: string) => void;
   posts: ProfilePostItem[];
   initialPostId: string | null;
   username?: string | null;
@@ -106,6 +108,7 @@ export default function ProfilePostsViewer({
           <DialogTitle className="sr-only">{username ? `${username}'s posts` : "Profile posts"}</DialogTitle>
           <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <span className="rounded-full bg-black/45 px-3 py-1 text-sm font-semibold">{username || "Posts"}</span>
+            {onDelete && activePost && <button onClick={() => onDelete(activePost.id)} aria-label="Delete post" className="ml-auto mr-2 flex size-9 items-center justify-center rounded-full bg-black/50 text-red-300"><Trash2 className="size-4" /></button>}
             <button onClick={onClose} aria-label="Close posts" className="flex size-9 items-center justify-center rounded-full bg-black/50"><X className="size-5" /></button>
           </div>
           <div
