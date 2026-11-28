@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { INLINE_VIDEO_ATTRS } from "@/utils/media";
+import AiCover, { isBrokenMedia } from "@/components/AiCover";
 import PostCarousel, { type CarouselItem } from "@/components/PostCarousel";
 import { BLANK_POSTER } from "@/lib/blankPoster";
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -74,6 +75,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
   const [showHeart, setShowHeart] = useState(false);
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const lastTap = useRef(0);
   const tapTimer = useRef<number | null>(null);
@@ -294,6 +296,8 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
             <div className="w-full min-h-40 px-6 py-10 flex items-center justify-center">
               <p className="max-w-prose whitespace-pre-wrap text-center text-lg text-foreground">{caption}</p>
             </div>
+          ) : isBrokenMedia(image) || imgFailed ? (
+            <AiCover postId={String(postId)} caption={caption} username={username} />
           ) : mediaItems && mediaItems.length > 1 ? (
             <PostCarousel items={mediaItems} alt={`Post by ${username}`} />
           ) : isVideo ? (
@@ -361,7 +365,7 @@ const FeedPost = ({ image, poster, mediaType = "image", username, avatar, captio
             </div>
           ) : (
             // Natural aspect ratio: square, portrait, landscape and panoramas all show whole.
-            <img src={image} alt={`Post by ${username}`} className="w-full h-auto max-h-[75vh] object-contain" loading="lazy" decoding="async" />
+            <img src={image} alt={`Post by ${username}`} className="w-full h-auto max-h-[75vh] object-contain" loading="lazy" decoding="async" onError={() => setImgFailed(true)} />
           )}
           <AnimatePresence>
             {showHeart && (
