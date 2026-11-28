@@ -4,6 +4,7 @@ import { X, Mic, MicOff, Keyboard, Square } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import SiriOrb from "./SiriOrb";
+import AuroraAura from "./AuroraAura";
 import { authHeader } from "@/utils/authFetch";
 import { Button } from "@/components/ui/button";
 import { ROUTES, runAction, splitAction } from "@/utils/auroraActions";
@@ -324,13 +325,15 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 260, damping: 22 }}
             >
-              <SiriOrb
-                size={190}
-                intensity={phase === "speaking" ? 0.55 : intensity}
-                listening={phase === "listening"}
-                speaking={phase === "speaking" || phase === "thinking"}
-                onClick={() => (wantListeningRef.current ? endSession() : beginSession())}
-              />
+              <AuroraAura size={220} level={phase === "speaking" ? 0.55 : intensity} state={phase === "listening" ? "listening" : phase === "speaking" ? "speaking" : phase === "thinking" ? "thinking" : "idle"}>
+                <SiriOrb
+                  size={150}
+                  intensity={phase === "speaking" ? 0.55 : intensity}
+                  listening={phase === "listening"}
+                  speaking={phase === "speaking" || phase === "thinking"}
+                  onClick={() => (wantListeningRef.current ? endSession() : beginSession())}
+                />
+              </AuroraAura>
             </motion.div>
 
             <div className="text-center w-full min-h-[92px] max-h-[30dvh] overflow-y-auto break-words">

@@ -1,21 +1,27 @@
 import { mediaStorage } from "@/lib/mediaStorage";
 import { authHeader } from "@/utils/authFetch";
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Sparkles, Mic, MicOff, Volume2, Paperclip, Share2 } from "lucide-react";
+import { X, Send, Sparkles, Mic, MicOff, Paperclip, Share2, Image as ImageIcon, Music2, FileText, Loader2 } from "lucide-react";
+import AuroraAura from "./AuroraAura";
+import { ImageCard, SongCard } from "./AuroraCreations";
+import { parseSongSpec, type SongSpec } from "@/features/aurora/songComposer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 
-const PrimeOrb = lazy(() => import("./PrimeOrb"));
-
-const FloatingOrb = lazy(() => import("./FloatingOrb"));
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prime-ai-chat`;
 
 type Attachment = { kind: "image" | "video" | "audio" | "file"; url: string; name: string; dataUrl?: string };
-type Msg = { role: "user" | "assistant"; content: string; attachments?: Attachment[] };
+type Creation = { kind: "image"; prompt: string; seed: number } | { kind: "song"; spec: SongSpec };
+type Msg = { role: "user" | "assistant"; content: string; attachments?: Attachment[]; creation?: Creation };
+type Mode = "chat" | "image" | "song";
+
+const IMAGE_INTENT = /\b(?:create|generate|draw|make|paint|design|imagine)\s+(?:me\s+)?(?:an?\s+|some\s+)?(?:image|picture|photo|artwork|art|illustration|logo|wallpaper|poster|cover)\b\s*(?:of|for|showing|with|about)?\s*(.*)/i;
+const SONG_INTENT = /\b(?:create|write|make|compose|produce|generate)\s+(?:me\s+)?(?:an?\s+)?(?:\w+\s+)?(?:song|beat|track|tune|jingle)\b\s*(?:about|on|for|called|named|with)?\s*(.*)/i;
+const SONG_PROMPT = `You are a songwriter and music producer. Reply with ONLY one JSON object, no prose, no code fences, with keys: title (string), lyrics (string, 2 verses and a chorus, lines separated by \\n, section tags like [Chorus] allowed), bpm (number 70-150), key (one of C,C#,D,Eb,E,F,F#,G,Ab,A,Bb,B), mode ("major" or "minor"), style (one of afrobeat,pop,lofi,trap,rnb,gospel,dance), progression (array of 4 scale degrees 1-7). Song request: `;
 
 const toDataUrl = (file: File, max = 1280) => new Promise<string>((resolve, reject) => {
   const img = new Image();
@@ -62,6 +68,8 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
   const [pending, setPending] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<Mode>("chat");
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -207,7 +215,46 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
       }
       setPending(p => [...p, ...next].slice(0, 4));
     } catch (e: any) { toast.error(e.message || "Couldn't attach file"); }
-    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; if (docRef.current) docRef.current.value = ""; }
+  };
+
+  const askOnce = async (prompt: string) => {
+    const resp = await fetch(CHAT_URL, { method: "POST", headers: { "Content-Type": "application/json", Authorization: await authHeader() }, body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }) });
+    if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.error || `Error ${resp.status}`); }
+    const reader = resp.body?.getReader(); if (!reader) throw new Error("No stream");
+    const dec = new TextDecoder(); let buf = "", out = "";
+    for (;;) {
+      const { done, value } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line.startsWith("data: ")) continue;
+        try { out += JSON.parse(line.slice(6)).choices?.[0]?.delta?.content ?? ""; } catch { /* partial */ }
+      }
+    }
+    return out;
+  };
+
+  /** Image / song requests, from the mode chips or natural phrases. Returns true when handled. */
+  const create = async (text: string): Promise<boolean> => {
+    const im = IMAGE_INTENT.exec(text); const sm = SONG_INTENT.exec(text);
+    const kind: Mode = mode !== "chat" ? mode : sm && !im ? "song" : im ? "image" : "chat";
+    if (kind === "chat") return false;
+    const subject = (mode !== "chat" ? text : (kind === "image" ? im?.[1] : sm?.[1]) || text).trim() || text;
+    setMessages(prev => [...prev, { role: "user", content: text }]);
+    setInput(""); setLoading(true);
+    try {
+      if (kind === "image") {
+        setMessages(prev => [...prev, { role: "assistant", content: "Here you go ✨", creation: { kind: "image", prompt: subject, seed: Math.floor(Math.random() * 1e6) } }]);
+      } else {
+        const raw = await askOnce(SONG_PROMPT + subject);
+        const spec = parseSongSpec(raw, subject.slice(0, 40) || "Aurora Song");
+        setMessages(prev => [...prev, { role: "assistant", content: `I wrote and produced “${spec.title}” for you 🎶`, creation: { kind: "song", spec } }]);
+      }
+    } catch (e: any) { toast.error(e.message || "Couldn't create that"); }
+    finally { setLoading(false); }
+    return true;
   };
 
   const shareReply = async (text: string) => {
@@ -221,6 +268,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     if ((!input.trim() && !pending.length) || loading) return;
     const lower = input.toLowerCase();
     
+    if (!pending.length && await create(input.trim())) return;
     // Check for Aurora commands
     const isAurora = lower.includes("aurora");
     for (const [keyword, path] of Object.entries(COMMAND_REGISTRY)) {
@@ -291,101 +339,90 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     finally { setLoading(false); }
   };
 
+  const aState = listening ? "listening" : speaking ? "speaking" : loading ? "thinking" : "idle";
+  const chips: { m: Mode; label: string; icon: typeof ImageIcon }[] = [{ m: "chat", label: "Chat", icon: Sparkles }, { m: "image", label: "Create image", icon: ImageIcon }, { m: "song", label: "Create song", icon: Music2 }];
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0, y: 100, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 100, scale: 0.9 }}
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="fixed inset-4 bottom-24 z-[60] liquid-glass-elevated rounded-3xl flex flex-col overflow-hidden"
+          initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 60 }}
+          transition={{ type: "spring", stiffness: 380, damping: 32 }}
+          className="fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#07061a] text-white"
         >
-          <div className="flex items-center justify-between px-5 py-3 relative z-10">
-            <div className="flex items-center gap-3">
-              <Suspense fallback={<Sparkles className="w-8 h-8 text-primary animate-pulse" />}>
-                <PrimeOrb intensity={listening ? voiceIntensity : speaking ? 0.3 : 0} />
-              </Suspense>
-              <div>
-                <span className="text-headline text-foreground text-sm">Aurora</span>
-                <p className="text-caption text-muted-foreground">Press 'P' for voice</p>
-                {speaking && <p className="text-xs text-primary animate-pulse">Speaking...</p>}
-                {listening && <p className="text-xs text-green-400 animate-pulse">Listening...</p>}
-              </div>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.35),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(6,182,212,0.22),transparent_55%)]" />
+          <div className="safe-area-top relative z-10 flex items-center justify-between px-4 pt-3">
+            <div className="w-9" />
+            <h2 className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-lg font-black tracking-[0.35em] text-transparent">AURORA</h2>
+            <button onClick={() => { window.speechSynthesis.cancel(); onClose(); }} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 backdrop-blur"><X className="h-4 w-4" /></button>
+          </div>
+
+          <div className="relative z-10 flex flex-1 flex-col overflow-y-auto px-4 pb-2">
+            <div className={`flex flex-col items-center transition-all ${messages.length ? "py-2" : "py-6"}`}>
+              <AuroraAura size={messages.length ? 84 : 190} level={voiceIntensity} state={aState} />
+              <p className="mt-2 text-xs text-white/60">{listening ? "Listening…" : speaking ? "Speaking…" : loading ? "Creating…" : messages.length ? "" : "Ask me anything, or have me make something"}</p>
             </div>
-            <button onClick={() => { window.speechSynthesis.cancel(); onClose(); }} className="depth-press w-8 h-8 rounded-full liquid-glass-subtle flex items-center justify-center">
-              <X className="w-4 h-4 text-foreground" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-5 py-2 space-y-3 relative z-10">
             {messages.length === 0 && (
-              <div className="text-center text-muted-foreground text-sm mt-6">
-                <p className="text-base font-medium text-foreground mb-2">Hey! I'm Aurora 🤖</p>
-                <p className="text-xs mb-1">Your AI assistant. Try voice commands:</p>
-                <p className="text-xs text-primary mb-3">"Aurora, play music" • "Aurora, open Sports"</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {["Aurora, open Sports", "Aurora, play music", "Go to Profile"].map(cmd => (
-                    <button key={cmd} onClick={() => setInput(cmd)} className="depth-press px-3 py-1.5 rounded-xl liquid-glass-subtle text-xs text-foreground relative z-10">
-                      {cmd}
-                    </button>
-                  ))}
-                </div>
+              <div className="mb-3 flex flex-wrap justify-center gap-2">
+                {["Create an image of a neon Nairobi skyline", "Write a song about summer love", "Open Sports", "Make a lofi beat for studying"].map(cmd => (
+                  <button key={cmd} onClick={() => setInput(cmd)} className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs backdrop-blur active:scale-95">{cmd}</button>
+                ))}
               </div>
             )}
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm ${msg.role === "user" ? "bg-primary text-primary-foreground" : "liquid-glass-subtle text-foreground relative z-10"}`}>
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm prose-invert max-w-none"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
-                  ) : msg.content}
-                  {msg.attachments?.map((a, k) => (
-                    <div key={k} className="mt-2">
-                      {a.kind === "image" ? <img src={a.url} alt={a.name} className="max-h-48 rounded-xl" />
-                        : a.kind === "video" ? <video src={a.url} controls preload="none" className="max-h-48 rounded-xl" />
-                        : a.kind === "audio" ? <audio src={a.url} controls className="max-w-full" />
-                        : <a href={a.url} target="_blank" rel="noreferrer" className="underline text-xs">{a.name}</a>}
-                    </div>
-                  ))}
-                  {msg.role === "assistant" && msg.content && (
-                    <button onClick={() => void shareReply(msg.content)} aria-label="Share reply" className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><Share2 className="h-3 w-3" />Share</button>
-                  )}
+            <div className="space-y-3">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm ${msg.role === "user" ? "bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white" : "border border-white/10 bg-white/10 backdrop-blur"}`}>
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm prose-invert max-w-none"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
+                    ) : msg.content}
+                    {msg.creation?.kind === "image" && <ImageCard prompt={msg.creation.prompt} seed={msg.creation.seed} />}
+                    {msg.creation?.kind === "song" && <SongCard spec={msg.creation.spec} />}
+                    {msg.attachments?.map((a, k) => (
+                      <div key={k} className="mt-2">
+                        {a.kind === "image" ? <img src={a.url} alt={a.name} className="max-h-48 rounded-xl" />
+                          : a.kind === "video" ? <video src={a.url} controls preload="none" className="max-h-48 rounded-xl" />
+                          : a.kind === "audio" ? <audio src={a.url} controls className="max-w-full" />
+                          : <a href={a.url} target="_blank" rel="noreferrer" className="text-xs underline">{a.name}</a>}
+                      </div>
+                    ))}
+                    {msg.role === "assistant" && msg.content && !msg.creation && (
+                      <button onClick={() => void shareReply(msg.content)} aria-label="Share reply" className="mt-1 flex items-center gap-1 text-[10px] text-white/50"><Share2 className="h-3 w-3" />Share</button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {loading && messages[messages.length - 1]?.role === "user" && (
-              <div className="flex justify-start">
-                <div className="liquid-glass-subtle rounded-2xl px-4 py-2.5 text-sm text-muted-foreground relative z-10">
-                  <span className="animate-pulse">Thinking...</span>
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
+              ))}
+              {loading && (messages[messages.length - 1]?.role === "user" || mode === "song") && (
+                <div className="flex justify-start"><div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm text-white/70"><Loader2 className="h-4 w-4 animate-spin" />{mode === "song" ? "Composing…" : "Thinking…"}</div></div>
+              )}
+              <div ref={bottomRef} />
+            </div>
           </div>
 
-          <div className="px-4 py-3 relative z-10">
+          <div className="safe-area-bottom relative z-10 px-3 pb-3 pt-1">
+            <div className="mb-2 flex gap-2 overflow-x-auto">
+              {chips.map(c => (
+                <button key={c.m} onClick={() => setMode(c.m)} className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${mode === c.m ? "border-transparent bg-gradient-to-r from-cyan-400 to-fuchsia-500 font-semibold text-black" : "border-white/15 bg-white/10"}`}><c.icon className="h-3.5 w-3.5" />{c.label}</button>
+              ))}
+            </div>
             {pending.length > 0 && (
               <div className="mb-2 flex gap-2 overflow-x-auto">
                 {pending.map((a, k) => (
-                  <div key={k} className="relative shrink-0 rounded-xl liquid-glass-subtle px-2 py-1 text-[10px] text-foreground">
+                  <div key={k} className="relative shrink-0 rounded-xl bg-white/10 px-2 py-1 text-[10px]">
                     {a.kind === "image" ? <img src={a.url} alt="" className="h-12 w-12 rounded-lg object-cover" /> : `${a.kind}: ${a.name.slice(0, 14)}`}
                     <button onClick={() => setPending(p => p.filter((_, i) => i !== k))} aria-label="Remove attachment" className="absolute -right-1 -top-1 rounded-full bg-black/70 p-0.5"><X className="h-3 w-3" /></button>
                   </div>
                 ))}
               </div>
             )}
-            <input ref={fileRef} type="file" multiple accept="image/*,video/*,audio/*,application/pdf,text/*" hidden onChange={e => void attach(e.target.files)} />
-            <div className="flex gap-2">
-              <button onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Attach media" className="depth-press w-11 h-11 rounded-2xl liquid-glass-subtle flex items-center justify-center disabled:opacity-40">
-                <Paperclip className="w-4 h-4 text-foreground" />
-              </button>
-              <button onClick={toggleVoiceInput} className={`depth-press w-11 h-11 rounded-2xl flex items-center justify-center ${listening ? "bg-green-500" : "liquid-glass-subtle"}`}>
-                {listening ? <MicOff className="w-4 h-4 text-primary-foreground" /> : <Mic className="w-4 h-4 text-foreground" />}
-              </button>
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={listening ? "Listening..." : "Ask Aurora or attach media..."} className="flex-1 px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" />
-              <button onClick={send} disabled={loading || (!input.trim() && !pending.length)} className="depth-press w-11 h-11 rounded-2xl bg-primary flex items-center justify-center disabled:opacity-40">
-                <Send className="w-4 h-4 text-primary-foreground" />
-              </button>
+            {/* photo/video only, so the Android app shows its own gallery instead of the system Files browser */}
+            <input ref={fileRef} type="file" multiple accept="image/*,video/*" hidden onChange={e => void attach(e.target.files)} />
+            <input ref={docRef} type="file" multiple accept="audio/*,application/pdf,text/*" hidden onChange={e => void attach(e.target.files)} />
+            <div className="flex items-center gap-2 rounded-[1.75rem] border border-white/15 bg-white/10 p-1.5 backdrop-blur-xl">
+              <button onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Add photo or video" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 disabled:opacity-40">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button>
+              <button onClick={() => docRef.current?.click()} disabled={uploading} aria-label="Add audio or document" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 disabled:opacity-40"><FileText className="h-4 w-4" /></button>
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && void send()} placeholder={listening ? "Listening…" : mode === "image" ? "Describe the image…" : mode === "song" ? "What's the song about?" : "Ask Aurora…"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/40" />
+              <button onClick={toggleVoiceInput} aria-label="Voice" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${listening ? "bg-green-500 text-black" : "bg-white/10"}`}>{listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}</button>
+              <button onClick={() => void send()} disabled={loading || (!input.trim() && !pending.length)} aria-label="Send" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 text-black disabled:opacity-40"><Send className="h-4 w-4" /></button>
             </div>
           </div>
         </motion.div>
