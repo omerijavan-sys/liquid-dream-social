@@ -159,7 +159,8 @@ const GroupChats = ({ userId }: { userId: string }) => {
         if (uploadError) throw uploadError;
         avatarUrl = mediaStorage.getPublicUrl(uploadedPath).data.publicUrl;
       }
-      const callRpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+      type RpcFn = (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+      const callRpc: RpcFn = (fn, args) => (supabase.rpc as unknown as RpcFn)(fn, args); // keep `this` bound to the client
       const { data, error } = await callRpc("create_chat_group", {
         _name: name,
         _avatar_url: avatarUrl,
