@@ -1,4 +1,5 @@
 import { mediaStorage } from "@/lib/mediaStorage";
+import { dropDeadMedia } from "@/lib/oldMedia";
 import { createPortal } from "react-dom";
 import { getBlockedIds } from "@/utils/blocks";
 import type { Tables } from "@/integrations/supabase/types";
@@ -157,7 +158,7 @@ const ReelsPage = () => {
       // Reels the user marked "Not interested" stay out of the feed (stored on this device).
       let hidden: Record<string, string> = {};
       try { hidden = JSON.parse(localStorage.getItem("primegram:reelFeedback") || "{}"); } catch { /* storage unavailable */ }
-      const rawBatch = (data ?? []) as Tables<"reels">[];
+      const rawBatch = await dropDeadMedia((data ?? []) as Tables<"reels">[], r => [r.video_url]);
       const blockedIds = await getBlockedIds();
       const batch = rawBatch.filter(r => hidden[r.id] !== "not_interested" && !blockedIds.has(r.user_id));
       const userIds = [...new Set(batch.map(reel => reel.user_id))];

@@ -1,4 +1,5 @@
 import PublicVibe from "@/features/vibe/PublicVibe";
+import { dropDeadMedia } from "@/lib/oldMedia";
 import { invalidateBlocked } from "@/utils/blocks";
 import StreakBadge from "@/features/drops/StreakBadge";
 import { useEffect, useState } from "react";
@@ -65,7 +66,7 @@ const PublicProfilePage = () => {
   const [reels, setReels] = useState<{ id: string; video_url: string; caption: string | null; thumbnail_url: string | null; views_count: number | null; likes_count: number | null }[]>([]);
   useEffect(() => {
     if (!userId) return;
-    void supabase.from("reels").select("id, video_url, caption, thumbnail_url, views_count, likes_count").eq("user_id", userId).order("created_at", { ascending: false }).then(({ data }) => setReels((data ?? []) as never));
+    void supabase.from("reels").select("id, video_url, caption, thumbnail_url, views_count, likes_count").eq("user_id", userId).order("created_at", { ascending: false }).then(async ({ data }) => setReels((await dropDeadMedia((data ?? []) as { video_url: string | null }[], r => [r.video_url])) as never));
   }, [userId]);
   const reelViews = reels.reduce((n, r) => n + (r.views_count ?? 0), 0);
   const reelLikes = reels.reduce((n, r) => n + (r.likes_count ?? 0), 0);

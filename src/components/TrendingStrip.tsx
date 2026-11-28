@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { dropDeadMedia } from "@/lib/oldMedia";
 import { Flame, Heart, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,7 +44,7 @@ const TrendingStrip = () => {
           .select("id, video_url, thumbnail_url, caption, likes_count, views_count, user_id")
           .is("source_post_id", null).eq("visibility", "public").gte("created_at", since)
           .order("likes_count", { ascending: false }).order("views_count", { ascending: false }).limit(12);
-        const rows = (data ?? []) as Item[];
+        const rows = await dropDeadMedia((data ?? []) as Item[], r => [r.video_url]);
         if (dead || rows.length < 3) return;
         const ids = [...new Set(rows.map((r) => r.user_id))];
         const { data: ps } = await supabase.from("profiles").select("user_id, username, display_name").in("user_id", ids);

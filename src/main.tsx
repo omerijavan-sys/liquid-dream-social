@@ -42,8 +42,9 @@ if (root) {
   // Media from the old backend can't load yet: hide the broken-image icon so initials/gradient backgrounds show instead.
   window.addEventListener("error", (e) => {
     const t = e.target as HTMLElement | null;
-    if (t instanceof HTMLImageElement && t.src.includes("kfvoqwbfgptqrrkyhorj.supabase.co")) t.style.visibility = "hidden";
+    if ((t instanceof HTMLImageElement || t instanceof HTMLVideoElement) && t.currentSrc.includes("kfvoqwbfgptqrrkyhorj.supabase.co") || (t instanceof HTMLImageElement && t.src.includes("kfvoqwbfgptqrrkyhorj.supabase.co"))) t.style.visibility = "hidden";
   }, true);
+  void import("./lib/oldMedia").then(m => m.oldMediaWorks()); // start the check early so pages know if the old storage is back
   setTimeout(() => { try { sessionStorage.removeItem("chunkReload"); } catch { /* ignore */ } }, 15000);
   import("./App.tsx").then(({ default: App }) => createRoot(root).render(<ErrorBoundary><App /></ErrorBoundary>)).catch(showFatal);
   window.addEventListener("error", (e) => { if (!root.hasChildNodes() || root.querySelector(".pg-splash")) showFatal(e.error ?? e.message); });

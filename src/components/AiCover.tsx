@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { isOldMedia, oldMediaKnownWorking } from "@/lib/oldMedia";
 
 const hash = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
 const GRADS = [["#7c3aed", "#22d3ee"], ["#db2777", "#fbbf24"], ["#2563eb", "#a78bfa"], ["#059669", "#60a5fa"], ["#ea580c", "#f472b6"], ["#c026d3", "#34d399"]];
 
 /** Old-project media links are unreachable until the old project unlocks. */
-export const isBrokenMedia = (url?: string | null) => !!url && url.includes("kfvoqwbfgptqrrkyhorj.supabase.co");
+export const isBrokenMedia = (url?: string | null) => isOldMedia(url) && !oldMediaKnownWorking();
 
 /**
  * An AI-generated cover for a post whose own picture/video can't load.

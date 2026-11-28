@@ -1,4 +1,5 @@
 import { mediaStorage } from "@/lib/mediaStorage";
+import { dropDeadMedia } from "@/lib/oldMedia";
 import VibeSection from "@/features/vibe/VibeSection";
 import PublicVibe from "@/features/vibe/PublicVibe";
 import StreakBadge from "@/features/drops/StreakBadge";
@@ -69,7 +70,7 @@ const ProfilePage = () => {
         const { data: reposted } = rids.length ? await supabase.from("reels").select(cols).in("id", rids) : { data: [] as typeof data };
         const toItem = (reel: any) =>  // eslint-disable-line @typescript-eslint/no-explicit-any
            ({ ...reel, media_url: reel.video_url, media_type: "video" });
-        setTabPosts([...(data || []).map(toItem), ...(reposted || []).map(toItem)]);
+        setTabPosts(await dropDeadMedia([...(data || []).map(toItem), ...(reposted || []).map(toItem)], (r: { video_url?: string | null }) => [r.video_url]));
         return;
       }
       let ids: string[] = [];
