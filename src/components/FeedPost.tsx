@@ -56,7 +56,7 @@ const readSet = (k: string) => { try { return new Set<string>(JSON.parse(localSt
 const writeSet = (k: string, s: Set<string>) => localStorage.setItem(k, JSON.stringify([...s]));
 
 const Avatar = ({ avatar, username, size = "w-9 h-9 text-sm" }: { avatar: string; username: string; size?: string }) =>
-  avatar.startsWith("http") ? (
+  (avatar.startsWith("http") || avatar.startsWith("data:image/")) ? (
     <img src={avatar} alt={username} className={`${size} rounded-full object-cover`} />
   ) : (
     <div className={`${size} rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold`}>{avatar}</div>
