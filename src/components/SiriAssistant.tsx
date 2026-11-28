@@ -114,7 +114,23 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
           else setPhaseSafe("idle");
         });
       };
+      const act = async (a: Parameters<typeof runAction>[0], say: string) => {
+        const problem = await runAction(a, navigate as never).catch(() => "Sorry, I couldn't do that.");
+        done(problem ?? say);
+      };
+      let m: RegExpMatchArray | null;
+      if ((m = lower.match(/^(?:please )?(?:play|put on|i want to (?:hear|listen to)|listen to)\s+(?:me\s+|some\s+)?(.+?)(?: on (?:music|primegram|spotify))?$/)) && !/^(music|some music|a song|something|songs?)$/.test(m[1])) { void act({ type: "play", query: m[1] }, `Playing ${m[1]}.`); return; }
+      if (/^(?:please )?(?:play|put on)\s*(?:some |my )?(?:music|songs?|a song|something)?$/.test(lower) || /^(?:open|show|go to)\s+(?:the\s+)?(?:music|music hub|player)(?: page)?$/.test(lower)) { void act({ type: "music", cmd: /^(?:please )?(?:play|put on)/.test(lower) ? "resume" : "open" }, "Opening your music."); return; }
+      if (/^(pause|pause (?:the )?(?:music|song)|stop (?:the )?(?:music|song)|stop playing)$/.test(lower)) { void act({ type: "music", cmd: "pause" }, "Paused."); return; }
+      if (/^(resume|continue|unpause)(?: (?:the )?(?:music|song))?$/.test(lower)) { void act({ type: "music", cmd: "resume" }, "Resuming."); return; }
+      if (/^(next|skip)(?: (?:the )?(?:song|track))?$|^play (?:the )?next(?: song| track)?$/.test(lower)) { void act({ type: "music", cmd: "next" }, "Next song."); return; }
+      if (/^(previous|prev|last)(?: (?:the )?(?:song|track))?$|^play (?:the )?previous(?: song| track)?$/.test(lower)) { void act({ type: "music", cmd: "prev" }, "Previous song."); return; }
+      if ((m = lower.match(/^(?:please )?(?:open|show|view|go to)\s+(?:@)?([a-z0-9_. ]+?)(?:'s| s)?\s+profile$|^(?:please )?(?:open|show|view)\s+profile (?:of |for )?(?:@)?([a-z0-9_. ]+)$/)) && !/^(my|me|the|your)$/.test((m[1] || m[2]).trim())) { const n = (m[1] || m[2]).trim(); void act({ type: "profile", username: n }, `Opening ${n}'s profile.`); return; }
+      if (/^(?:please )?(?:open|show|view|go to)\s+(?:my|me|my own)\s+profile$/.test(lower)) { void act({ type: "navigate", page: "profile" }, "Opening your profile."); return; }
+      if ((m = lower.match(/^(?:please )?(?:message|text|chat with|dm)\s+(?:@)?([a-z0-9_. ]+)$/))) { void act({ type: "message", username: m[1].trim() }, `Opening your chat with ${m[1].trim()}.`); return; }
+      if ((m = lower.match(/^(?:please )?search(?: for)?\s+(.+)$/))) { void act({ type: "search", query: m[1] }, `Searching for ${m[1]}.`); return; }
       const nav = lower.match(/^(?:please )?(?:open|go to|show me|show|take me to|navigate to|launch)\s+(?:the\s+)?([a-z ]+?)(?: page| tab| screen)?$/);
+      if (nav && nav[1].trim() === "music") { void act({ type: "music", cmd: "open" }, "Opening your music."); return; }
       if (nav && ROUTES[nav[1].trim()]) { navigate(ROUTES[nav[1].trim()]); done(`Opening ${nav[1].trim()}.`); return; }
       if (/^(go back|back|previous page)$/.test(lower)) { navigate(-1 as never); done("Going back."); return; }
       if (/^scroll (down|up)$/.test(lower)) { void runAction({ type: "scroll", direction: lower.endsWith("up") ? "up" : "down" }, navigate as never); done("Okay."); return; }

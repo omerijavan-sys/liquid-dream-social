@@ -15,7 +15,9 @@ export type AuroraAction =
   | { type: "profile"; username: string }
   | { type: "back" }
   | { type: "reload" }
-  | { type: "scroll"; direction: "up" | "down" };
+  | { type: "scroll"; direction: "up" | "down" }
+  | { type: "play"; query: string }
+  | { type: "music"; cmd: "pause" | "resume" | "next" | "prev" | "stop" | "open" };
 
 const TAG = /^\s*\[\[ACTION:(\{[\s\S]*?\})\]\]\s*/;
 
@@ -38,6 +40,7 @@ const clean = (s: unknown) => String(s ?? "").replace(/[^\p{L}\p{N}_. -]/gu, "")
 export async function runAction(a: AuroraAction, navigate: (to: string | number) => void): Promise<string | null> {
   switch (a?.type) {
     case "navigate": {
+      if (String(a.page ?? "").toLowerCase() === "music") return runAction({ type: "music", cmd: "open" }, navigate);
       const path = ROUTES[String(a.page ?? "").toLowerCase()];
       if (!path) return "I can't open that page.";
       navigate(path); return null;
@@ -55,6 +58,33 @@ export async function runAction(a: AuroraAction, navigate: (to: string | number)
       const p = data?.[0];
       if (!p) return `I couldn't find ${name}.`;
       navigate(a.type === "message" ? `/messages?to=${p.user_id}` : `/profile/${p.user_id}`); return null;
+    }
+    case "music": {
+      const M = await import("@/services/MusicEngine");
+      switch (a.cmd) {
+        case "pause": if (!M.getMusicState().paused) M.toggleMusic(); return null;
+        case "resume": if (M.getMusicState().paused && M.getMusicState().track) M.toggleMusic(); else if (!M.getMusicState().track) return runAction({ type: "music", cmd: "open" }, navigate); return null;
+        case "next": M.nextTrack(); return null;
+        case "prev": M.prevTrack(); return null;
+        case "stop": M.stopMusic(); return null;
+        default:
+          if (window.location.pathname !== "/") { navigate("/"); setTimeout(() => window.dispatchEvent(new Event("prime:openMusic")), 600); }
+          else window.dispatchEvent(new Event("prime:openMusic"));
+          return null;
+      }
+    }
+    case "play": {
+      const q = String(a.query ?? "").trim().slice(0, 80);
+      if (!q) return runAction({ type: "music", cmd: "resume" }, navigate);
+      const M = await import("@/services/MusicEngine");
+      let title = q, artist = "", artwork: string | null = null, key: string | undefined;
+      try {
+        const { data } = await supabase.functions.invoke("spotify-search", { body: { q, limit: 1 } });
+        const t = data?.tracks?.[0];
+        if (t) { title = t.title; artist = t.artist; artwork = t.artwork ?? null; key = `sp_${t.id}`; }
+      } catch { /* play by name */ }
+      const ok = await M.playSong(title, artist, artwork, key);
+      return ok ? null : `I couldn't find a way to play ${q}.`;
     }
     case "back": navigate(-1); return null;
     case "reload": window.location.reload(); return null;
