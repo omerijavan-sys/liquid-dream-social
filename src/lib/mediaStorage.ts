@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { compressForUpload } from "@/lib/mediaCompress";
 
 /** Public address of the Cloudflare R2 bucket that now holds new uploads. */
 export const R2_PUBLIC_URL = ((import.meta.env.VITE_R2_PUBLIC_URL as string | undefined) || "https://pub-37993350e1d74ff0a8ffbf394fc68e1b.r2.dev").replace(/\/$/, "");
@@ -18,6 +19,8 @@ export const mediaStorage = {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return { data: null, error: { message: "Sign in required" } };
+      // Shrink big photos/videos on the phone first: faster uploads and far less storage and data used.
+      if (file instanceof File) { file = await compressForUpload(file); if (file.type !== opts.contentType) opts = { ...opts, contentType: file.type || opts.contentType }; }
       const contentType = opts.contentType || file.type || "application/octet-stream";
       const r = await fetch("/api/upload-url", {
         method: "POST",
