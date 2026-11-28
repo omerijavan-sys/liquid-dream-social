@@ -200,11 +200,12 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
           "audio-capture": "No microphone found.",
           network: "Voice recognition needs an internet connection (some browsers like Brave don't support it; try Chrome or Edge).",
           unsupported: "This browser can't listen. Try Chrome or Edge, or use the Android app.",
+          "update-app": "Voice needs the newest Primegram app. Install the latest APK from primegramx.co.ke/primegram.apk, then open Aurora again.",
           "start-failed": "Couldn't start the microphone. Tap the orb to try again.",
         };
         if (err === "no-speech" || err === "aborted") return;
         setNote(why[err] ?? `Voice problem (${err}). Tap the orb to retry.`);
-        if (err === "not-allowed" || err === "service-not-allowed" || err === "unsupported") { wantListeningRef.current = false; setPhaseSafe("idle"); }
+        if (err === "not-allowed" || err === "service-not-allowed" || err === "unsupported" || err === "update-app") { wantListeningRef.current = false; setPhaseSafe("idle"); }
       },
       onEnd: () => {
         // keep the conversation going: listen again unless Aurora is busy answering

@@ -5,10 +5,13 @@ import { Capacitor } from "@capacitor/core";
  * (the WebView has neither); in a browser it uses the Web Speech API. The voice is always a woman's.
  */
 const native = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+const nativeSR = () => native() && Capacitor.isPluginAvailable("SpeechRecognition");
+const nativeTTS = () => native() && Capacitor.isPluginAvailable("TextToSpeech");
+const webSR = () => !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 const FEMALE = /female|woman|samantha|karen|moira|tessa|serena|ava\b|allison|susan|zira|hazel|aria|jenny|libby|sonia|google uk english female|google us english|-x-(tpf|iob|iog|sfg|iol|enb|ene|afs|tpc)/i;
 const MALE = /\bmale\b|daniel|david|mark|george|alex\b|fred|-x-(tpd|iom|rjs|gba)/i;
 
-export const canListen = () => native() || !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+export const canListen = () => nativeSR() || webSR() || native();
 
 /* ---------------- voice ---------------- */
 let webVoice: SpeechSynthesisVoice | null | undefined;
@@ -29,7 +32,7 @@ let stopFlag = 0;
 export const stopSpeaking = () => {
   stopFlag++;
   try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
-  if (native()) void import("@capacitor-community/text-to-speech").then((m) => m.TextToSpeech.stop()).catch(() => undefined);
+  if (nativeTTS()) void import("@capacitor-community/text-to-speech").then((m) => m.TextToSpeech.stop()).catch(() => undefined);
 };
 
 const clean = (t: string) => t.replace(/```[\s\S]*?```/g, " ").replace(/\[\[ACTION:[\s\S]*?\]\]/g, " ").replace(/https?:\/\/\S+/g, " ").replace(/[#*_`~>\[\]()]/g, "").replace(/\s+/g, " ").trim();
@@ -39,7 +42,7 @@ const chunks = (t: string) => t.match(/[^.!?\n]+[.!?]*/g)?.map((x) => x.trim()).
 export async function speakAurora(text: string, onStart?: () => void): Promise<void> {
   const say = clean(text); if (!say) return;
   const mine = ++stopFlag;
-  if (native()) {
+  if (nativeTTS()) {
     try {
       const { TextToSpeech } = await import("@capacitor-community/text-to-speech");
       let voice: number | undefined;
@@ -85,7 +88,8 @@ export interface ListenOpts {
 
 /** Starts one recognition run. Always call the returned stop() when done. */
 export async function listen(o: ListenOpts): Promise<Listener> {
-  if (native()) {
+  if (native() && !nativeSR() && !webSR()) { o.onError?.("update-app"); o.onEnd?.(); return { stop() {} }; }
+  if (nativeSR()) {
     const { SpeechRecognition } = await import("@capacitor-community/speech-recognition");
     try {
       const perm = await SpeechRecognition.requestPermissions();
