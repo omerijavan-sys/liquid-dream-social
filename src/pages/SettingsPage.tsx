@@ -330,8 +330,9 @@ const SettingsPage = () => {
                     try {
                       if (Capacitor.isNativePlatform()) { await sendNativeTest(); toast.success("Test notification sent"); return; }
                       if (typeof Notification === "undefined" || Notification.permission !== "granted") throw new Error("Enable notifications first.");
-                      const reg = await navigator.serviceWorker.ready;
-                      await reg.showNotification("Primegram", { body: "Push notifications are working 🎉", icon: "/favicon.ico" });
+                      const { error } = await supabase.rpc("send_test_push" as never);
+                      if (error) throw error;
+                      toast.success("Test sent. It should arrive in a few seconds.");
                     } catch (e) { toast.error(e instanceof Error ? e.message : "Test failed"); }
                   }}
                 >Send test</button>

@@ -2,7 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "@/integrations/supabase/client";
 
-const VAPID_PUBLIC_KEY = "BIxoIal8OTWjGhelc6tzx29-pYEDFuU1ubHRvkiX7g7BrffCe0_fCPzMxt5aeDnwSTP-VY0Dy1yMrWQJaL-sBUY";
+const VAPID_PUBLIC_KEY = "BHcpwgIsVwQyNfCUzW-7EZ6wTuXE0WeYbsEOEuXuRvkSdpbrSzpvtQVRPNfJu4cxK1BecJACJzWs40AAh6y4ZKA";
 
 const toKey = (b64: string) => {
   const pad = "=".repeat((4 - (b64.length % 4)) % 4);
@@ -24,8 +24,12 @@ export async function enablePush(userId: string): Promise<void> {
   if (!pushSupported()) throw new Error("Push notifications aren't supported on this browser.");
   if ((await Notification.requestPermission()) !== "granted") throw new Error("Allow notifications in your browser settings.");
   const reg = await navigator.serviceWorker.ready;
-  const sub = (await reg.pushManager.getSubscription())
-    ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toKey(VAPID_PUBLIC_KEY) }));
+  let sub = await reg.pushManager.getSubscription();
+  // A subscription made with an older server key can't receive pushes any more: replace it.
+  const want = toKey(VAPID_PUBLIC_KEY);
+  const have = sub?.options?.applicationServerKey ? new Uint8Array(sub.options.applicationServerKey) : null;
+  if (sub && have && (have.length !== want.length || have.some((b, i) => b !== want[i]))) { await sub.unsubscribe().catch(() => undefined); sub = null; }
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: want });
   const json = sub.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) throw new Error("Couldn't register this device for push.");
   const { error } = await supabase.from("push_subscriptions" as never).upsert(
