@@ -1,6 +1,7 @@
 import { mediaStorage } from "@/lib/mediaStorage";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Phone, Video as VideoIcon, Loader2, Palette, Paperclip, Send, Users, X, LogOut, UserPlus } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Camera, Phone, Video as VideoIcon, Loader2, Palette, Paperclip, Send, Users, X, LogOut, UserPlus } from "lucide-react";
+import { GROUP_VERIFY_PRICE_KES, payGroupVerification } from "@/features/groups/groupVerify";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -31,7 +32,10 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
     if (error || !data) { toast.error(error?.message ?? "Couldn't start the group call"); return; }
     navigate(`/gcall/${data.id}${audio ? "?audio=1" : ""}`);
   };
-  const [group, setGroup] = useState<{ name: string; theme: string } | null>(null);
+  const [group, setGroup] = useState<{ name: string; theme: string; avatar_url?: string | null; is_verified?: boolean } | null>(null);
+  const [payingVerify, setPayingVerify] = useState(false);
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [people, setPeople] = useState<Record<string, Person>>({});
   const [msgs, setMsgs] = useState<GMsg[]>([]);
@@ -61,9 +65,9 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
   useEffect(() => {
     let dead = false;
     void (async () => {
-      const { data: g } = await supabase.from("chat_groups" as never).select("name, theme").eq("id", groupId).maybeSingle();
+      const { data: g } = await supabase.from("chat_groups" as never).select("name, theme, avatar_url, is_verified").eq("id", groupId).maybeSingle();
       if (dead) return; if (!g) { toast.error("This group isn't available."); onClose(); return; }
-      setGroup(g as { name: string; theme: string });
+      setGroup(g as { name: string; theme: string; avatar_url?: string | null; is_verified?: boolean });
       await loadMembers();
       const { data } = await supabase.from("group_messages" as never).select(COLS).eq("group_id", groupId).order("created_at", { ascending: false }).limit(100);
       if (!dead) { const rows = ((data ?? []) as GMsg[]).reverse(); setMsgs(rows); void loadPeople([...new Set(rows.map((r) => r.sender_id))]); }
@@ -126,12 +130,34 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
   };
   const leave = async () => { const { error } = await rpc("group_leave", { _gid: groupId }); if (error) toast.error(error.message); else { toast.success("You left the group"); onClose(); } };
   const isAdmin = members.find((m) => m.user_id === user?.id)?.role === "admin";
+  const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const changePhoto = async (file: File) => {
+    if (!user) return;
+    if (!file.type.startsWith("image/")) return toast.error("Choose an image file.");
+    if (file.size > 5 * 1024 * 1024) return toast.error("Group photos must be 5 MB or smaller.");
+    setSavingPhoto(true);
+    try {
+      const path = `${user.id}/group_avatar_${Date.now()}.${(file.name.split(".").pop() || "jpg").toLowerCase()}`;
+      const up = await mediaStorage.upload(path, file, { cacheControl: UPLOAD_CACHE }); if (up.error) throw up.error;
+      const url = mediaStorage.getPublicUrl(path).data.publicUrl;
+      const { error } = await rpc("group_set_avatar", { _gid: groupId, _url: url }); if (error) throw new Error(error.message);
+      setGroup((g) => g ? { ...g, avatar_url: url } : g); toast.success("Group picture updated");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't update the picture"); } finally { setSavingPhoto(false); }
+  };
+  const verifyGroup = async () => {
+    setPayingVerify(true);
+    try {
+      const ok = await payGroupVerification(groupId);
+      if (ok) { setGroup((g) => g ? { ...g, is_verified: true } : g); toast.success("Your group is verified ✅"); }
+      else toast.info("Payment received. The blue tick will appear shortly.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Payment failed"); } finally { setPayingVerify(false); }
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col text-white" style={{ background: theme.bg }}>
       <div className="flex items-center gap-3 border-b border-white/10 bg-black/40 px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl">
         <button onClick={onClose} aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
-        <button onClick={() => setInfoOpen(true)} className="min-w-0 flex-1 text-left"><p className="truncate font-semibold">{group?.name ?? "…"}</p><p className="text-[11px] text-white/60">{members.length} members</p></button>
+        <button onClick={() => setInfoOpen(true)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left"><span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">{group?.avatar_url ? <img src={group.avatar_url} alt="" className="h-full w-full object-cover" /> : <Users className="h-4 w-4" />}</span><span className="min-w-0"><p className="flex items-center gap-1 truncate font-semibold"><span className="truncate">{group?.name ?? "…"}</span>{group?.is_verified && <BadgeCheck className="h-4 w-4 shrink-0 text-sky-400" aria-label="Verified group" />}</p><p className="text-[11px] text-white/60">{members.length} members</p></span></button>
         <button onClick={() => void startCall(true)} aria-label="Group voice call" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><Phone className="h-4 w-4" /></button>
         <button onClick={() => void startCall(false)} aria-label="Group video call" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><VideoIcon className="h-4 w-4" /></button>
         <button onClick={() => setThemeOpen(true)} aria-label="Change theme" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><Palette className="h-4 w-4" /></button>
@@ -156,6 +182,7 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
                     {m.media_type === "video" && m.media_url && <video src={m.media_url} controls playsInline preload="none" className="mb-1 max-h-64 rounded-xl" />}
                     {!m.media_type && linkify(m.content)}
                     {m.edited_at && <span className="ml-2 text-[10px] text-white/50">edited</span>}
+                    <span className="ml-2 inline-block align-bottom text-[10px] text-white/50">{timeOf(m.created_at)}</span>
                   </>)}
                 </div>
                 {rx.length > 0 && !deleted && <div className={`-mt-2 flex gap-1 ${mine ? "justify-end pr-2" : "pl-2"}`}>{rx.map(([e, u]) => <button key={e} onClick={() => void react(m, e)} className="rounded-full border border-white/20 bg-black/60 px-1.5 py-0.5 text-xs">{e}{u.length > 1 ? ` ${u.length}` : ""}</button>)}</div>}
@@ -192,7 +219,20 @@ const GroupChat = ({ groupId, onClose }: { groupId: string; onClose: () => void 
       {infoOpen && (
         <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/60" onClick={() => setInfoOpen(false)}>
           <div onClick={(e) => e.stopPropagation()} className="max-h-[85%] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl border border-white/15 bg-black/85 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-2xl">
-            <div className="flex items-center justify-between"><p className="font-semibold">{group?.name} · {members.length} members</p><button onClick={() => setInfoOpen(false)} aria-label="Close"><X className="h-5 w-5" /></button></div>
+            <div className="flex items-center gap-3">
+              <button type="button" disabled={!isAdmin || savingPhoto} onClick={() => photoRef.current?.click()} aria-label="Change group picture" className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
+                {group?.avatar_url ? <img src={group.avatar_url} alt="" className="h-full w-full object-cover" /> : <Users className="h-6 w-6" />}
+                {isAdmin && <span className="absolute inset-x-0 bottom-0 flex justify-center bg-black/60 py-0.5">{savingPhoto ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}</span>}
+              </button>
+              <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void changePhoto(f); }} />
+              <p className="flex min-w-0 flex-1 items-center gap-1 font-semibold"><span className="truncate">{group?.name}</span>{group?.is_verified && <BadgeCheck className="h-4 w-4 shrink-0 text-sky-400" aria-label="Verified group" />}<span className="shrink-0 font-normal text-white/60"> · {members.length} members</span></p>
+              <button onClick={() => setInfoOpen(false)} aria-label="Close" className="self-start"><X className="h-5 w-5" /></button>
+            </div>
+            {isAdmin && !group?.is_verified && (
+              <button onClick={() => void verifyGroup()} disabled={payingVerify} className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                {payingVerify ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />}Get the blue tick · {GROUP_VERIFY_PRICE_KES} KES
+              </button>
+            )}
             <div className="space-y-1">{members.map((m) => <div key={m.user_id} className="flex items-center justify-between rounded-xl px-2 py-1.5 text-sm"><span>{nameOf(m.user_id)}</span>{m.role === "admin" && <span className="text-[10px] text-emerald-300">admin</span>}</div>)}</div>
             {isAdmin && (<div className="space-y-2 border-t border-white/10 pt-3">
               <p className="flex items-center gap-2 text-sm font-semibold"><UserPlus className="h-4 w-4" />Add people</p>

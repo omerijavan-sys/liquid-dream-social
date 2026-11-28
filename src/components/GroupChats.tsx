@@ -1,6 +1,6 @@
 import { mediaStorage } from "@/lib/mediaStorage";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Camera, Loader2, Plus, Search, Send, Users, X } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Camera, Loader2, Plus, Search, Send, Users, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +11,7 @@ type Group = {
   name: string;
   avatar_url: string | null;
   created_at: string;
+  is_verified?: boolean;
 };
 
 type Person = {
@@ -64,7 +65,7 @@ const GroupChats = ({ userId }: { userId: string }) => {
       setLoading(false);
       return;
     }
-    const groupQuery = supabase.from("chat_groups" as never).select("id, name, avatar_url, created_at").in("id", groupIds).order("created_at", { ascending: false });
+    const groupQuery = supabase.from("chat_groups" as never).select("id, name, avatar_url, created_at, is_verified").in("id", groupIds).order("created_at", { ascending: false });
     const { data, error } = await groupQuery as unknown as { data: Group[] | null; error: { message: string } | null };
     if (error) toast.error(error.message || "Could not load your groups.");
     setGroups(data ?? []);
@@ -204,7 +205,7 @@ const GroupChats = ({ userId }: { userId: string }) => {
             {selectedGroup.avatar_url ? <img src={selectedGroup.avatar_url} alt={`${selectedGroup.name} group`} className="h-full w-full object-cover" /> : <Users className="h-5 w-5" />}
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold text-amber-100">{selectedGroup.name}</h2>
+            <h2 className="flex items-center gap-1 truncate text-sm font-semibold text-amber-100"><span className="truncate">{selectedGroup.name}</span>{selectedGroup.is_verified && <BadgeCheck className="h-4 w-4 shrink-0 text-sky-400" aria-label="Verified group" />}</h2>
             <p className="text-xs text-white/45">Group conversation</p>
           </div>
         </header>
@@ -249,7 +250,7 @@ const GroupChats = ({ userId }: { userId: string }) => {
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-amber-200/25 bg-amber-200/10 text-amber-100">
             {group.avatar_url ? <img src={group.avatar_url} alt="" className="h-full w-full object-cover" /> : <Users className="h-5 w-5" />}
           </div>
-          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-amber-100">{group.name}</span><span className="mt-1 block text-xs text-white/45">Open conversation</span></span>
+          <span className="min-w-0 flex-1"><span className="flex items-center gap-1 truncate text-sm font-semibold text-amber-100"><span className="truncate">{group.name}</span>{group.is_verified && <BadgeCheck className="h-4 w-4 shrink-0 text-sky-400" aria-label="Verified group" />}</span><span className="mt-1 block text-xs text-white/45">Open conversation</span></span>
           <ArrowLeft className="h-4 w-4 rotate-180 text-white/35" aria-hidden="true" />
         </button>)}
       </div>}

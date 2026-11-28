@@ -643,6 +643,7 @@ const MessagesPage = () => {
                       </button>
                     )}
                     {m.edited_at && <span className="ml-2 text-[10px] text-white/40">edited</span>}
+                    <span className="ml-2 inline-block align-bottom text-[10px] text-white/40">{new Date(m.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
                     </>)}
                   </div>
                   {reactionEntries.length > 0 && !deleted && (

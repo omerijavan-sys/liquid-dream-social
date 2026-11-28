@@ -23,15 +23,16 @@ async function processCharge(admin: any, data: any): Promise<{ ok: boolean; dupl
   const meta = data.metadata ?? {};
   if (!reference || data.currency !== "KES") return { ok: false, duplicate: false };
   const type = String(meta.payment_type ?? "");
-  if (!["tip", "subscription", "topup"].includes(type)) return { ok: false, duplicate: false };
+  if (!["tip", "subscription", "topup", "group_verify"].includes(type)) return { ok: false, duplicate: false };
   const gross = Math.round(Number(data.amount)) / 100;
+  if (type === "group_verify" && gross !== 100) { console.error("wrong group verify amount", reference); return { ok: false, duplicate: false }; }
   if (Math.abs(gross - Number(meta.amount_kes)) > 0.01) { console.error("amount mismatch", reference); return { ok: false, duplicate: false }; }
   const buyerId = meta.buyer_id as string;
   const creatorId = (meta.creator_id as string | null) || null;
-  const platformFee = type === "topup" ? 0 : Math.round(gross * PLATFORM_RATE * 100) / 100;
+  const platformFee = type === "group_verify" ? gross : type === "topup" ? 0 : Math.round(gross * PLATFORM_RATE * 100) / 100;
   const paystackFee = Math.round(Number(data.fees ?? 0)) / 100;
   // bearer=subaccount: the Paystack processing fee comes out of the creator's 85% share
-  const creatorNet = type === "topup" ? 0 : Math.round((gross - platformFee - paystackFee) * 100) / 100;
+  const creatorNet = type === "topup" || type === "group_verify" ? 0 : Math.round((gross - platformFee - paystackFee) * 100) / 100;
 
   const { error: insErr } = await admin.from("transactions").insert({
     reference, payment_type: type, buyer_id: buyerId, creator_id: creatorId, gross_kes: gross,
@@ -51,6 +52,9 @@ async function processCharge(admin: any, data: any): Promise<{ ok: boolean; dupl
       await admin.from("subscriptions").upsert({ subscriber_id: buyerId, creator_id: creatorId, amount_kes: gross, status: "active", last_reference: reference, expires_at: expires }, { onConflict: "subscriber_id,creator_id" });
       await admin.from("creator_subscriptions").upsert({ subscriber_id: buyerId, creator_id: creatorId, amount: Math.round(gross), status: "active", started_at: new Date().toISOString(), expires_at: expires, canceled_at: null }, { onConflict: "subscriber_id,creator_id" });
     }
+  } else if (type === "group_verify") {
+    const gid = String(meta.group_id ?? "");
+    if (/^[0-9a-f-]{36}$/i.test(gid)) await admin.from("chat_groups").update({ is_verified: true, verified_at: new Date().toISOString() }).eq("id", gid);
   } else if (type === "topup") {
     const note = `Paystack top-up ${reference}`;
     const { data: have } = await admin.from("wallet_transactions").select("id").eq("user_id", buyerId).eq("note", note).maybeSingle();
