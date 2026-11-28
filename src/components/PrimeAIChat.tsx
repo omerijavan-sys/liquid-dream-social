@@ -2,7 +2,7 @@ import { mediaStorage } from "@/lib/mediaStorage";
 import { authHeader } from "@/utils/authFetch";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Sparkles, Mic, MicOff, Paperclip, Share2, Volume2, VolumeX, Image as ImageIcon, Music2, FileText, Loader2 } from "lucide-react";
+import { X, Send, Sparkles, Mic, Paperclip, Share2, Volume2, VolumeX, Image as ImageIcon, Music2, FileText, Loader2 } from "lucide-react";
 import AuroraAura from "./AuroraAura";
 import { setWakeEnabled, wakeEnabled } from "./AuroraWake";
 import { Capacitor } from "@capacitor/core";
@@ -74,6 +74,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
   const docRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>("chat");
   const [wake, setWake] = useState(wakeEnabled);
+  const openVoiceMode = () => { stopSpeaking(); onClose(); setTimeout(() => window.dispatchEvent(new Event("prime:openOrb")), 150); };
   const flipWake = async () => {
     const v = !wake;
     if (v) { try { if (!Capacitor.isNativePlatform()) { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); } } catch { toast.error("Allow the microphone to use Hey Aurora"); return; } toast.success("Say “Hey Aurora” while Primegram is open"); }
@@ -382,6 +383,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
 
           <div className="safe-area-bottom relative z-10 px-3 pb-3 pt-1">
             <div className="mb-2 flex gap-2 overflow-x-auto">
+              <button onClick={openVoiceMode} className="flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-300 to-cyan-400 px-3 py-1.5 text-xs font-bold text-black"><Mic className="h-3.5 w-3.5" />Voice mode</button>
               {chips.map(c => (
                 <button key={c.m} onClick={() => setMode(c.m)} className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${mode === c.m ? "border-transparent bg-gradient-to-r from-cyan-400 to-fuchsia-500 font-semibold text-black" : "border-white/15 bg-white/10"}`}><c.icon className="h-3.5 w-3.5" />{c.label}</button>
               ))}
@@ -404,7 +406,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
               <button onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Add photo or video" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 disabled:opacity-40">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button>
               <button onClick={() => docRef.current?.click()} disabled={uploading} aria-label="Add audio or document" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 disabled:opacity-40"><FileText className="h-4 w-4" /></button>
               <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && void send()} placeholder={listening ? "Listening…" : mode === "image" ? "Describe the image…" : mode === "song" ? "What's the song about?" : "Ask Aurora…"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/40" />
-              <button onClick={toggleVoiceInput} aria-label="Voice" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${listening ? "bg-green-500 text-black" : "bg-white/10"}`}>{listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}</button>
+              <button onClick={openVoiceMode} aria-label="Voice mode" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-400 text-black"><Mic className="h-4 w-4" /></button>
               <button onClick={() => void send()} disabled={loading || (!input.trim() && !pending.length)} aria-label="Send" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 text-black disabled:opacity-40"><Send className="h-4 w-4" /></button>
             </div>
           </div>
