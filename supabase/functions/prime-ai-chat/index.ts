@@ -2,17 +2,21 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 type Cand = { url: string; headers: Record<string, string>; model: string; label: string };
-/** Your own key first (AI_API_KEY / AI_BASE_URL / AI_MODEL), then free anonymous Pollinations models as backups. */
-function candidates(): Cand[] {
-  const out: Cand[] = [];
-  const key = Deno.env.get("AI_API_KEY");
-  if (key) {
-    const base = (Deno.env.get("AI_BASE_URL") ?? "https://api.openai.com/v1").replace(/\/$/, "");
-    out.push({ url: `${base}/chat/completions`, headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, model: Deno.env.get("AI_MODEL") ?? "gpt-4o-mini", label: "key" });
-  }
-  for (const m of ["openai-fast", "mistral", "llama", "openai"]) out.push({ url: "https://text.pollinations.ai/openai", headers: { "Content-Type": "application/json" }, model: m, label: m });
-  return out;
+const bearer = (k: string) => ({ "Content-Type": "application/json", Authorization: `Bearer ${k}` });
+/** Free, fast providers first (Groq, Gemini), then your own key, then anonymous Pollinations as a last resort. */
+function candidates(voice: boolean, hasImage: boolean): Cand[] {
+  const groq = Deno.env.get("GROQ_API_KEY"), gem = Deno.env.get("GEMINI_API_KEY"), own = Deno.env.get("AI_API_KEY");
+  const G: Cand | null = groq ? { url: "https://api.groq.com/openai/v1/chat/completions", headers: bearer(groq), model: Deno.env.get("GROQ_MODEL") ?? (voice ? "llama-3.1-8b-instant" : "llama-3.3-70b-versatile"), label: "groq" } : null;
+  const G2: Cand | null = groq && voice ? { url: "https://api.groq.com/openai/v1/chat/completions", headers: bearer(groq), model: "llama-3.3-70b-versatile", label: "groq-70b" } : null;
+  const M: Cand | null = gem ? { url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", headers: bearer(gem), model: Deno.env.get("GEMINI_MODEL") ?? "gemini-flash-latest", label: "gemini" } : null;
+  const O: Cand | null = own ? { url: `${(Deno.env.get("AI_BASE_URL") ?? "https://api.openai.com/v1").replace(/\/$/, "")}/chat/completions`, headers: bearer(own), model: Deno.env.get("AI_MODEL") ?? "gpt-4o-mini", label: "key" } : null;
+  const out: (Cand | null)[] = hasImage ? [M, O] : [G, M, G2, O]; // photos need a vision model: Gemini
+  for (const m of ["openai-fast", "mistral", "llama"]) out.push({ url: "https://text.pollinations.ai/openai", headers: { "Content-Type": "application/json" }, model: m, label: m });
+  return out.filter((c): c is Cand => !!c);
 }
+// light per-person limit (best effort per instance) so one user can't burn the shared free allowance
+const hits = new Map<string, number[]>();
+const tooMany = (id: string) => { const now = Date.now(); const a = (hits.get(id) ?? []).filter((t) => now - t < 60000); a.push(now); hits.set(id, a); return a.length > 20; };
 const FRESH = /\b(news|today|tonight|latest|current|currently|now|price|score|scores|weather|who is|who won|who's|when is|when does|how much|result|results|update|trending|release|released|this week|this year|202\d)\b/i;
 
 const stripTags = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
@@ -89,7 +93,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-        const now = new Date();
+        if (tooMany(userId)) return new Response(JSON.stringify({ error: "You are going a bit fast. Give Aurora a few seconds." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const hasImage = JSON.stringify(messages).includes("image_url");
+    const now = new Date();
     const nairobi = new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "short", timeZone: "Africa/Nairobi" }).format(now);
     const last = [...messages].reverse().find((m: { role?: string }) => m?.role === "user");
     const q = textOf(last?.content).trim();
@@ -115,7 +121,7 @@ serve(async (req) => {
     });
     // Try each provider in turn: a rate limit or outage on one just moves on to the next.
     let response: Response | null = null; let lastStatus = 0;
-    for (const c of candidates()) {
+    for (const c of candidates(mode === "voice", hasImage)) {
       try {
         const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 12000);
         const r = await fetch(c.url, { method: "POST", headers: c.headers, body: payload(c.model), signal: ctrl.signal });
