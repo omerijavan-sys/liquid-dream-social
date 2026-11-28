@@ -44,7 +44,7 @@ const TopNavBar = () => {
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('prime:openOrb'))}
             className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center depth-press"
-            aria-label="Open Heiji AI"
+            aria-label="Open Aurora"
           >
             <img src={pLogo} alt="Primegram" className="w-full h-full object-contain" />
           </button>

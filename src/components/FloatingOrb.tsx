@@ -121,7 +121,7 @@ const FloatingOrb = () => {
                 exit={{ opacity: 0, y: 10 }}
                 className="absolute -top-12 left-1/2 transform -translate-x-1/2 liquid-glass-elevated rounded-full px-3 py-1.5 text-xs font-medium text-foreground whitespace-nowrap z-10"
               >
-                Tap or press 'P' — talk to Siri
+                Tap or press 'P' — talk to Aurora
               </motion.div>
             )}
           </AnimatePresence>

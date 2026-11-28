@@ -54,7 +54,7 @@ const SiriOrb = ({
     <motion.button
       type="button"
       onClick={onClick}
-      aria-label="Siri assistant"
+      aria-label="Aurora assistant"
       className="relative rounded-full overflow-visible"
       style={{ width: size, height: size }}
       animate={{ scale: 1 + energy * 0.14 }}

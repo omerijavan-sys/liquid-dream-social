@@ -10,6 +10,7 @@ import { lazy, Suspense } from "react";
 import SplashLoader from "@/components/SplashLoader";
 import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
+import DownloadAppPrompt from "@/components/DownloadAppPrompt";
 import WebPushPrompt from "@/components/WebPushPrompt";
 import NativePush from "@/components/NativePush";
 import ReferralClaimer from "@/features/referrals/ReferralClaimer";
@@ -126,6 +127,7 @@ const App = () => (
           <GlobalRealtimeListener />
           <NativePush />
           <WebPushPrompt />
+          <DownloadAppPrompt />
           <Suspense fallback={<SplashLoader />}>
           <Routes>
             <Route path="/invite/:code" element={<InvitePage />} />

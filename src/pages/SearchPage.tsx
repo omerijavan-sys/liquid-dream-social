@@ -16,7 +16,7 @@ const HISTORY_KEY = "primegram-search-history";
 const readHistory = (): string[] => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; } };
 
 const SearchPage = () => {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
   const [results, setResults] = useState<any[]>([]);
   const [following, setFollowing] = useState<Set<string>>(new Set());
   const { user } = useAuth();

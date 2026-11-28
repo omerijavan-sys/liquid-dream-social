@@ -76,7 +76,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Global 'P' key listener to trigger Heiji
+  // Global 'P' key listener to trigger Aurora
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "p" || e.key === "P") {
@@ -166,8 +166,8 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
       // Auto-send voice commands
       setTimeout(() => {
         const lower = transcript.toLowerCase();
-        // Check for "Heiji" prefix commands
-        if (lower.includes("heiji")) {
+        // Check for "Aurora" prefix commands
+        if (lower.includes("aurora")) {
           for (const [keyword, path] of Object.entries(COMMAND_REGISTRY)) {
             if (lower.includes(keyword)) {
               onClose();
@@ -221,10 +221,10 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
     if ((!input.trim() && !pending.length) || loading) return;
     const lower = input.toLowerCase();
     
-    // Check for Heiji commands
-    const isHeiji = lower.includes("heiji");
+    // Check for Aurora commands
+    const isAurora = lower.includes("aurora");
     for (const [keyword, path] of Object.entries(COMMAND_REGISTRY)) {
-      if ((isHeiji && lower.includes(keyword)) || lower.includes(`open ${keyword}`) || lower.includes(`go to ${keyword}`) || lower === keyword) {
+      if ((isAurora && lower.includes(keyword)) || lower.includes(`open ${keyword}`) || lower.includes(`go to ${keyword}`) || lower === keyword) {
         onClose();
         navigate(path);
         toast.success(`Opening ${keyword}...`);
@@ -232,7 +232,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
         return;
       }
     }
-    if (isHeiji && lower.includes("play music")) {
+    if (isAurora && lower.includes("play music")) {
       onClose();
       toast.success("Opening Music Hub...");
       setInput("");
@@ -307,7 +307,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
                 <PrimeOrb intensity={listening ? voiceIntensity : speaking ? 0.3 : 0} />
               </Suspense>
               <div>
-                <span className="text-headline text-foreground text-sm">Heiji AI</span>
+                <span className="text-headline text-foreground text-sm">Aurora</span>
                 <p className="text-caption text-muted-foreground">Press 'P' for voice</p>
                 {speaking && <p className="text-xs text-primary animate-pulse">Speaking...</p>}
                 {listening && <p className="text-xs text-green-400 animate-pulse">Listening...</p>}
@@ -321,11 +321,11 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
           <div className="flex-1 overflow-y-auto px-5 py-2 space-y-3 relative z-10">
             {messages.length === 0 && (
               <div className="text-center text-muted-foreground text-sm mt-6">
-                <p className="text-base font-medium text-foreground mb-2">Hey! I'm Heiji 🤖</p>
+                <p className="text-base font-medium text-foreground mb-2">Hey! I'm Aurora 🤖</p>
                 <p className="text-xs mb-1">Your AI assistant. Try voice commands:</p>
-                <p className="text-xs text-primary mb-3">"Heiji, play music" • "Heiji, open Sports"</p>
+                <p className="text-xs text-primary mb-3">"Aurora, play music" • "Aurora, open Sports"</p>
                 <div className="flex flex-wrap gap-2 justify-center">
-                  {["Heiji, open Sports", "Heiji, play music", "Go to Profile"].map(cmd => (
+                  {["Aurora, open Sports", "Aurora, play music", "Go to Profile"].map(cmd => (
                     <button key={cmd} onClick={() => setInput(cmd)} className="depth-press px-3 py-1.5 rounded-xl liquid-glass-subtle text-xs text-foreground relative z-10">
                       {cmd}
                     </button>
@@ -382,7 +382,7 @@ const PrimeAIChat = ({ open, onClose, onOpen }: { open: boolean; onClose: () => 
               <button onClick={toggleVoiceInput} className={`depth-press w-11 h-11 rounded-2xl flex items-center justify-center ${listening ? "bg-green-500" : "liquid-glass-subtle"}`}>
                 {listening ? <MicOff className="w-4 h-4 text-primary-foreground" /> : <Mic className="w-4 h-4 text-foreground" />}
               </button>
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={listening ? "Listening..." : "Ask Heiji or attach media..."} className="flex-1 px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" />
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={listening ? "Listening..." : "Ask Aurora or attach media..."} className="flex-1 px-4 py-3 rounded-2xl bg-secondary/50 text-foreground text-sm placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30" />
               <button onClick={send} disabled={loading || (!input.trim() && !pending.length)} className="depth-press w-11 h-11 rounded-2xl bg-primary flex items-center justify-center disabled:opacity-40">
                 <Send className="w-4 h-4 text-primary-foreground" />
               </button>

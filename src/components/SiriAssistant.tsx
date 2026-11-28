@@ -6,25 +6,12 @@ import { useNavigate } from "react-router-dom";
 import SiriOrb from "./SiriOrb";
 import { authHeader } from "@/utils/authFetch";
 import { Button } from "@/components/ui/button";
+import { ROUTES, runAction, splitAction } from "@/utils/auroraActions";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prime-ai-chat`;
 
 type Msg = { role: "user" | "assistant"; content: string };
 type Phase = "idle" | "listening" | "thinking" | "speaking";
-
-const COMMANDS: Record<string, string> = {
-  home: "/",
-  music: "/",
-  sports: "/sports",
-  movies: "/movies",
-  reels: "/reels",
-  profile: "/profile",
-  messages: "/messages",
-  wallet: "/wallet",
-  settings: "/settings",
-  search: "/search",
-  discover: "/discover",
-};
 
 interface Props {
   open: boolean;
@@ -132,21 +119,20 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
       setPhaseSafe("thinking");
       setReply("");
 
-      // Local navigation intents answered instantly
-      const lower = text.toLowerCase();
-      for (const [word, path] of Object.entries(COMMANDS)) {
-        if (lower.match(new RegExp(`(open|go to|show|take me to|navigate to)\\s+(the\\s+)?${word}`))) {
-          const line = `Opening ${word}.`;
-          setReply(line);
-          navigate(path);
-          speak(line, () => {
-            busyRef.current = false;
-            if (wantListeningRef.current) startRecognition();
-            else setPhaseSafe("idle");
-          });
-          return;
-        }
-      }
+      // Instant local commands: "open movies", "go back", "scroll down"...
+      const lower = text.toLowerCase().replace(/^(hey |hi |ok |okay )?aurora[, ]*/i, "").trim();
+      const done = (line: string) => {
+        setReply(line);
+        speak(line, () => {
+          busyRef.current = false;
+          if (wantListeningRef.current) startRecognition();
+          else setPhaseSafe("idle");
+        });
+      };
+      const nav = lower.match(/^(?:please )?(?:open|go to|show me|show|take me to|navigate to|launch)\s+(?:the\s+)?([a-z ]+?)(?: page| tab| screen)?$/);
+      if (nav && ROUTES[nav[1].trim()]) { navigate(ROUTES[nav[1].trim()]); done(`Opening ${nav[1].trim()}.`); return; }
+      if (/^(go back|back|previous page)$/.test(lower)) { navigate(-1 as never); done("Going back."); return; }
+      if (/^scroll (down|up)$/.test(lower)) { void runAction({ type: "scroll", direction: lower.endsWith("up") ? "up" : "down" }, navigate as never); done("Okay."); return; }
 
       const userMsg: Msg = { role: "user", content: text };
       const convo = [...history, userMsg].slice(-16);
@@ -180,7 +166,7 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
               const delta = JSON.parse(json).choices?.[0]?.delta?.content;
               if (delta) {
                 full += delta;
-                setReply(full);
+                setReply(splitAction(full).text);
               }
             } catch {}
           }
@@ -190,8 +176,16 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
         setReply(full);
       }
 
-      setHistory([...convo, { role: "assistant" as const, content: full }].slice(-16));
-      speak(full, () => {
+      const parsed = splitAction(full);
+      let spoken = parsed.text.trim();
+      if (parsed.action) {
+        const problem = await runAction(parsed.action, navigate as never).catch(() => "Sorry, I couldn't do that.");
+        if (problem) spoken = problem;
+        if (!spoken) spoken = "Done.";
+        setReply(spoken);
+      }
+      setHistory([...convo, { role: "assistant" as const, content: spoken }].slice(-16));
+      speak(spoken, () => {
         busyRef.current = false;
         if (wantListeningRef.current) startRecognition();
         else setPhaseSafe("idle");
@@ -316,14 +310,14 @@ const SiriAssistant = ({ open, onClose, onOpenTextChat }: Props) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          role="dialog" aria-modal="true" aria-label="Heiji assistant"
+          role="dialog" aria-modal="true" aria-label="Aurora assistant"
           className="fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-y-auto py-6"
         >
           {/* Dim + glass backdrop */}
           <div className="absolute inset-0 bg-background/70 backdrop-blur-2xl" />
 
           <div className="relative z-10 w-full max-w-lg px-6 flex flex-col items-center gap-5">
-            <div className="w-full flex items-center justify-between border-b border-border pb-3"><h2 className="text-xl font-semibold text-foreground">Heiji</h2><span className="text-xs text-muted-foreground">{label}</span></div>
+            <div className="w-full flex items-center justify-between border-b border-border pb-3"><h2 className="text-xl font-semibold text-foreground">Aurora</h2><span className="text-xs text-muted-foreground">{label}</span></div>
             {/* Orb */}
             <motion.div
               initial={{ scale: 0.7, opacity: 0 }}
