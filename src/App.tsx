@@ -12,6 +12,7 @@ import PaystackReturn from "@/components/PaystackReturn";
 import SpotifyCallback from "@/components/SpotifyCallback";
 import DownloadAppPrompt from "@/components/DownloadAppPrompt";
 import WebPushPrompt from "@/components/WebPushPrompt";
+import AuroraVoiceHost from "@/components/AuroraVoiceHost";
 import NativePush from "@/components/NativePush";
 import ReferralClaimer from "@/features/referrals/ReferralClaimer";
 import OnboardingGate from "@/features/onboarding/OnboardingGate";
@@ -128,6 +129,7 @@ const App = () => (
           <NativePush />
           <WebPushPrompt />
           <DownloadAppPrompt />
+          <AuroraVoiceHost />
           <Suspense fallback={<SplashLoader />}>
           <Routes>
             <Route path="/invite/:code" element={<InvitePage />} />
