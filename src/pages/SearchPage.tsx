@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { dropDeadMedia, postMediaUrls } from "@/lib/oldMedia";
 import VideoThumb from "@/components/VideoThumb";
 import { motion } from "framer-motion";
 import { Search, UserPlus, UserCheck } from "lucide-react";
@@ -40,7 +41,7 @@ const SearchPage = () => {
     let qb = supabase.from("posts").select("*").neq("media_type", "story");
     if (readContentPrefs().safeSearch) qb = qb.eq("is_adult", false);
     qb.order("created_at", { ascending: false }).limit(60)
-      .then(({ data }) => setPostResults(data || []));
+      .then(async ({ data }) => setPostResults(await dropDeadMedia(data || [], postMediaUrls)));
   }, []);
 
   // Suggestions while typing: people whose username or name starts with (or contains) what was typed.
@@ -83,7 +84,7 @@ const SearchPage = () => {
       ).ilike("caption", `%${q}%`).order("created_at", { ascending: false }).limit(60),
     ]);
     setResults(data || []);
-    setPostResults(posts || []);
+    setPostResults(await dropDeadMedia(posts || [], postMediaUrls));
   };
 
   const toggleFollow = async (targetId: string) => {

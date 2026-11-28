@@ -1,5 +1,5 @@
 import { mediaStorage } from "@/lib/mediaStorage";
-import { dropDeadMedia } from "@/lib/oldMedia";
+import { dropDeadMedia, postMediaUrls } from "@/lib/oldMedia";
 import VibeSection from "@/features/vibe/VibeSection";
 import PublicVibe from "@/features/vibe/PublicVibe";
 import StreakBadge from "@/features/drops/StreakBadge";
@@ -125,7 +125,7 @@ const ProfilePage = () => {
         .eq("user_id", user.id)
         .neq("media_type", "story")
         .order("created_at", { ascending: false });
-      setPosts(userPosts || []);
+      setPosts(await dropDeadMedia(userPosts || [], postMediaUrls));
       const { count } = await supabase.from("reels").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("source_post_id", null);
       setReelTotal(count ?? 0);
     };

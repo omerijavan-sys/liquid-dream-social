@@ -1,5 +1,5 @@
 import PublicVibe from "@/features/vibe/PublicVibe";
-import { dropDeadMedia } from "@/lib/oldMedia";
+import { dropDeadMedia, postMediaUrls } from "@/lib/oldMedia";
 import { invalidateBlocked } from "@/utils/blocks";
 import StreakBadge from "@/features/drops/StreakBadge";
 import { useEffect, useState } from "react";
@@ -183,7 +183,7 @@ const PublicProfilePage = () => {
         toast.error("Couldn't load this profile");
       }
       setProfile(profileRes.data);
-      setPosts(postsRes.data ?? []);
+      setPosts(await dropDeadMedia(postsRes.data ?? [], postMediaUrls));
       setFollowers(followersRes.count ?? 0);
       setFollowingCount(followingRes.count ?? 0);
       setFollowing(!!followRes.data);

@@ -1,4 +1,5 @@
 import HomeReelCard from "@/components/HomeReelCard";
+import { dropDeadMedia, postMediaUrls } from "@/lib/oldMedia";
 import { useState, useEffect, useRef, useCallback } from "react";
 import TopNavBar from "@/components/TopNavBar";
 import GlassTabBar from "@/components/GlassTabBar";
@@ -77,10 +78,10 @@ const Index = () => {
       if (followedPostResult.error) throw followedPostResult.error;
       const blockedIds = await getBlockedIds();
       const uniquePostRows = [...new Map([...(data ?? []), ...(followedPostResult.data ?? [])].map(post => [post.id, post])).values()];
-      const postRows = uniquePostRows.filter(post => !blockedIds.has(post.user_id));
+      const postRows = await dropDeadMedia(uniquePostRows.filter(post => !blockedIds.has(post.user_id)), postMediaUrls);
       const rows = [
         ...postRows,
-        ...((reelRows ?? []) as any[]).map(r => ({ ...r, _reel: true, media_url: r.video_url, media_type: "video" })),
+        ...(await dropDeadMedia((reelRows ?? []) as any[], (r: any) => [r.video_url])).map(r => ({ ...r, _reel: true, media_url: r.video_url, media_type: "video" })),
       ].filter(r => !blockedIds.has(r.user_id)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
       hasMoreRef.current = postRows.length === FEED_PAGE_SIZE;
       setHasMore(hasMoreRef.current);

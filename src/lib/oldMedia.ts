@@ -27,8 +27,11 @@ export function oldMediaWorks(): Promise<boolean> {
 export const oldMediaKnownWorking = () => okState === true;
 
 /** Drops rows whose media can't load. `urlOf` picks the media link(s) from a row. */
-export async function dropDeadMedia<T>(rows: T[], urlOf: (r: T) => (string | null | undefined)[]): Promise<T[]> {
+export async function dropDeadMedia<T>(rows: T[], urlOf: (r: NoInfer<T>) => (string | null | undefined)[]): Promise<T[]> {
   if (!rows.some((r) => urlOf(r).some(isOldMedia))) return rows;
   if (await oldMediaWorks()) return rows;
   return rows.filter((r) => !urlOf(r).some(isOldMedia));
 }
+
+/** Links of a post that must load for it to show (main media and any carousel items). */
+export const postMediaUrls = (p: { media_url?: string | null; media_items?: unknown }) => [p.media_url, p.media_items ? JSON.stringify(p.media_items) : null];
